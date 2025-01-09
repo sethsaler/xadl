@@ -1,0 +1,221 @@
+input:
+    documents:
+        type: document
+    workspace:
+        type: workspace
+
+actions:
+    get-agreementInformation-tags:
+        tool: find-tags
+        category: "Agreement Information"
+
+    # Agreement-based Instructions to Pass to the LLM
+    instructionsPrompt:
+        tool: echo
+        message: |
+            {% if Agreement_Information.name == "Preamble" %}
+            TALENT instructions:
+                TalentDetails:
+                    - TalentName:
+                        SubjectMatter: "Identifying the individual (or individuals) engaged by the studio."
+                        InformationNeeded: "The name of the individual or team being engaged."
+                        OutputFormat: "**Talent Name:** [Name of Individual or Team]"
+                    - TalentType:
+                        SubjectMatter: "Determining the capacity in which the individual or team is hired."
+                        InformationNeeded: "Whether the talent is a Writer, Director, Producer, Performer, Physical Producer, Lead Cast, or otherwise."
+                        OutputFormat: "**Talent Type:** [e.g., Writer, Director, Performer, etc.]"
+                    - TalentRole:
+                        SubjectMatter: "If the talent is acting, what role do they play?"
+                        InformationNeeded: "The specific character name or role; if not applicable, use 'N/A.'"
+                        OutputFormat: "**Role:** [Role Name or N/A]"
+                    - AgreementName:
+                        SubjectMatter: "The formal name of the talent agreement."
+                        InformationNeeded: "The specific title of the agreement (e.g., 'Series Performer Agreement')."
+                        OutputFormat: "**Agreement Name:** [Name of Agreement]"
+                    - EffectiveDate:
+                        SubjectMatter: "The operative date of the agreement."
+                        InformationNeeded: "If defined, the effective date (e.g., 'Effective as of June 1, 2024'), or if no effective date is explicitly mentioned, use the latest date of signature (e.g., 'Executed as of June 1, 2024')."
+                        OutputFormat: "**Effective Date:** [Effective Date or Execution Date]"
+                    - ProjectName:
+                        SubjectMatter: "The project for which the talent is being engaged."
+                        InformationNeeded: "The precise title or working title of the project (e.g., 'Project Name: Awesome New Series')."
+                        OutputFormat: "**Project Name:** [Title of Project]"
+            {% endif %}
+
+            {% if Agreement_Information.name == "Credit" %}
+            CREDIT instructions:
+                CreditDetails:
+                SubjectMatter: "Summarizing the credit obligations in detail."
+                InformationNeeded:
+                    - "All relevant deal points specifically mentioned in the provided text, such as:"
+                    - "Main titles vs. end titles requirements"
+                    - "Special designations (e.g., guest star, special appearance)"
+                    - "Single card vs. shared card, and any position (first, second, etc.)"
+                    - "Type size or other format requirements"
+                    - "“No less favorable than…” or parity language"
+                    - "Producer or studio discretion over any of the above"
+                    - "Only include these items if they are explicitly mentioned; do not speculate on unmentioned conditions."
+                OutputFormat: "Summarize all credit obligations in a single paragraph, applying **bold formatting** to key terms (e.g., **single card**, **shared card**, **guest star**, etc.) but do not include extraneous language beyond the specific credit details required."
+                OverallGuidance:
+                - "Adhere Rigorously to the Output Format: Provide only the requested fields, in the exact format specified, with no additional text."
+                - "Use Bold Tags: For labels (e.g., **Talent Name:**) and for any special designations within the Credit summary (e.g., **guest star**)."
+                - "Avoid Irrelevant Content: Do not output commentary, explanations, or any information not explicitly requested."
+                - "Maintain Consistency: Ensure each section’s format is consistent with these instructions."
+            {% endif %}
+
+            {% assign roles = "Preamble,Credit" | split: "," %}
+
+            {% if roles contains Agreement_Information.name %}
+            {% else %}
+            GENERAL instructions for {{Agreement_Information.name}}
+            - Use your best judgment.
+            {% endif %}
+    
+    # Base configuration for shared prompt elements
+    basePrompt:
+        tool: echo
+        message: |
+            # Role and Context Setup
+            You are in-house counsel at a major entertainment studio, responsible for assessing legal obligations, compliance risks, and business implications within talent agreements. Your objectives include:
+
+            1. Identifying all obligations, commitments, and representations the studio has made regarding screen credit for the talent.
+            2. Pinpointing potential risks or ambiguities, including any conditions or limitations on credit obligations, noting relevant union/guild requirements, deadlines, or other time-sensitive triggers.
+            3. Providing actionable insights that integrate both legal and business perspectives (e.g., compliance with labor requirements, reputation management, financial implications).
+            4. Highlighting any provisions that could require negotiation, revision, or special attention to mitigate legal or reputational exposure.
+
+            When offering analysis or summarizing findings:
+            - Focus on clarity, precision, and direct relevance to studio obligations.
+            - Avoid unnecessary speculation; stick to explicit terms and established industry standards.
+            - Provide well-reasoned justifications for any concerns or potential adjustments.
+
+    # Contract Analysis
+    contractAnalysisPrompt:
+        tool: echo
+        message: |
+            {{instructionsPrompt}}
+            {{basePrompt}}
+            
+            Below is key text from the talent agreement. As in-house counsel, you should:
+            - Thoroughly review the credit-related clauses to ensure compliance with the studio’s existing policies and any union/guild rules.
+            - Identify potential loopholes, ambiguous language, or conflicting provisions that may lead to disputes or noncompliance.
+            - Recommend steps (if any) to clarify, renegotiate, or reinforce obligations in line with best practices and studio interests.
+            - Provide your analysis succinctly, focusing on the specific clauses below.
+
+            Relevant language from the agreement:
+
+    # Section Titles
+    contractAnalysisTitle:
+        tool: echo
+        message: Credit Obligations Output Test
+
+    # Knowledge Set Configuration
+    kset:
+        input:
+            documents: task/documents
+            agreementInformationTags: get-agreementInformation-tags
+        tool: knowledge-set
+        knowledgeSetName: "Credit Obligations Memo"
+        operations:
+            - op: add-dimension
+              key: theme
+              name: Theme
+              nodes: agreementInformationTags
+              priority: 1
+            - op: set-nodes
+              nodes: documents
+
+    # Insight Generation Actions
+    add-contract-analysis:
+        repeat:
+            function: analyze-for-tag
+            for: [tag]
+        input:
+            tag: get-agreementInformation-tags
+            documents: task/documents
+            knowledge: kset
+            basePrompt: basePrompt
+            instructionsPrompt: instructionsPrompt
+            prompt: contractAnalysisPrompt
+            title: contractAnalysisTitle
+
+    # Workspace Configuration
+    add-kset-to-workspace:
+        input:
+            workspace: task/workspace
+            knowledge: kset
+            contractAnalysis: add-contract-analysis
+        tool: workspace
+        operations:
+            - op: add-items
+              items: knowledge
+
+functions:
+    analyze-for-tag:
+        input:
+            tag:
+                type: tag
+            documents:
+                type: document
+            basePrompt:
+                type: text
+            instructionsPrompt:
+                type: text
+            prompt:
+                type: text
+            knowledge:
+                type: knowledge-set
+            title:
+                type: text
+        
+        actions:
+            get-snippets:
+                input:
+                    tag: function/tag
+                    documents: function/documents
+                tool: document-text
+                textFilter:
+                    operator: "and"
+                    tags: [tag]
+
+            run-prompt:
+                input:
+                    snippets: get-snippets
+                    basePrompt: function/basePrompt
+                    instructionsPrompt: function/instructionsPrompt
+                    prompt: function/prompt
+                tool: llm
+                skipIfEmpty: snippets
+                prompt: |
+                    {{prompt.text}}
+                    {% for s in snippets %}
+                    {{s.text}}
+                    {% endfor %}
+
+            create-insight:
+                input:
+                    summary: run-prompt
+                    snippets: get-snippets
+                    tag: function/tag
+                    title: function/title
+                skipIfEmpty: summary
+                tool: insight
+                text: |
+                    {{summary.text}}
+                name: "{{title.text}} for {{tag.name}}"
+                tags: [tag]
+                attributes:
+                    category: contract-analysis-insight
+                relations:
+                    derived-from: [snippets]
+
+            add-insight:
+                input:
+                    knowledge: function/knowledge
+                    insight: create-insight
+                    snippets: get-snippets
+                tool: knowledge-set
+                operations:
+                    - op: set-nodes
+                      nodes: insight
+                    - op: set-nodes
+                      nodes: snippets
