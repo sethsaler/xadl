@@ -5,15 +5,19 @@ input:
         type: workspace
 
 actions:
+    # 1) Tags
     get-agreementInformation-tags:
         tool: find-tags
         category: "Agreement Information"
 
-    # Agreement-based Instructions to Pass to the LLM
+    # 2) Agreement-based instructions to pass to the LLM
     instructionsPrompt:
+        input:
+            tags: get-agreementInformation-tags
         tool: echo
         message: |
-            {% if Agreement_Information.name == "Preamble" %}
+            {% for tag in tags %}
+            {% if tag.name == "Preamble" %}
             TALENT instructions:
                 TalentDetails:
                     - TalentName:
@@ -42,12 +46,12 @@ actions:
                         OutputFormat: "**Project Name:** [Title of Project]"
             {% endif %}
 
-            {% if Agreement_Information.name == "Credit" %}
+            {% if tag.name == "Credit" %}
             CREDIT instructions:
                 CreditDetails:
-                SubjectMatter: "Summarizing the credit obligations in detail."
-                InformationNeeded:
-                    - "All relevant deal points specifically mentioned in the provided text, such as:"
+                    SubjectMatter: "Summarizing the credit obligations in detail."
+                    InformationNeeded:
+                        - "All relevant deal points specifically mentioned in the provided text, such as:"
                     - "Main titles vs. end titles requirements"
                     - "Special designations (e.g., guest star, special appearance)"
                     - "Single card vs. shared card, and any position (first, second, etc.)"
@@ -65,13 +69,14 @@ actions:
 
             {% assign roles = "Preamble,Credit" | split: "," %}
 
-            {% if roles contains Agreement_Information.name %}
+            {% if roles contains tag.name %}
             {% else %}
-            GENERAL instructions for {{Agreement_Information.name}}
+            GENERAL instructions for {{tag.name}}
             - Use your best judgment.
             {% endif %}
-    
-    # Base configuration for shared prompt elements
+            {% endfor %}
+
+    # 3) Base configuration for shared prompt elements
     basePrompt:
         tool: echo
         message: |
@@ -88,7 +93,7 @@ actions:
             - Avoid unnecessary speculation; stick to explicit terms and established industry standards.
             - Provide well-reasoned justifications for any concerns or potential adjustments.
 
-    # Contract Analysis
+    # 4) Contract Analysis prompt
     contractAnalysisPrompt:
         tool: echo
         message: |
@@ -103,13 +108,13 @@ actions:
 
             Relevant language from the agreement:
 
-    # Section Titles
+    # 5) Section Titles
     contractAnalysisTitle:
         tool: echo
         message: Credit Obligations Output Test
 
-    # Knowledge Set Configuration
-    kset:
+    # 6) Initialize Knowledge Set
+    init-kset:
         input:
             documents: task/documents
             agreementInformationTags: get-agreementInformation-tags
@@ -124,26 +129,26 @@ actions:
             - op: set-nodes
               nodes: documents
 
-    # Insight Generation Actions
-    add-contract-analysis:
+    # 7) Analyze each tag
+    analyze-each-tag:
         repeat:
             function: analyze-for-tag
             for: [tag]
         input:
             tag: get-agreementInformation-tags
             documents: task/documents
-            knowledge: kset
+            knowledge: init-kset
             basePrompt: basePrompt
             instructionsPrompt: instructionsPrompt
             prompt: contractAnalysisPrompt
             title: contractAnalysisTitle
 
-    # Workspace Configuration
-    add-kset-to-workspace:
+    # 8) Add to Workspace
+    add-to-workspace:
         input:
             workspace: task/workspace
-            knowledge: kset
-            contractAnalysis: add-contract-analysis
+            contractAnalysis: analyze-each-tag
+            knowledge: init-kset
         tool: workspace
         operations:
             - op: add-items
@@ -166,7 +171,7 @@ functions:
                 type: knowledge-set
             title:
                 type: text
-        
+
         actions:
             get-snippets:
                 input:
