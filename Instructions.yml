@@ -1,226 +1,231 @@
+#>> The 'input' section defines the named inputs that this pipeline will receive.
+#>> Each field within 'input' expects a certain type of data.
 input:
-    documents:
-        type: document
-    workspace:
-        type: workspace
+  documents:
+    type: document  #>> 'documents' is an input accepting document-type data (e.g., text or structured information).
+  workspace:
+    type: workspace #>> 'workspace' is an input for storing or accessing data across the pipeline.
 
 actions:
-    # 1) Tags
-    get-agreementInformation-tags:
-        tool: find-tags
-        category: "Agreement Information"
+  #>> The "actions" block defines a sequence of steps the pipeline will execute.
 
-    # 2) Agreement-based instructions to pass to the LLM
-    instructionsPrompt:
-        input:
-            tags: get-agreementInformation-tags
-        tool: echo
-        message: |
-            {% for tag in tags %}
-            {% if tag.name == "Preamble" %}
-            TALENT instructions:
-                TalentDetails:
-                    - TalentName:
-                        SubjectMatter: "Identifying the individual (or individuals) engaged by the studio."
-                        InformationNeeded: "The name of the individual or team being engaged."
-                        OutputFormat: "**Talent Name:** [Name of Individual or Team]"
-                    - TalentType:
-                        SubjectMatter: "Determining the capacity in which the individual or team is hired."
-                        InformationNeeded: "Whether the talent is a Writer, Director, Producer, Performer, Physical Producer, Lead Cast, or otherwise."
-                        OutputFormat: "**Talent Type:** [e.g., Writer, Director, Performer, etc.]"
-                    - TalentRole:
-                        SubjectMatter: "If the talent is acting, what role do they play?"
-                        InformationNeeded: "The specific character name or role; if not applicable, use 'N/A.'"
-                        OutputFormat: "**Role:** [Role Name or N/A]"
-                    - AgreementName:
-                        SubjectMatter: "The formal name of the talent agreement."
-                        InformationNeeded: "The specific title of the agreement (e.g., 'Series Performer Agreement')."
-                        OutputFormat: "**Agreement Name:** [Name of Agreement]"
-                    - EffectiveDate:
-                        SubjectMatter: "The operative date of the agreement."
-                        InformationNeeded: "If defined, the effective date (e.g., 'Effective as of June 1, 2024'), or if no effective date is explicitly mentioned, use the latest date of signature (e.g., 'Executed as of June 1, 2024')."
-                        OutputFormat: "**Effective Date:** [Effective Date or Execution Date]"
-                    - ProjectName:
-                        SubjectMatter: "The project for which the talent is being engaged."
-                        InformationNeeded: "The precise title or working title of the project (e.g., 'Project Name: Awesome New Series')."
-                        OutputFormat: "**Project Name:** [Title of Project]"
-            {% endif %}
+  # 1) Tags
+  #>> This action finds and retrieves relevant tags (keywords/labels) from the provided content, based on a category.
+  get-agreementInformation-tags:
+    tool: find-tags
+    category: "Agreement Information"  #>> The category of tags we want to extract is "Agreement Information."
 
-            {% if tag.name == "Credit" %}
-            CREDIT instructions:
-                CreditDetails:
-                    SubjectMatter: "Summarizing the credit obligations in detail."
-                    InformationNeeded:
-                        - "All relevant deal points specifically mentioned in the provided text, such as:"
-                    - "Main titles vs. end titles requirements"
-                    - "Special designations (e.g., guest star, special appearance)"
-                    - "Single card vs. shared card, and any position (first, second, etc.)"
-                    - "Type size or other format requirements"
-                    - "“No less favorable than…” or parity language"
-                    - "Producer or studio discretion over any of the above"
-                    - "Only include these items if they are explicitly mentioned; do not speculate on unmentioned conditions."
-                OutputFormat: "Summarize all credit obligations in a single paragraph, applying **bold formatting** to key terms (e.g., **single card**, **shared card**, **guest star**, etc.) but do not include extraneous language beyond the specific credit details required."
-                OverallGuidance:
-                - "Adhere Rigorously to the Output Format: Provide only the requested fields, in the exact format specified, with no additional text."
-                - "Use Bold Tags: For labels (e.g., **Talent Name:**) and for any special designations within the Credit summary (e.g., **guest star**)."
-                - "Avoid Irrelevant Content: Do not output commentary, explanations, or any information not explicitly requested."
-                - "Maintain Consistency: Ensure each section’s format is consistent with these instructions."
-            {% endif %}
+  # 3) Base configuration for shared prompt elements
+  #>> 'basePrompt' sets up a default or foundation prompt that other steps can reference when communicating with the LLM.
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are an internal advisor at a large organization, responsible for evaluating contractual obligations, compliance considerations, and strategic implications within agreements involving external contributors. Your objectives include:
 
-            {% assign roles = "Preamble,Credit" | split: "," %}
+      1. Identifying all obligations, commitments, and representations the organization has made regarding acknowledgments or recognition of any parties involved.
+      2. Pinpointing potential risks or ambiguities, including any conditions or limitations on recognition obligations, noting relevant professional association or licensing requirements, deadlines, or other time-sensitive triggers.
+      3. Providing actionable insights that integrate both regulatory and practical perspectives (e.g., compliance with external standards, reputation management, budgetary considerations).
+      4. Highlighting any provisions that could require negotiation, revision, or special attention to mitigate legal or reputational exposure.
 
-            {% if roles contains tag.name %}
-            {% else %}
-            GENERAL instructions for {{tag.name}}
-            - Use your best judgment.
-            {% endif %}
-            {% endfor %}
+      When offering analysis or summarizing findings:
+      - Focus on clarity, precision, and direct relevance to organizational commitments.
+      - Avoid unnecessary speculation; adhere to explicit terms and established best practices.
+      - Provide sound justifications for any concerns or proposed modifications.
 
-    # 3) Base configuration for shared prompt elements
-    basePrompt:
-        tool: echo
-        message: |
-            # Role and Context Setup
-            You are in-house counsel at a major entertainment studio, responsible for assessing legal obligations, compliance risks, and business implications within talent agreements. Your objectives include:
+  # 4) Contract Analysis prompt
+  #>> 'contractAnalysisPrompt' references 'basePrompt' and then adds more details to instruct the LLM how to analyze text that may be related to acknowledgments or recognition obligations.
+  contractAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
 
-            1. Identifying all obligations, commitments, and representations the studio has made regarding screen credit for the talent.
-            2. Pinpointing potential risks or ambiguities, including any conditions or limitations on credit obligations, noting relevant union/guild requirements, deadlines, or other time-sensitive triggers.
-            3. Providing actionable insights that integrate both legal and business perspectives (e.g., compliance with labor requirements, reputation management, financial implications).
-            4. Highlighting any provisions that could require negotiation, revision, or special attention to mitigate legal or reputational exposure.
+      Below is key text from the agreement with an external contributor. As an internal advisor, you should:
+      - Thoroughly review any recognition-related clauses to ensure alignment with the organization's policies and any professional or regulatory rules.
+      - Identify potential loopholes, ambiguous language, or conflicting provisions that may lead to disputes or noncompliance.
+      - Recommend steps (if any) to clarify, renegotiate, or reinforce obligations in line with organizational objectives and best practices.
+      - Provide your analysis succinctly, focusing on the specific clauses below.
 
-            When offering analysis or summarizing findings:
-            - Focus on clarity, precision, and direct relevance to studio obligations.
-            - Avoid unnecessary speculation; stick to explicit terms and established industry standards.
-            - Provide well-reasoned justifications for any concerns or potential adjustments.
+      Relevant language from the agreement:
 
-    # 4) Contract Analysis prompt
-    contractAnalysisPrompt:
-        tool: echo
-        message: |
-            {{instructionsPrompt}}
-            {{basePrompt}}
-            
-            Below is key text from the talent agreement. As in-house counsel, you should:
-            - Thoroughly review the credit-related clauses to ensure compliance with the studio’s existing policies and any union/guild rules.
-            - Identify potential loopholes, ambiguous language, or conflicting provisions that may lead to disputes or noncompliance.
-            - Recommend steps (if any) to clarify, renegotiate, or reinforce obligations in line with best practices and studio interests.
-            - Provide your analysis succinctly, focusing on the specific clauses below.
+  # 5) Section Titles
+  #>> 'contractAnalysisTitle' is a straightforward echo action setting a title for the analysis output.
+  contractAnalysisTitle:
+    tool: echo
+    message: Acknowledgment Obligations Output Test
 
-            Relevant language from the agreement:
+  # 6) Initialize Knowledge Set
+  #>> 'init-kset' creates or updates a "knowledge set" that will store any extracted insights and relevant information for later use.
+  init-kset:
+    input:
+      documents: task/documents               #>> Passes the 'documents' from pipeline input.
+      agreementInformationTags: get-agreementInformation-tags  #>> Passes the extracted tags from the earlier action.
+    tool: knowledge-set
+    knowledgeSetName: "Acknowledgment Obligations Memo"  #>> Names the knowledge set for future reference.
+    operations:
+      - op: add-dimension
+        key: theme
+        name: Theme
+        nodes: agreementInformationTags
+        priority: 1  #>> Adds a dimension named 'theme' to categorize or group data by the extracted tags.
+      - op: set-nodes
+        nodes: documents  #>> Associates all documents with this knowledge set under the 'theme' dimension.
 
-    # 5) Section Titles
-    contractAnalysisTitle:
-        tool: echo
-        message: Credit Obligations Output Test
+  # 7) Analyze each tag
+  #>> 'analyze-each-tag' repeats an analysis function for each tag found in 'get-agreementInformation-tags.'
+  analyze-each-tag:
+    repeat:
+      function: analyze-for-tag  #>> The function to invoke for each tag is named 'analyze-for-tag.'
+      for: [tag]                 #>> We'll iterate over a list of 'tag' items.
+    input:
+      tag: get-agreementInformation-tags  #>> Feeds in the extracted tags from 'get-agreementInformation-tags.'
+      documents: task/documents          #>> Provides the original documents for context.
+      knowledge: init-kset               #>> References the knowledge set so the function can store new insights.
+      basePrompt: basePrompt             #>> Passes the base prompt for consistent LLM instructions.
+      prompt: contractAnalysisPrompt     #>> Passes the specialized analysis prompt.
+      title: contractAnalysisTitle       #>> Passes the title for the resulting insights.
 
-    # 6) Initialize Knowledge Set
-    init-kset:
-        input:
-            documents: task/documents
-            agreementInformationTags: get-agreementInformation-tags
-        tool: knowledge-set
-        knowledgeSetName: "Credit Obligations Memo"
-        operations:
-            - op: add-dimension
-              key: theme
-              name: Theme
-              nodes: agreementInformationTags
-              priority: 1
-            - op: set-nodes
-              nodes: documents
+  # 8) Add to Workspace
+  #>> 'add-to-workspace' stores or merges the results from the previous steps into the workspace so they can be accessed or retrieved later.
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      contractAnalysis: analyze-each-tag  #>> The results from analyzing each tag.
+      knowledge: init-kset               #>> The knowledge set object.
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge  #>> Adds the updated knowledge set to the workspace.
 
-    # 7) Analyze each tag
-    analyze-each-tag:
-        repeat:
-            function: analyze-for-tag
-            for: [tag]
-        input:
-            tag: get-agreementInformation-tags
-            documents: task/documents
-            knowledge: init-kset
-            basePrompt: basePrompt
-            instructionsPrompt: instructionsPrompt
-            prompt: contractAnalysisPrompt
-            title: contractAnalysisTitle
-
-    # 8) Add to Workspace
-    add-to-workspace:
-        input:
-            workspace: task/workspace
-            contractAnalysis: analyze-each-tag
-            knowledge: init-kset
-        tool: workspace
-        operations:
-            - op: add-items
-              items: knowledge
-
+#>> The 'functions' block defines reusable operations or subroutines that can be called in the "actions" section.
 functions:
-    analyze-for-tag:
+  #>> 'analyze-for-tag' is a custom function that handles the logic of extracting text relevant to a given tag and then running LLM prompts on it.
+  analyze-for-tag:
+    input:
+      tag:
+        type: tag         #>> The specific tag to analyze (e.g., 'Preamble', 'Acknowledgment', etc.).
+      documents:
+        type: document    #>> Documents that might contain matching text for the given tag.
+      basePrompt:
+        type: text        #>> The foundational instructions for the LLM.
+      get-instruction-prompt-for-tag:
+        type: text        #>> A specialized instruction prompt for each tag, to tailor the LLM's output.
+      prompt:
+        type: text        #>> Additional or overriding instructions for the LLM.
+      knowledge:
+        type: knowledge-set #>> The knowledge set object to store insights.
+      title:
+        type: text        #>> A title string used when generating the new insight.
+
+    actions:
+      #>> 'get-snippets' filters the documents based on the current tag. Only text labeled with that tag is extracted.
+      get-snippets:
         input:
-            tag:
-                type: tag
-            documents:
-                type: document
-            basePrompt:
-                type: text
-            instructionsPrompt:
-                type: text
-            prompt:
-                type: text
-            knowledge:
-                type: knowledge-set
-            title:
-                type: text
+          tag: function/tag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [tag]  #>> Ensures that only text chunks containing this specific tag are returned.
 
-        actions:
-            get-snippets:
-                input:
-                    tag: function/tag
-                    documents: function/documents
-                tool: document-text
-                textFilter:
-                    operator: "and"
-                    tags: [tag]
+      #>> 'get-instruction-prompt-for-tag' dynamically generates a specialized prompt for the given tag, if needed.
+      get-instruction-prompt-for-tag:
+        input:
+          tag: function/tag
+        tool: echo
+        message: |
+          {% if tag.name == "Preamble" %}
+          PREAMBLE instructions:
+              OutputFormat: |
+                  Extract and format the following information in this exact format:
+                  **Contributor Name:** [Name]
+                  **Contribution Type:** [Category]
+                  **Role/Position:** [Position or Function]
+                  **Agreement Name:** [Title]
+                  **Effective Date:** [Date]
+                  **Project Name:** [Title]
+              
+              RequiredFields:
+                  - ContributorName: "Name of individual or organization"
+                  - ContributionType: "Category of service (e.g., consultant, researcher, producer, etc.)"
+                  - RolePosition: "Specific position or function in the project"
+                  - AgreementName: "Formal name of the agreement"
+                  - EffectiveDate: "Defined effective date or date of final signature; if missing, specify that"
+                  - ProjectName: "Project or initiative title"
+          {% endif %}
 
-            run-prompt:
-                input:
-                    snippets: get-snippets
-                    basePrompt: function/basePrompt
-                    instructionsPrompt: function/instructionsPrompt
-                    prompt: function/prompt
-                tool: llm
-                skipIfEmpty: snippets
-                prompt: |
-                    {{prompt.text}}
-                    {% for s in snippets %}
-                    {{s.text}}
-                    {% endfor %}
+          {% if tag.name == "Acknowledgment" %}
+          ACKNOWLEDGMENT instructions:
+              RecognitionDetails:
+                  SubjectMatter: "Summarizing any recognition or acknowledgment obligations in detail."
+                  InformationNeeded:
+                      - "All relevant points specifically mentioned in the provided text, such as:"
+                      - "Front-end vs. back-end acknowledgments"
+                      - "Special designations (e.g., featured contributor, highlighted role)"
+                      - "Exclusive reference vs. shared reference, and any positional requirements (first, second, etc.)"
+                      - "Font size or other formatting stipulations"
+                      - "'No less favorable than…' or parity language"
+                      - "Organizational discretion over any of the above"
+                      - "Only include items explicitly mentioned; do not add unverified conditions."
+              OutputFormat: "Summarize all recognition obligations in a single paragraph, using **bold formatting** for key terms (e.g., **exclusive reference**, **featured contributor**) but do not include content beyond these necessary details."
+              OverallGuidance:
+              - "Strictly follow the Output Format: Provide only the requested fields, in the exact format, with no extra text."
+              - "Use Bold Tags: For labels (e.g., **Contributor Name:**) and any special designations (e.g., **featured contributor**)."
+              - "Avoid Irrelevant Content: No commentary or details beyond what is explicitly mentioned."
+              - "Maintain Consistency: Ensure uniform formatting and style across sections."
+          {% endif %}
 
-            create-insight:
-                input:
-                    summary: run-prompt
-                    snippets: get-snippets
-                    tag: function/tag
-                    title: function/title
-                skipIfEmpty: summary
-                tool: insight
-                text: |
-                    {{summary.text}}
-                name: "{{title.text}} for {{tag.name}}"
-                tags: [tag]
-                attributes:
-                    category: contract-analysis-insight
-                relations:
-                    derived-from: [snippets]
+          {% assign roles = "Preamble,Acknowledgment" | split: "," %}
 
-            add-insight:
-                input:
-                    knowledge: function/knowledge
-                    insight: create-insight
-                    snippets: get-snippets
-                tool: knowledge-set
-                operations:
-                    - op: set-nodes
-                      nodes: insight
-                    - op: set-nodes
-                      nodes: snippets
+          {% if roles contains tag.name %}
+          {% else %}
+          GENERAL instructions for {{tag.name}}
+          - Use your best judgment.
+          {% endif %}
+
+      #>> 'run-prompt' uses the LLM to analyze the snippets in light of the specialized instructions and the base prompt.
+      run-prompt:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-tag
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets  #>> If there are no snippets matching the tag, this step is skipped.
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      #>> 'create-insight' takes the LLM's analysis and generates an "insight" object, capturing the summary and linking it to the source snippets.
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-snippets
+          tag: function/tag
+          title: function/title
+        skipIfEmpty: summary  #>> This step is skipped if there's no summary from the LLM (i.e., empty snippets).
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} for {{tag.name}}"
+        tags: [tag]
+        attributes:
+          category: contract-analysis-insight  #>> Category can be reused for referencing the type of insight.
+        relations:
+          derived-from: [snippets]  #>> Points to the original text snippets as the data source.
+
+      #>> 'add-insight' updates the knowledge set with the newly created insight, linking back to the relevant snippets.
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
