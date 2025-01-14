@@ -8,7 +8,7 @@ actions:
   # 1) Existing Tag Collection for Agreement Information
   get-agreementInformation-tags:
     tool: find-tags
-    category: "Agreement Information"
+    name: ["Credit", "Preamble"]
   
   # 2) NEW Tag Collection for "Document Tags"
   get-documentCategory-tags:
@@ -58,7 +58,7 @@ actions:
       agreementInformationTags: get-agreementInformation-tags
       documentCategoryTags: get-documentCategory-tags
     tool: knowledge-set
-    knowledgeSetName: "Credit Obligations Memo"
+    knowledgeSetName: "Credit Obligations Memo (Multi-Doc)"
     operations:
       - op: add-dimension
         key: theme
@@ -73,36 +73,7 @@ actions:
       - op: set-nodes
         nodes: documents
 
-  # # 7) Analyze each Agreement Information Tag
-  # analyze-each-tag:
-  #   repeat:
-  #     function: analyze-for-tag
-  #     for: [tag]
-  #   input:
-  #     tag: get-agreementInformation-tags
-  #     documents: task/documents
-  #     knowledge: init-kset
-  #     basePrompt: basePrompt
-  #     prompt: contractAnalysisPrompt
-  #     title: contractAnalysisTitle
-
-  # # 6b) NEW - Initialize Knowledge Set for "Document Tags"
-  # init-documentCategory-kset:
-  #   input:
-  #     documents: task/documents
-  #     documentCategoryTags: get-documentCategory-tags
-  #   tool: knowledge-set
-  #   knowledgeSetName: "Document Tags Memo"
-  #   operations:
-  #     - op: add-dimension
-  #       key: theme
-  #       name: Theme
-  #       nodes: documentCategoryTags
-  #       priority: 1
-  #     - op: set-nodes
-  #       nodes: documents
-
-  # 7b) NEW - Analyze each "Document Tags"
+  # 7) NEW - Analyze each "Agreement Tag" for each "Document Tag"
   analyze-each-documentCategory-tag:
     repeat:
       function: analyze-for-tag
@@ -111,7 +82,7 @@ actions:
       tag: get-documentCategory-tags
       agreementTag: get-agreementInformation-tags
       documents: task/documents
-      knowledge: init-documentCategory-kset
+      knowledge: init-kset
       basePrompt: basePrompt
       prompt: contractAnalysisPrompt
       title: contractAnalysisTitle
@@ -120,26 +91,19 @@ actions:
   add-to-workspace:
     input:
       workspace: task/workspace
-      # Include both sets of analyses
-      # agreementAnalysis: analyze-each-tag
       documentCategoryAnalysis: analyze-each-documentCategory-tag
-      # knowledgeForAgreements: init-kset
-      knowledgeForDocuments: init-documentCategory-kset
+      knowledgeForDocuments: init-kset
     tool: workspace
     operations:
-      # - op: add-items
-      #   items: knowledgeForAgreements
-      # - op: add-items
-      #   items: agreementAnalysis
       - op: add-items
         items: knowledgeForDocuments
-      - op: add-items
-        items: documentCategoryAnalysis
 
 functions:
   analyze-for-tag:
     input:
       tag:
+        type: tag
+      agreementTag:
         type: tag
       documents:
         type: document
@@ -158,18 +122,19 @@ functions:
       get-snippets:
         input:
           tag: function/tag
+          agreementTag: function/agreementTag
           documents: function/documents
         tool: document-text
         textFilter:
           operator: "and"
-          tags: [tag]
+          tags: [tag, agreementTag]
       
       get-instruction-prompt-for-tag:
         input:
-          tag: function/tag
+          agreementTag: function/agreementTag
         tool: echo
         message: |
-          {% if tag.name == "Preamble" %}
+          {% if agreementTag.name == "Preamble" %}
           PREAMBLE instructions:
               OutputFormat: |
                   Extract and format the following information in this exact format:
@@ -189,7 +154,7 @@ functions:
                   - ProjectName: "Project title or working title"
           {% endif %}
 
-          {% if tag.name == "Credit" %}
+          {% if agreementTag.name == "Credit" %}
           CREDIT instructions:
               CreditDetails:
                   SubjectMatter: "Summarizing the credit obligations in detail."
@@ -212,9 +177,9 @@ functions:
 
           {% assign roles = "Preamble,Credit" | split: "," %}
 
-          {% if roles contains tag.name %}
+          {% if roles contains agreementTag.name %}
           {% else %}
-          GENERAL instructions for {{tag.name}}
+          GENERAL instructions for {{agreementTag.name}}
           - Use your best judgment.
           {% endif %}
 
@@ -238,13 +203,14 @@ functions:
           summary: run-prompt
           snippets: get-snippets
           tag: function/tag
+          agreementTag: function/agreementTag
           title: function/title
         skipIfEmpty: summary
         tool: insight
         text: |
           {{summary.text}}
         name: "{{title.text}} for {{tag.name}}"
-        tags: [tag]
+        tags: [tag, agreementTag]
         attributes:
           category: contract-analysis-insight
         relations:
