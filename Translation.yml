@@ -1,0 +1,40 @@
+input:
+    documents:
+        type: document
+        label: "Select Source Document"
+    targetLanguage:
+        type: text
+        label: "Select Target Language"
+    tags:
+        type: tag
+        label: "Select Tag"
+
+actions:
+    get-paragraphs:
+        input:
+            documents: task/documents
+            tags: task/tags
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [tags]
+
+    translate-documents:
+        input:
+            snippets: get-paragraphs
+            targetLanguage: task/targetLanguage
+        skipIfEmpty: [snippets]
+        tool: llm
+        prompt: |
+            Translate the following text into {{targetLanguage.text}}.
+            Only output the translated text and nothing else. Identify original formatting and ensure the output contains markdown formatting.
+            {% for s in snippets %}
+                {{s.text}}
+            {% endfor %}
+
+    render-translation:
+        input:
+            translation: translate-documents
+        tool: echo
+        message: |
+            {{translation.text}}
