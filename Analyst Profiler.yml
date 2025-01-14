@@ -1,0 +1,52 @@
+input:
+  analystReports:
+    type: document
+    label: Analyst Reports
+  earningsCallTranscripts:
+    type: document
+    label: Earnings Call Transcripts
+  workspace:
+      type: workspace
+
+actions:
+    get-analyst-tags:
+        tool: find-tags
+        category: ["Analyst"]
+    get-company-tags:
+        tool: find-tags
+        category: ["Company"]
+    kset:
+        input:
+            analystReports: task/analystReports
+            earningsCallTranscripts: task/earningsCallTranscripts
+            analystTags: get-analyst-tags
+            companyTags: get-company-tags
+        tool: knowledge-set
+        knowledgeSetName: "Analyst Profiles"
+        operations:
+            - op: add-dimension
+              key: analyst
+              name: Analyst
+              nodes: analystTags
+              priority: 1
+            - op: add-dimension
+              key: company
+              name: Company
+              nodes: companyTags
+              priority: 2
+            - op: set-nodes
+              nodes: analystReports
+    # render:
+    #   input:
+    #     kset: kset
+    #   tool: echo
+    #   message: Summary!
+
+    add-to-workspace:
+        input:
+            workspace: task/workspace
+            knowledge: kset
+        tool: workspace
+        operations:
+            -   op: add-items
+                items: knowledge

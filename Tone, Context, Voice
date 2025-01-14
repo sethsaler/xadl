@@ -1,0 +1,85 @@
+input:
+  earningsCallDocuments:
+    type: document
+    label: Earnings call transcripts
+  questionDocument:
+    type: document
+    label: Question source
+  answerDocuments:
+    type: document
+    label: Answer sources
+
+actions:
+  openai:
+    input:
+      earningsCallDocuments: task/earningsCallDocuments
+      questionDocument: task/questionDocument
+      answerDocuments: task/answerDocuments
+    tool: llm
+    prompt: |
+        Analyze the given earnings call transcripts, generate analyst profiles, create and answer questions, and perform red-teaming to improve answers.
+
+        {% if earningsCallDocuments %}
+        Here are the earnings call transcripts for analysis:
+        {% for doc in earningsCallDocuments %}
+        ```Text
+        {{ doc.xdoc.text }}
+        ```
+        {% endfor %}
+        {% endif %}
+
+        {% if questionDocument %}
+        Question source:
+        {% for doc in questionDocument %}
+        {{ doc.xdoc.text }}
+        {% endfor %}
+        {% endif %}
+
+        {% if answerDocuments %}
+        Answer sources:
+        {% for doc in answerDocuments %}
+        {{ doc.xdoc.text }}
+        {% endfor %}
+        {% endif %}
+
+        Complete the following tasks based on the provided information:
+
+        1. Analyst Identification and Profiling:
+        a) Search through the question-and-answer portion of the earnings call transcripts.
+        b) Identify all analysts who ask questions and note the frequency of questions asked by each.
+        c) For each identified analyst, create a detailed profile including:
+            - Name and associated financial institution
+            - Questioning style (e.g., direct, technical, big-picture oriented)
+            - Particular areas of interest or focus
+            - Any notable patterns or trends in their questioning
+        d) Present the analyst profiles in descending order of question frequency.
+        e) Format each profile as a series of paragraphs with a brief introduction.
+
+        2. Question Generation and Multi-Sentiment Answering:
+        a) For each analyst profile, devise 5-10 non-obvious, complex questions they might ask in future earnings calls.
+        b) Ensure questions are novel and based on the analyst's profile, interests, and current market trends.
+        c) For each generated question:
+            - Create a concise, single-paragraph answer with positive sentiment
+            - Create a concise, single-paragraph answer with neutral sentiment
+            - Create a concise, single-paragraph answer with negative sentiment
+        d) Ensure all answers directly address the question and maintain factual accuracy across sentiments.
+
+        3. Red-Teaming and Answer Improvement:
+        a) For each set of answers (positive, neutral, negative):
+            - Identify potential biases, logical fallacies, or factual inaccuracies
+            - Point out any inconsistencies between the different sentiment versions
+            - Highlight areas where the answer could be more comprehensive or nuanced
+        b) Based on the red-teaming feedback, generate an improved, balanced answer that:
+            - Addresses the identified issues
+            - Incorporates the strengths from each sentiment version
+            - Provides a more comprehensive and accurate response to the question
+
+        4. Output Format:
+        a) Analyst Profiles:
+            [Detailed analyst profiles as described in step 1]
+        b) Improved Question and Answer Pairs:
+            Question: [Generated question]
+            Improved Answer: [Red-team-improved answer]
+            [Repeat for all questions]
+
+        Ensure your response is structured, detailed, and supported by specific examples from the provided documents where applicable.

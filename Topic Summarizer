@@ -1,0 +1,74 @@
+input:
+  investorTags:
+    type: tag
+    label: Investor Tags
+  companyTags:
+    type: tag
+    label: Company Tags
+  investorReports:
+    type: document
+    label: Investor Reports Documents
+
+actions:
+  documentTextSelection:
+    input:
+      documents: task/investorReports
+      tags: task/investorTags
+    tool: document-text
+
+  companyTextSelection:
+    input:
+      documents: task/investorReports
+      tags: task/companyTags
+    tool: document-text
+
+  openai:
+    input:
+      taggedInvestorInfo: documentTextSelection/default
+      taggedCompanyInfo: companyTextSelection/default
+    tool: llm
+    prompt: |
+        Using the provided tagged investor relations information, generate a structured report for the investor relations team. Follow this exact format:
+
+        **SUMMARY**
+        [Provide a concise overview of the investor information extracted. Highlight key points or issues for the investor relations team.]
+
+        **INVESTOR INFORMATION BY CATEGORY**
+        [For each investor category (e.g., institutional investors, individual shareholders, analysts), create a subsection:]
+
+        **[CATEGORY NAME (e.g., INSTITUTIONAL INVESTORS)]**
+        - [Institution/Individual Name]: [Type of Investor]
+          Investment Details: [Specific holdings or "Standard"]
+          [Any special communication or reporting requirements]
+        [Repeat for each category, listing entities alphabetically by name within each category]
+
+        **REPORTING INSTRUCTIONS**
+        [Provide any overall reporting or disclosure instructions for investor communications]
+
+        Ensure all information is derived solely from the provided tagged content. Do not include any explanations of your process or thinking. Present only the final, structured report as outlined above.
+
+        Tagged investor information:
+        {% if taggedInvestorInfo.data %}
+        {% for doc in taggedInvestorInfo.data %}
+        {% if doc.paragraphs %}
+        {% for paragraph in doc.paragraphs %}
+        ```Text
+        {{ paragraph }}
+        ```
+        {% endfor %}
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+
+        Tagged company information:
+        {% if taggedCompanyInfo.data %}
+        {% for doc in taggedCompanyInfo.data %}
+        {% if doc.paragraphs %}
+        {% for paragraph in doc.paragraphs %}
+        ```Text
+        {{ paragraph }}
+        ```
+        {% endfor %}
+        {% endif %}
+        {% endfor %}
+        {% endif %}

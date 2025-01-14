@@ -1,0 +1,485 @@
+input:
+    documents:
+        type: document
+        label: Earnings Call Transcripts 
+    workspace:
+        type: workspace
+
+actions:
+    get-segment-tags:
+        tool: find-tags
+        category: "Segments"
+    
+    get-component-prompt:
+        tool: echo
+        message: |
+            Analyze this document and extract key information about financial segment definitions and reporting. For each identified segment:
+
+            **What are the current components of this segment's definition?**
+            - List each element.
+            - Specify any calculation methodologies.
+    
+    get-definition-changes-prompt:
+        tool: echo
+        message: |
+            **Are there any signs of recent definition changes?**
+            - Look for references to "new" or "revised" definitions.
+            - Identify comparisons to previous reporting methods.
+            - Note restatements of historical figures.
+            - Check for footnotes about methodology changes.
+    
+    get-strategic-metrics-prompt:
+        tool: echo
+        message: |
+            **What strategic metrics are:**
+            - Explicitly reported?
+            - Embedded within larger segments.
+            - Referenced but not quantified?
+    
+    get-competitor-alignment-prompt:
+        tool: echo
+        message: |
+            **How does this segment align with competitor reporting?**
+            - Identify any direct comparisons made to competitors.
+            - Highlight unique elements in the definition.
+            - Note industry-standard metrics used.
+    
+    get-data-quality-flags-prompt:
+        tool: echo
+        message: |
+            **What data quality flags should analysts be aware of:**
+            - Missing or incomplete metrics.
+            - Unclear definitions.
+            - Non-standard calculations.
+            - One-time adjustments.
+    
+    get-forward-guidance-prompt:
+        tool: echo
+        message: |
+            **What forward-looking statements or guidance is provided about:**
+            - Future definition changes.
+            - New metrics to be introduced.
+            - Planned reporting adjustments.
+    
+    # Building the Knowledge Set with Relevant Dimensions
+    kset:
+        input:
+            documents: task/documents
+            components: summarize-component-for-tag
+            changes: summarize-definition-changes-for-tag
+            metrics: summarize-strategic-metrics-for-tag
+            competitor: summarize-competitor-alignment-for-tag
+            quality_flags: summarize-data-quality-flags-for-tag
+            forward_guidance: summarize-forward-guidance-for-tag
+        tool: knowledge-set
+        knowledgeSetName: "Microsoft Financial Segments"
+        operations:
+            - op: add-dimension
+              key: segment-definition
+              name: Segment Definition
+              nodes: components
+              priority: 1
+            - op: add-dimension
+              key: definition-changes
+              name: Definition Changes
+              nodes: changes
+              priority: 2
+            - op: add-dimension
+              key: strategic-metrics
+              name: Strategic Metrics
+              nodes: metrics
+              priority: 3
+            - op: add-dimension
+              key: competitor-alignment
+              name: Competitor Alignment
+              nodes: competitor
+              priority: 4
+            - op: add-dimension
+              key: data-quality-flags
+              name: Data Quality Flags
+              nodes: quality_flags
+              priority: 5
+            - op: add-dimension
+              key: forward-guidance
+              name: Forward Guidance
+              nodes: forward_guidance
+              priority: 6
+            - op: set-nodes
+              nodes: documents
+                  
+    add-component-insights:
+        repeat:
+            function: summarize-component-for-tag
+            for: [tag]
+        input:
+            tag: get-segment-tags
+            documents: task/documents
+            knowledge: kset
+            prompt: get-component-prompt
+
+    add-definition-changes-insights:
+        repeat:
+            function: summarize-definition-changes-for-tag
+            for: [tag]
+        input:
+            tag: get-segment-tags
+            documents: task/documents
+            knowledge: kset
+            prompt: get-definition-changes-prompt
+
+    add-strategic-metrics-insights:
+        repeat:
+            function: summarize-strategic-metrics-for-tag
+            for: [tag]
+        input:
+            tag: get-segment-tags
+            documents: task/documents
+            knowledge: kset
+            prompt: get-strategic-metrics-prompt
+
+    add-competitor-alignment-insights:
+        repeat:
+            function: summarize-competitor-alignment-for-tag
+            for: [tag]
+        input:
+            tag: get-segment-tags
+            documents: task/documents
+            knowledge: kset
+            prompt: get-competitor-alignment-prompt
+
+    add-data-quality-flags-insights:
+        repeat:
+            function: summarize-data-quality-flags-for-tag
+            for: [tag]
+        input:
+            tag: get-segment-tags
+            documents: task/documents
+            knowledge: kset
+            prompt: get-data-quality-flags-prompt
+
+    add-forward-guidance-insights:
+        repeat:
+            function: summarize-forward-guidance-for-tag
+            for: [tag]
+        input:
+            tag: get-segment-tags
+            documents: task/documents
+            knowledge: kset
+            prompt: get-forward-guidance-prompt
+    
+    # Adding Knowledge Set to Workspace
+    add-kset-to-workspace:
+        input:
+            workspace: task/workspace
+            knowledge: kset  # dependency on kset
+        tool: workspace
+        operations:
+            - op: add-items
+              items: knowledge
+
+functions:
+    summarize-component-for-tag:
+        input:
+            tag:
+                type: tag
+            documents:
+                type: document
+            prompt:
+                type: text
+        actions:
+            get-snippets:
+                input:
+                    tag: function/tag
+                    documents: function/documents
+                tool: document-text
+                textFilter:
+                    operator: "and"
+                    tags: [tag]
+            run-prompt:
+                input:
+                    snippets: get-snippets
+                    prompt: function/prompt
+                tool: llm
+                skipIfEmpty: [snippets]
+                prompt: |
+                    {{prompt}}
+                    {% for s in snippets %}
+                    {{s.text}}
+                    {% endfor %}
+    
+            segment-insight:
+                input:
+                    segment-summary: run-prompt
+                    snippets: get-snippets
+                skipIfEmpty: segment-summary
+                tool: insight
+                text: "{{segment-summary.text}}"
+                name: "Analysis of Financial Segments"
+                attributes:
+                    category: segment-analysis-insight
+                relations:
+                    derived-from: [snippets]                   
+    
+            add-insight:
+                input:
+                    knowledge: kset  # dependency on kset
+                    segment-insight: segment-insight
+                tool: knowledge-set
+                operations:
+                    - op: set-nodes
+                      nodes: segment-insight
+
+    summarize-definition-changes-for-tag:
+        input:
+            tag:
+                type: tag
+            documents:
+                type: document
+            prompt:
+                type: text
+        actions:
+            get-snippets:
+                input:
+                    tag: function/tag
+                    documents: function/documents
+                tool: document-text
+                textFilter:
+                    operator: "and"
+                    tags: [tag]
+            run-prompt:
+                input:
+                    snippets: get-snippets
+                    prompt: function/prompt
+                tool: llm
+                skipIfEmpty: [snippets]
+                prompt: |
+                    {{prompt}}
+                    {% for s in snippets %}
+                    {{s.text}}
+                    {% endfor %}
+    
+            definition-changes-insight:
+                input:
+                    changes-summary: run-prompt
+                    snippets: get-snippets
+                skipIfEmpty: changes-summary
+                tool: insight
+                text: "{{changes-summary.text}}"
+                name: "Analysis of Definition Changes"
+                attributes:
+                    category: definition-changes-insight
+                relations:
+                    derived-from: [snippets]                   
+    
+            add-insight:
+                input:
+                    knowledge: kset  # dependency on kset
+                    definition-changes-insight: definition-changes-insight
+                tool: knowledge-set
+                operations:
+                    - op: set-nodes
+                      nodes: definition-changes-insight
+
+    summarize-strategic-metrics-for-tag:
+        input:
+            tag:
+                type: tag
+            documents:
+                type: document
+            prompt:
+                type: text
+        actions:
+            get-snippets:
+                input:
+                    tag: function/tag
+                    documents: function/documents
+                tool: document-text
+                textFilter:
+                    operator: "and"
+                    tags: [tag]
+            run-prompt:
+                input:
+                    snippets: get-snippets
+                    prompt: function/prompt
+                tool: llm
+                skipIfEmpty: [snippets]
+                prompt: |
+                    {{prompt}}
+                    {% for s in snippets %}
+                    {{s.text}}
+                    {% endfor %}
+    
+            strategic-metrics-insight:
+                input:
+                    metrics-summary: run-prompt
+                    snippets: get-snippets
+                skipIfEmpty: metrics-summary
+                tool: insight
+                text: "{{metrics-summary.text}}"
+                name: "Analysis of Strategic Metrics"
+                attributes:
+                    category: strategic-metrics-insight
+                relations:
+                    derived-from: [snippets]                   
+    
+            add-insight:
+                input:
+                    knowledge: kset  # dependency on kset
+                    strategic-metrics-insight: strategic-metrics-insight
+                tool: knowledge-set
+                operations:
+                    - op: set-nodes
+                      nodes: strategic-metrics-insight
+
+    summarize-competitor-alignment-for-tag:
+        input:
+            tag:
+                type: tag
+            documents:
+                type: document
+            prompt:
+                type: text
+        actions:
+            get-snippets:
+                input:
+                    tag: function/tag
+                    documents: function/documents
+                tool: document-text
+                textFilter:
+                    operator: "and"
+                    tags: [tag]
+            run-prompt:
+                input:
+                    snippets: get-snippets
+                    prompt: function/prompt
+                tool: llm
+                skipIfEmpty: [snippets]
+                prompt: |
+                    {{prompt}}
+                    {% for s in snippets %}
+                    {{s.text}}
+                    {% endfor %}
+    
+            competitor-alignment-insight:
+                input:
+                    competitor-summary: run-prompt
+                    snippets: get-snippets
+                skipIfEmpty: competitor-summary
+                tool: insight
+                text: "{{competitor-summary.text}}"
+                name: "Analysis of Competitor Alignment"
+                attributes:
+                    category: competitor-alignment-insight
+                relations:
+                    derived-from: [snippets]                   
+    
+            add-insight:
+                input:
+                    knowledge: kset  # dependency on kset
+                    competitor-alignment-insight: competitor-alignment-insight
+                tool: knowledge-set
+                operations:
+                    - op: set-nodes
+                      nodes: competitor-alignment-insight
+
+    summarize-data-quality-flags-for-tag:
+        input:
+            tag:
+                type: tag
+            documents:
+                type: document
+            prompt:
+                type: text
+        actions:
+            get-snippets:
+                input:
+                    tag: function/tag
+                    documents: function/documents
+                tool: document-text
+                textFilter:
+                    operator: "and"
+                    tags: [tag]
+            run-prompt:
+                input:
+                    snippets: get-snippets
+                    prompt: function/prompt
+                tool: llm
+                skipIfEmpty: [snippets]
+                prompt: |
+                    {{prompt}}
+                    {% for s in snippets %}
+                    {{s.text}}
+                    {% endfor %}
+    
+            data-quality-flags-insight:
+                input:
+                    quality-flags-summary: run-prompt
+                    snippets: get-snippets
+                skipIfEmpty: quality-flags-summary
+                tool: insight
+                text: "{{quality-flags-summary.text}}"
+                name: "Analysis of Data Quality Flags"
+                attributes:
+                    category: data-quality-flags-insight
+                relations:
+                    derived-from: [snippets]                   
+    
+            add-insight:
+                input:
+                    knowledge: kset  # dependency on kset
+                    data-quality-flags-insight: data-quality-flags-insight
+                tool: knowledge-set
+                operations:
+                    - op: set-nodes
+                      nodes: data-quality-flags-insight
+
+    summarize-forward-guidance-for-tag:
+        input:
+            tag:
+                type: tag
+            documents:
+                type: document
+            prompt:
+                type: text
+        actions:
+            get-snippets:
+                input:
+                    tag: function/tag
+                    documents: function/documents
+                tool: document-text
+                textFilter:
+                    operator: "and"
+                    tags: [tag]
+            run-prompt:
+                input:
+                    snippets: get-snippets
+                    prompt: function/prompt
+                tool: llm
+                skipIfEmpty: [snippets]
+                prompt: |
+                    {{prompt}}
+                    {% for s in snippets %}
+                    {{s.text}}
+                    {% endfor %}
+    
+            forward-guidance-insight:
+                input:
+                    guidance-summary: run-prompt
+                    snippets: get-snippets
+                skipIfEmpty: guidance-summary
+                tool: insight
+                text: "{{guidance-summary.text}}"
+                name: "Analysis of Forward Guidance"
+                attributes:
+                    category: forward-guidance-insight
+                relations:
+                    derived-from: [snippets]                   
+    
+            add-insight:
+                input:
+                    knowledge: kset  # dependency on kset
+                    forward-guidance-insight: forward-guidance-insight
+                tool: knowledge-set
+                operations:
+                    - op: set-nodes
+                      nodes: forward-guidance-insight

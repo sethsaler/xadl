@@ -1,0 +1,274 @@
+input:
+    documents:
+        type: document
+    workspace:
+        type: workspace
+    
+actions:
+    financial-tags:
+        tool: find-tags
+        category: ["Financial Performance"]
+ 
+    analyst-tags:
+        tool: find-tags
+        category: ["Analyst"]
+
+    theme-tags:
+        tool: find-tags
+        category: ["Theme"]
+    
+    kset:
+        input:
+            financial-tags: financial-tags
+            analyst-tags: analyst-tags
+            theme-tags: theme-tags
+            documents: task/documents
+        tool: knowledge-set
+        knowledgeSetName: "Analyst Reports - Insights"
+        operations:
+            -   op: add-dimension
+                key: financial
+                name: Financial Performance
+                nodes: financial-tags
+                priority: 1
+            -   op: add-dimension
+                key: analyst
+                name: Analyst
+                priority: 2
+                nodes: analyst-tags
+            -   op: add-dimension
+                key: theme
+                name: Theme
+                priority: 3
+                nodes: theme-tags
+            -   op: set-nodes
+                nodes: documents
+ 
+    summarize-financial-by-analyst:
+        repeat:
+            function: summarize-topic-for-analyst
+            for: [topic-tag, analyst-tag]
+        input:
+            topic-tag: financial-tags
+            analyst-tag: analyst-tags
+            documents: task/documents
+            knowledge: kset
+            
+    summarize-financial-by-theme:
+        repeat:
+            function: summarize-topic-for-theme
+            for: [topic-tag, theme-tag]
+        input:
+            topic-tag: financial-tags
+            theme-tag: theme-tags
+            documents: task/documents
+            knowledge: kset            
+
+    summarize-financial-all-analysts:
+        input:
+            topic-tag: financial-tags
+            analayst-summaries: summarize-financial-by-analyst # dependency
+            knowledge: kset
+        repeat:
+            function: summarize-all-analyst-financial-insights-by-topic
+            for: [topic-tag]
+
+    add-to-workpsace:
+        input:
+            workspace: task/workspace
+            financial-by-analyst: summarize-financial-by-analyst # dependency
+            financial-by-theme: summarize-financial-by-theme # dependency
+            financial-all-analysts: summarize-financial-all-analysts # dependency
+            knowledge: kset
+        tool: workspace
+        operations:
+            -   op: add-items
+                items: knowledge
+ 
+functions:
+    summarize-topic-for-analyst:
+        input:
+            topic-tag:
+                type: tag
+            analyst-tag:
+                type: tag
+            documents:
+                type: document
+            knowledge:
+                type: knowledge-set
+        actions:
+            document-text:
+                input:
+                    documents: function/documents
+                    topic-tag: function/topic-tag
+                    analyst-tag: function/analyst-tag
+                tool: document-text
+                textFilter:
+                    operator: "and"
+                    tags: [topic-tag, analyst-tag]
+            summary:
+                input:
+                    document-text: document-text
+                    topic-tag: function/topic-tag
+                skipIfEmpty: document-text
+                tool: llm
+                prompt: |
+                    Below is a series of excerpts from investor analyst reports from a single analyst.
+                    Summarize the statements with respect to {{topic-tag.name}}.
+                    The summary should be a short paragraph that is at most 100 words, ideally only a single sentence.
+                    Highlight key phrases in bold.
+
+                    {% for x in document-text%}{{x.text}}
+                    {% endfor %}
+            summary-insight:
+                input:
+                    document-text: document-text
+                    summary: summary
+                    topic-tag: function/topic-tag
+                    analyst-tag: function/analyst-tag
+                skipIfEmpty: summary
+                tool: insight
+                text: "{{summary.text}}"
+                tags: [topic-tag, analyst-tag]
+                name: "Summary of {{topic-tag.name}} for analyst {{analyst-tag.name}}"
+                attributes:
+                    category: analyst-financial-insight
+                    analyst: "{{analyst-tag.name}}"
+                relations:
+                    derived-from: [document-text]                   
+            add-summaries:
+                input:
+                    knowledge: function/knowledge
+                    summary-insight: summary-insight
+                    document-text: document-text
+                tool: knowledge-set
+                operations:
+                    - op: set-nodes
+                      nodes: summary-insight
+                    - op: set-nodes
+                      nodes: document-text
+
+    summarize-topic-for-theme:
+        input:
+            topic-tag:
+                type: tag
+            theme-tag:
+                type: tag
+            documents:
+                type: document
+            knowledge:
+                type: knowledge-set
+        actions:
+            document-text:
+                input:
+                    documents: function/documents
+                    topic-tag: function/topic-tag
+                    theme-tag: function/theme-tag
+                tool: document-text
+                textFilter:
+                    operator: "and"
+                    tags: [topic-tag, theme-tag]
+            summary:
+                input:
+                    document-text: document-text
+                    topic-tag: function/topic-tag
+                    theme-tag: function/theme-tag
+                skipIfEmpty: document-text
+                tool: llm
+                prompt: |
+                    Below is a series of excerpts from investor analyst reports as pertaining to the following theme: {{theme-tag.name}}.
+                    Summarize the statements with respect to {{topic-tag.name}}.
+                    The summary should be a short paragraph that is at most 100 words, ideally only a single sentence.
+                    Highlight key phrases in bold.
+
+                    {% for x in document-text%}{{x.text}}
+                    {% endfor %}
+            summary-insight:
+                input:
+                    document-text: document-text
+                    summary: summary
+                    topic-tag: function/topic-tag
+                    theme-tag: function/theme-tag
+                skipIfEmpty: summary
+                tool: insight
+                text: "{{summary.text}}"
+                tags: [topic-tag, theme-tag]
+                name: "Summary of {{topic-tag.name}} for theme {{theme-tag.name}}"
+                attributes:
+                    category: segment-financial-insight
+                    theme: "{{theme-tag.name}}"
+                relations:
+                    derived-from: [document-text]                   
+            add-summaries:
+                input:
+                    knowledge: function/knowledge
+                    summary-insight: summary-insight
+                    document-text: document-text
+                tool: knowledge-set
+                operations:
+                    - op: set-nodes
+                      nodes: summary-insight
+                    - op: set-nodes
+                      nodes: document-text
+
+    summarize-all-analyst-financial-insights-by-topic:
+        input:
+            topic-tag:
+                type: tag
+            knowledge:
+                type: knowledge-set
+        actions:
+            insights:
+                input:
+                    knowledge: function/knowledge
+                    topic-tag: function/topic-tag
+                tool: knowledge-set-query
+                nodes:
+                    type: insight
+                    attributes:
+                        category: analyst-financial-insight
+                nodeDimensions:
+                    exactMatch: false
+                    match: 
+                      - key: financial
+                        values: topic-tag                    
+            summary:
+                input:
+                    insights: insights
+                    topic-tag: function/topic-tag
+                skipIfEmpty: insights
+                tool: llm
+                prompt: |
+
+                    Below is a series of investor analyst statements. 
+                    Each statement is from a different investor. 
+                    Summarize the statements with respect to the topic of {{topic-tag.name}}.
+                    The summary should indicate where there is agreement and where there are differences 
+                      of opinion with respect to {{topic-tag.name}}. 
+                    The summary should be a short paragraph that is at most 100 words but ideally fewer.
+                    Highlight in bold the sentences that indicate disagreement. 
+
+                    {% for x in insights%}{{x.attributes.analyst}}: {{x.text}}
+                    {% endfor %}
+            summary-insight:
+                input:
+                    insights: insights
+                    summary: summary
+                    topic-tag: function/topic-tag
+                skipIfEmpty: summary
+                tool: insight
+                text: "{{summary.text}}"
+                tags: [topic-tag]
+                name: "Summary of {{ topic-tag.name }} for All Analysts"
+                attributes:
+                    category: all-analysts-financial-insight
+                relations:
+                    derived-from: [insights]                   
+            add-summaries:
+                input:
+                    knowledge: function/knowledge
+                    summary-insight: summary-insight
+                tool: knowledge-set
+                operations:
+                    - op: set-nodes
+                      nodes: summary-insight

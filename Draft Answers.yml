@@ -1,0 +1,46 @@
+input:
+  questionDocument:
+    type: document
+    label: Question source
+  answerDocuments:
+    type: document
+    label: Answer sources
+
+actions:
+  openai:
+    input:
+      questionDocument: task/questionDocument
+      answerDocuments: task/answerDocuments
+    tool: llm
+    prompt: |
+        # Main instruction
+        Extract questions from the question source and answer each using only information from the answer sources.
+
+        # Question source
+        {% if questionDocument %}
+        Question source:
+        {% for doc in questionDocument %}
+        {{ doc.xdoc.text }}
+        {% endfor %}
+        {% endif %}
+
+        # Answer sources
+        {% if answerDocuments %}
+        Answer sources:
+        {% for doc in answerDocuments %}
+        {{ doc.xdoc.text }}
+        {% endfor %}
+        {% endif %}
+
+        # Detailed instructions
+        Instructions:
+        1. Identify all questions in the question source.
+        2. For each question:
+           a) Generate a concise, single-paragraph answer using only information from the answer sources.
+           b) Ensure the answer directly addresses the question and contains no external information.
+
+        # Output format
+        Format:
+        Question: [Extracted question]
+        Answer: [Concise answer based solely on provided sources]
+        Repeat for all identified questions. Output only questions and answers in this format.

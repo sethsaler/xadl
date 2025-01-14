@@ -1,0 +1,58 @@
+input:
+  taggedContent:
+    type: document
+    label: Tagged content from documents
+  userQuestion:
+    type: text
+    label: User's question
+
+actions:
+  openai:
+    input:
+      taggedContent: task/taggedContent
+      userQuestion: task/userQuestion
+    tool: llm
+    prompt: |
+        Answer the user's question based on the tagged content provided.
+
+        {% if taggedContent %}
+        Here is the tagged content for analysis:
+        {% for doc in taggedContent %}
+        ```Text
+        {{ doc.xdoc.text }}
+        ```
+        {% endfor %}
+        {% endif %}
+
+        Using the tagged content provided, answer the following question: {{userQuestion.text}}
+        Follow these guidelines:
+
+        1. Context Understanding:
+           - Analyze the tagged content to understand the context related to the question.
+           - Identify key information, data, or statements relevant to the question.
+
+        2. Comprehensive Answer:
+           - Provide a clear and concise answer to the question.
+           - Use specific information from the tagged content to support your answer.
+           - If the question cannot be fully answered, state this and provide the best possible answer based on available data.
+
+        3. Time-Sensitive Information:
+           - Note any changes or developments over time relevant to the question.
+           - Clearly indicate which time period(s) your answer is based on.
+
+        4. Multiple Perspectives:
+           - Summarize different viewpoints on the topic, if present.
+           - Highlight any consensus or disagreements found in the documents.
+
+        5. Data and Metrics:
+           - Include relevant quantitative data or metrics that help answer the question.
+           - Explain the significance of these numbers in the context of the question.
+
+        6. Limitations and Caveats:
+           - State any limitations in the available information for answering the question.
+           - If making inferences, explain your reasoning and note that it's based on limited information.
+
+        7. Further Exploration:
+           - Briefly mention additional relevant topics not fully covered in the tagged content.
+
+        Present your answer in a clear, structured format using headings or bullet points as appropriate. Ensure your response accurately reflects the content of the tagged sections without adding external information. Use quotation marks for direct quotes, indicating the source context.

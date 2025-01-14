@@ -1,0 +1,125 @@
+input:
+    documents:
+        type: document
+    workspace:
+        type: workspace
+
+actions:
+    # Tagging Documents for Relevant Categories
+    analyst-tags:
+        tool: find-tags
+        category: ["Analyst"]
+
+    company-tags:
+        tool: find-tags
+        category: ["Company"]
+
+    # Building the Knowledge Set with Relevant Dimensions
+    kset:
+        input:
+            analyst-tags: analyst-tags
+            company-tags: company-tags
+            documents: task/documents
+        tool: knowledge-set
+        knowledgeSetName: "Analyst Company Insights"
+        operations:
+            - op: add-dimension
+              key: analyst
+              name: Analyst Names
+              nodes: analyst-tags
+              priority: 1
+            - op: add-dimension
+              key: company
+              name: Company Names
+              nodes: company-tags
+              priority: 2
+            - op: set-nodes
+              nodes: documents
+
+    # Summarizing Analyst Statements for Each Company
+    summarize-analyst-company-insights:
+        repeat:
+            function: summarize-topic-for-analyst-company
+            for: [analyst-tag, company-tag]
+        input:
+            analyst-tag: analyst-tags
+            company-tag: company-tags
+            documents: task/documents
+            knowledge: kset
+
+    # Adding All Summaries to Workspace
+    add-to-workspace:
+        input:
+            workspace: task/workspace
+            analyst-company-insights: summarize-analyst-company-insights # dependency
+            knowledge: kset
+        tool: workspace
+        operations:
+            - op: add-items
+              items: knowledge
+
+functions:
+    summarize-topic-for-analyst-company:
+        input:
+            analyst-tag:
+                type: tag
+            company-tag:
+                type: tag
+            documents:
+                type: document
+            knowledge:
+                type: knowledge-set
+        actions:
+            document-text:
+                input:
+                    documents: function/documents
+                    analyst-tag: function/analyst-tag
+                    company-tag: function/company-tag
+                tool: document-text
+                textFilter:
+                    operator: "and"
+                    tags: [analyst-tag, company-tag]
+            summary:
+                input:
+                    document-text: document-text
+                    analyst-tag: function/analyst-tag
+                    company-tag: function/company-tag
+                skipIfEmpty: document-text
+                tool: llm
+                prompt: |
+                    Below is a series of excerpts from investor analyst reports from analyst {{analyst-tag.name}} regarding {{company-tag.name}}.
+                    Summarize the statements with respect to {{company-tag.name}}.
+                    The summary should be a short paragraph that is at most 100 words, ideally only a single sentence.
+                    Highlight key phrases in bold.
+
+                    {% for x in document-text %}
+                    {{x.text}}
+                    {% endfor %}
+            summary-insight:
+                input:
+                    document-text: document-text
+                    summary: summary
+                    analyst-tag: function/analyst-tag
+                    company-tag: function/company-tag
+                skipIfEmpty: summary
+                tool: insight
+                text: "{{summary.text}}"
+                tags: [analyst-tag, company-tag]
+                name: "Summary of {{company-tag.name}} for Analyst {{analyst-tag.name}}"
+                attributes:
+                    category: analyst-company-insight
+                    analyst: "{{analyst-tag.name}}"
+                    company: "{{company-tag.name}}"
+                relations:
+                    derived-from: [document-text]                   
+            add-summaries:
+                input:
+                    knowledge: function/knowledge
+                    summary-insight: summary-insight
+                    document-text: document-text
+                tool: knowledge-set
+                operations:
+                    - op: set-nodes
+                      nodes: summary-insight
+                    - op: set-nodes
+                      nodes: document-text

@@ -1,0 +1,50 @@
+input:
+  earningsCallDocuments:
+    type: document
+    label: Earnings call transcripts
+
+actions:
+  openai:
+    input:
+      earningsCallDocuments: task/earningsCallDocuments
+    tool: llm
+    prompt: |
+        Analyze the given earnings call transcripts to identify analysts and create profiles based on their questioning patterns.
+
+        {% if earningsCallDocuments %}
+        Here are the earnings call transcripts for analysis:
+        {% for doc in earningsCallDocuments %}
+        ```Text
+        {{ doc.xdoc.text }}
+        ```
+        {% endfor %}
+        {% endif %}
+
+        Based on the provided earnings call transcripts, complete the following tasks:
+
+        1. Analyst Identification:
+        a) Search through the question-and-answer portions of the documents
+        b) Identify all analysts who ask questions
+        c) Note the frequency of questions asked by each analyst across all documents
+
+        2. Analyst Profiling:
+        For each identified analyst, starting with those who have asked the most questions over time:
+        a) Create a detailed profile including:
+           - Name and associated financial institution
+           - Questioning style (e.g., direct, technical, strategic)
+           - Particular areas of interest or focus
+           - Any notable patterns or trends in their questions
+        b) Provide specific examples from the transcripts to support your observations
+        c) Analyze how their questioning style or focus may have evolved over time, if applicable
+
+        3. Profile Presentation:
+        a) Present the analyst profiles in descending order based on the number of questions asked
+        b) Format each profile as a series of paragraphs
+        c) Include a brief introduction for each analyst before delving into their profile details
+
+        4. Overall Analysis:
+        a) Summarize any common themes or trends across multiple analysts
+        b) Highlight any unique or standout questioning approaches
+        c) Discuss how the collective analyst interests might reflect broader market or industry concerns
+
+        Ensure your response is structured, detailed, and supported by specific examples from the transcripts. Do not use any Markdown formatting in your response.
