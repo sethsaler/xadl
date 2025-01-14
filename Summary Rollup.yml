@@ -1,0 +1,126 @@
+input:
+    documents:
+        type: document
+    workspace:
+        type: workspace
+    
+actions:
+    get-document-type:
+        tool: find-tags
+        category: ["Document Type"]
+ 
+    get-topic-tags:
+        tool: find-tags
+        category: ["Topic"]
+
+    init-kset:
+        input:
+            documentTags: get-document-type
+            topicTags: get-topic-tags
+            documents: task/documents
+        tool: knowledge-set
+        knowledgeSetName: "Manual Rollup"
+        operations:
+            -   op: add-dimension
+                key: documentType
+                name: Document Type
+                nodes: documentTags
+                priority: 1
+            -   op: add-dimension
+                key: topic
+                name: Topic
+                priority: 2
+                nodes: topicTags
+            -   op: set-nodes
+                nodes: documents
+ 
+    summarize-topic-by-document:
+        repeat:
+            function: summarize-topic
+            for: [documentTag, topicTag]
+        input:
+            documentTag: get-document-type
+            topicTag: get-topic-tags
+            documents: task/documents
+            knowledge: init-kset
+
+    add-to-workspace:
+        input:
+            workspace: task/workspace
+            summarize-topic-by-document: summarize-topic-by-document # dependency
+            knowledge: init-kset
+        tool: workspace
+        operations:
+            -   op: add-items
+                items: knowledge
+ 
+functions:
+    summarize-topic:
+        input:
+            documentTag:
+                type: tag
+            topicTag:
+                type: tag
+            documents:
+                type: document
+            knowledge:
+                type: knowledge-set
+        actions:
+            get-snippets:
+                input:
+                    documents: function/documents
+                    documentTag: function/documentTag
+                    topicTag: function/topicTag
+                tool: document-text
+                textFilter:
+                    operator: "and"
+                    tags: [documentTag, topicTag]
+            generate-summary:
+                input:
+                    snippets: get-snippets
+                    topicTag: function/topicTag
+                skipIfEmpty: snippets
+                tool: llm
+                prompt: |
+                    Below is a series of excerpts from safety manuals.
+
+                    Summarize the information and instructions contained in the below text related to {{topicTag.name}}.
+                    
+                    Present output in a bulleted list and in as few words as possible.
+
+                    {% for x in snippets%}{{x.text}}
+                    {% endfor %}
+
+                # input:
+                #     snippets: get-snippets
+                #     topicTag: function/topicTag
+                # skipIfEmpty: snippets
+                # tool: echo
+                # message: "summary of {% for x in snippets%}{{x.text}}{% endfor %}"
+            init-summary-insight:
+                input:
+                    snippets: get-snippets
+                    summary: generate-summary
+                    topicTag: function/topicTag
+                    documentTag: function/documentTag
+                skipIfEmpty: summary
+                tool: insight
+                text: "{{summary.text}}"
+                tags: [topicTag, documentTag]
+                name: "Summary of {{topicTag.name}} across all {{documentTag.name}}"
+                attributes:
+                    category: documentTopicInsight
+                    document: "{{documentTag.name}}"
+                relations:
+                    derived-from: [snippets]                   
+            add-summaries:
+                input:
+                    knowledge: function/knowledge
+                    summaryInsight: init-summary-insight
+                    snippets: get-snippets
+                tool: knowledge-set
+                operations:
+                    - op: set-nodes
+                      nodes: summaryInsight
+                    - op: set-nodes
+                      nodes: snippets
