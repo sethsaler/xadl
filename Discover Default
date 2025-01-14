@@ -1,0 +1,21 @@
+                                                                                                                       
+input:                                                                                                                                
+  human:
+    type: text
+  context:                                                                                                                  
+    type: assistant-context                                                                                                      
+actions:
+  respond:
+    input:
+      human: task/human
+      context: task/context
+    tool: llm                                                                                                                    
+    prompt:                                                                                                                                                                                                                                 
+      - |                                                                                                                       
+          {% if context.focus %}                                                                                      
+          When considering you response, please pay specific attention to the follow pieces of text:                            
+          {% for item in context.focus %}                                                                             
+          - {{ item.text }}                                                                                                     
+          {% endfor %}                                                                                                          
+          {% endif %}                                                                                                           
+      - "Now that you understand the context, can you help me with this query: {{ human.text }}"

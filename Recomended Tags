@@ -1,0 +1,9 @@
+
+input:
+  documents:
+    type: document
+actions:
+   autotag:
+     input:
+       documents: task/documents
+     tool: recommended-tags
