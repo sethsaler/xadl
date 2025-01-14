@@ -1,0 +1,383 @@
+# Define the input section, which specifies the types of data that will be used
+input:
+  # Define a section for documents, with a type of "document"
+  documents:
+    # Specify the type of the documents input
+    type: document
+  # Define a section for the workspace, with a type of "workspace"
+  workspace:
+    # Specify the type of the workspace input
+    type: workspace
+
+# Define the actions section, which specifies the operations that will be performed
+actions:
+  # 1) Existing Tag Collection for Agreement Information
+  # Define an action to get agreement information tags
+  get-agreementInformation-tags:
+    # Specify the tool to use for this action (find-tags)
+    tool: find-tags
+    # Specify the names of the tags to find (Credit and Preamble)
+    name: ["Credit", "Preamble"]
+  
+  # 2) NEW Tag Collection for "Document Tags"
+  # Define an action to get document category tags
+  get-documentCategory-tags:
+    # Specify the tool to use for this action (find-tags)
+    tool: find-tags
+    # Specify the category of tags to find (Document Tags)
+    category: "Document Tags"
+
+  # 3) Base configuration for shared prompt elements
+  # Define an action to specify the base prompt
+  basePrompt:
+    # Specify the tool to use for this action (echo)
+    tool: echo
+    # Specify the message for the base prompt
+    message: |
+      # Role and Context Setup
+      # Define the role and context for the prompt
+      You are in-house counsel at a major entertainment studio, responsible for assessing legal obligations, compliance risks, and business implications within talent agreements. Your objectives include:
+      # List the objectives for the prompt
+      1. Identifying all obligations, commitments, and representations the studio has made regarding screen credit for the talent.
+      2. Pinpointing potential risks or ambiguities, including any conditions or limitations on credit obligations, noting relevant union/guild requirements, deadlines, or other time-sensitive triggers.
+      3. Providing actionable insights that integrate both legal and business perspectives (e.g., compliance with labor requirements, reputation management, financial implications).
+      4. Highlighting any provisions that could require negotiation, revision, or special attention to mitigate legal or reputational exposure.
+      # Provide guidance for the prompt
+      When offering analysis or summarizing findings:
+      - Focus on clarity, precision, and direct relevance to studio obligations.
+      - Avoid unnecessary speculation; stick to explicit terms and established industry standards.
+      - Provide well-reasoned justifications for any concerns or potential adjustments.
+
+  # 4) Contract Analysis prompt
+  # Define an action to specify the contract analysis prompt
+  contractAnalysisPrompt:
+    # Specify the tool to use for this action (echo)
+    tool: echo
+    # Specify the message for the contract analysis prompt
+    message: |
+      # Include the base prompt
+      {{basePrompt}}
+      # Define the contract analysis task
+      Below is key text from the talent agreement. As in-house counsel, you should:
+      - Thoroughly review the credit-related clauses to ensure compliance with the studio's existing policies and any union/guild rules.
+      - Identify potential loopholes, ambiguous language, or conflicting provisions that may lead to disputes or noncompliance.
+      - Recommend steps (if any) to clarify, renegotiate, or reinforce obligations in line with best practices and studio interests.
+      - Provide your analysis succinctly, focusing on the specific clauses below.
+      # Define the relevant language from the agreement
+      Relevant language from the agreement:
+
+  # 5) Section Titles
+  # Define an action to specify the contract analysis title
+  contractAnalysisTitle:
+    # Specify the tool to use for this action (echo)
+    tool: echo
+    # Specify the message for the contract analysis title
+    message: Credit Obligations Output Test
+
+  # 6) Initialize Knowledge Set for Agreement Information
+  # Define an action to initialize the knowledge set
+  init-kset:
+    # Specify the input for this action
+    input:
+      # Use the documents from the task
+      documents: task/documents
+      # Use the agreement information tags from the get-agreementInformation-tags action
+      agreementInformationTags: get-agreementInformation-tags
+      # Use the document category tags from the get-documentCategory-tags action
+      documentCategoryTags: get-documentCategory-tags
+    # Specify the tool to use for this action (knowledge-set)
+    tool: knowledge-set
+    # Specify the name of the knowledge set
+    knowledgeSetName: "Credit Obligations Memo (Multi-Doc)"
+    # Define the operations for the knowledge set
+    operations:
+      # Add a dimension for the theme (Tags)
+      - op: add-dimension
+        # Specify the key for the dimension
+        key: theme
+        # Specify the name of the dimension
+        name: Tags
+        # Use the agreement information tags as the nodes for this dimension
+        nodes: agreementInformationTags
+        # Specify the priority of this dimension
+        priority: 1
+      # Add a dimension for the document
+      - op: add-dimension
+        # Specify the key for the dimension
+        key: document
+        # Specify the name of the dimension
+        name: Document
+        # Use the document category tags as the nodes for this dimension
+        nodes: documentCategoryTags
+        # Specify the priority of this dimension
+        priority: 2
+      # Set the nodes for the knowledge set
+      - op: set-nodes
+        # Use the documents as the nodes
+        nodes: documents
+
+  # 7) NEW - Analyze each "Agreement Tag" for each "Document Tag"
+  # Define an action to analyze each document category tag
+  analyze-each-documentCategory-tag:
+    # Specify the repeat function for this action
+    repeat:
+      # Specify the function to repeat (analyze-for-tag)
+      function: analyze-for-tag
+      # Specify the variables to repeat over (tag and agreementTag)
+      for: [tag, agreementTag]
+    # Specify the input for this action
+    input:
+      # Use the document category tags from the get-documentCategory-tags action
+      tag: get-documentCategory-tags
+      # Use the agreement information tags from the get-agreementInformation-tags action
+      agreementTag: get-agreementInformation-tags
+      # Use the documents from the task
+      documents: task/documents
+      # Use the knowledge set from the init-kset action
+      knowledge: init-kset
+      # Use the base prompt from the basePrompt action
+      basePrompt: basePrompt
+      # Use the contract analysis prompt from the contractAnalysisPrompt action
+      prompt: contractAnalysisPrompt
+      # Use the contract analysis title from the contractAnalysisTitle action
+      title: contractAnalysisTitle
+
+  # 8) Add Results to Workspace
+  # Define an action to add the results to the workspace
+  add-to-workspace:
+    # Specify the input for this action
+    input:
+      # Use the workspace from the task
+      workspace: task/workspace
+      # Use the document category analysis from the analyze-each-documentCategory-tag action
+      documentCategoryAnalysis: analyze-each-documentCategory-tag
+      # Use the knowledge set from the init-kset action
+      knowledgeForDocuments: init-kset
+    # Specify the tool to use for this action (workspace)
+    tool: workspace
+    # Define the operations for the workspace
+    operations:
+      # Add the knowledge set to the workspace
+      - op: add-items
+        # Use the knowledge set as the items to add
+        items: knowledgeForDocuments
+
+# Define the functions section, which specifies reusable functions
+functions:
+  # Define a function to analyze a tag
+  analyze-for-tag:
+    # Specify the input for this function
+    input:
+      # Use a tag as input
+      tag:
+        # Specify the type of the tag input
+        type: tag
+      # Use an agreement tag as input
+      agreementTag:
+        # Specify the type of the agreement tag input
+        type: tag
+      # Use documents as input
+      documents:
+        # Specify the type of the documents input
+        type: document
+      # Use the base prompt as input
+      basePrompt:
+        # Specify the type of the base prompt input
+        type: text
+      # Use the instruction prompt as input
+      get-instruction-prompt-for-tag:
+        # Specify the type of the instruction prompt input
+        type: text
+      # Use the prompt as input
+      prompt:
+        # Specify the type of the prompt input
+        type: text
+      # Use the knowledge set as input
+      knowledge:
+        # Specify the type of the knowledge set input
+        type: knowledge-set
+      # Use the title as input
+      title:
+        # Specify the type of the title input
+        type: text
+
+    # Define the actions for this function
+    actions:
+      # Define an action to get snippets
+      get-snippets:
+        # Specify the input for this action
+        input:
+          # Use the tag from the function input
+          tag: function/tag
+          # Use the agreement tag from the function input
+          agreementTag: function/agreementTag
+          # Use the documents from the function input
+          documents: function/documents
+        # Specify the tool to use for this action (document-text)
+        tool: document-text
+        # Specify the text filter for this action
+        textFilter:
+          # Specify the operator for the text filter (and)
+          operator: "and"
+          # Use the tag and agreement tag as the tags for the text filter
+          tags: [tag, agreementTag]
+      
+      # Define an action to get the instruction prompt for a tag
+      get-instruction-prompt-for-tag:
+        # Specify the input for this action
+        input:
+          # Use the agreement tag from the function input
+          agreementTag: function/agreementTag
+        # Specify the tool to use for this action (echo)
+        tool: echo
+        # Specify the message for the instruction prompt
+        message: |
+          # Check if the agreement tag is "Preamble"
+          {% if agreementTag.name == "Preamble" %}
+          # Define the instructions for the "Preamble" tag
+          PREAMBLE instructions:
+              # Specify the output format
+              OutputFormat: |
+                  # Define the format for the output
+                  Extract and format the following information in this exact format:
+                  **Talent Name:** [Name]
+                  **Talent Type:** [Category]
+                  **Role:** [Character Name]
+                  **Agreement Name:** [Title]
+                  **Effective Date:** [Date]
+                  **Project Name:** [Title]
+              
+              # Specify the required fields
+              RequiredFields:
+                  - TalentName: "Name of individual or team members"
+                  - TalentType: "Role category (Writer, Director, Producer, Performer, Physical Producer, Lead Cast)"
+                  - Role: "Character/role name for acting talent (N/A if not applicable)"
+                  - AgreementName: "Formal agreement title"
+                  - EffectiveDate: "Defined effective date or latest signature date. If missing, use the date the agreement was executed and specify that"
+                  - ProjectName: "Project title or working title"
+          # Check if the agreement tag is "Credit"
+          {% endif %}
+
+          {% if agreementTag.name == "Credit" %}
+          # Define the instructions for the "Credit" tag
+          CREDIT instructions:
+              # Specify the credit details
+              CreditDetails:
+                  # Specify the subject matter
+                  SubjectMatter: "Summarizing the credit obligations in detail."
+                  # Specify the information needed
+                  InformationNeeded:
+                      - "All relevant deal points specifically mentioned in the provided text, such as:"
+                      - "Main titles vs. end titles requirements"
+                      - "Special designations (e.g., guest star, special appearance)"
+                      - "Single card vs. shared card, and any position (first, second, etc.)"
+                      - "Type size or other format requirements"
+                      - "'No less favorable than…' or parity language"
+                      - "Producer or studio discretion over any of the above"
+                      - "Only include these items if they are explicitly mentioned; do not speculate on unmentioned conditions."
+              # Specify the output format
+              OutputFormat: "Summarize all credit obligations in a single paragraph, applying **bold formatting** to key terms (e.g., **single card**, **shared card**, **guest star**, etc.) but do not include extraneous language beyond the specific credit details required."
+              # Specify the overall guidance
+              OverallGuidance:
+              - "Adhere Rigorously to the Output Format: Provide only the requested fields, in the exact format specified, with no additional text."
+              - "Use Bold Tags: For labels (e.g., **Talent Name:**) and for any special designations within the Credit summary (e.g., **guest star**)."
+              - "Avoid Irrelevant Content: Do not output commentary, explanations, or any information not explicitly requested."
+              - "Maintain Consistency: Ensure each section's format is consistent with these instructions."
+          # Check if the agreement tag is not "P "Credit"
+          {% endif %}
+
+          {% assign roles = "Preamble,Credit" | split: "," %}
+
+          {% if roles contains agreementTag.name %}
+          # Do nothing if the agreement tag is "Preamble" or "Credit"
+          {% else %}
+          # Define the instructions for other agreement tags
+          GENERAL instructions for {{agreementTag.name}}
+          - Use your best judgment.
+          {% endif %}
+
+      # Define an action to run the prompt
+      run-prompt:
+        # Specify the input for this action
+        input:
+          # Use the snippets from the get-snippets action
+          snippets: get-snippets
+          # Use the base prompt from the function input
+          basePrompt: function/basePrompt
+          # Use the instruction prompt from the get-instruction-prompt-for-tag action
+          instructionPrompt: get-instruction-prompt-for-tag
+          # Use the prompt from the function input
+          prompt: function/prompt
+        # Specify the tool to use for this action (llm)
+        tool: llm
+        # Specify the skip if empty condition
+        skipIfEmpty: snippets
+        # Specify the prompt for this action
+        prompt: |
+          # Include the instruction prompt
+          {{instructionPrompt.text}}
+          # Include the prompt
+          {{prompt.text}}
+          # Include the snippets
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      # Define an action to create an insight
+      create-insight:
+        # Specify the input for this action
+        input:
+          # Use the summary from the run-prompt action
+          summary: run-prompt
+          # Use the snippets from the get-snippets action
+          snippets: get-snippets
+          # Use the tag from the function input
+          tag: function/tag
+          # Use the agreement tag from the function input
+          agreementTag: function/agreementTag
+          # Use the title from the function input
+          title: function/title
+        # Specify the skip if empty condition
+        skipIfEmpty: summary
+        # Specify the tool to use for this action (insight)
+        tool: insight
+        # Specify the text for the insight
+        text: |
+          # Include the summary
+          {{summary.text}}
+        # Specify the name of the insight
+        name: "{{title.text}} for {{tag.name}}"
+        # Specify the tags for the insight
+        tags: [tag, agreementTag]
+        # Specify the attributes for the insight
+        attributes:
+          # Specify the category of the insight
+          category: contract-analysis-insight
+        # Specify the relations for the insight
+        relations:
+          # Specify the derived from relation
+          derived-from: [snippets]
+
+      # Define an action to add the insight to the knowledge set
+      add-insight:
+        # Specify the input for this action
+        input:
+          # Use the knowledge set from the function input
+          knowledge: function/knowledge
+          # Use the insight from the create-insight action
+          insight: create-insight
+          # Use the snippets from the get-snippets action
+          snippets: get-snippets
+        # Specify the tool to use for this action (knowledge-set)
+        tool: knowledge-set
+        # Specify the operations for the knowledge set
+        operations:
+          # Set the nodes for the insight
+          - op: set-nodes
+            # Use the insight as the nodes
+            nodes: insight
+          # Set the nodes for the snippets
+          - op: set-nodes
+            # Use the snippets as the nodes
+            nodes: snippets
+```
