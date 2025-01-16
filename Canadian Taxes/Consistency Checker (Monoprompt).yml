@@ -1,0 +1,58 @@
+input:
+  topicCategory:
+    type: text
+    label: Topic Category
+  companyDocuments:
+    type: document
+    label: Time-series of company documents
+
+actions:
+  input:
+    topicCategory: task/topicCategory
+    companyDocuments: task/companyDocuments
+  tool:
+    type: openai
+    config:
+      prompt:
+        - |
+          Evaluate the way the company has discussed a specific topic category over a time-series of documents, focusing on the trendline and potential inconsistencies.
+        - |
+          {% if companyDocuments %}
+          Here are the company documents for analysis:
+          {% for doc in companyDocuments %}
+          ```Text
+          {{ doc.xdoc.text }}
+          ```
+          {% endfor %}
+          {% endif %}
+        - |
+          Based on the provided documents, analyze how the company has discussed the topic category: {{topicCategory.text}}. Follow these guidelines:
+
+          1. Trendline Analysis:
+              a) Identify statements related to {{topicCategory.text}} in each document
+              b) Categorize each statement as positive, negative, or neutral
+              c) Track the overall sentiment trend across the time-series of documents
+
+          2. Future Outlook:
+              a) Extract any forward-looking statements or predictions related to {{topicCategory.text}}
+              b) Summarize the company's perspective on the future of this topic
+
+          3. Consistency Check:
+              a) Compare statements and predictions across different time periods
+              b) Identify any discrepancies between anticipated outcomes and actual results
+              c) Highlight specific examples of inconsistencies, if any (e.g., projected growth vs. actual growth)
+
+          4. Key Metrics and Data:
+              a) Note any quantitative data or metrics mentioned in relation to {{topicCategory.text}}
+              b) Track changes in these metrics over time
+
+          5. Contextual Factors:
+              a) Consider any external factors or market conditions mentioned that may have influenced the company's statements
+              b) Assess how these factors may have affected the consistency of messaging
+
+          6. Overall Assessment:
+              a) Summarize the company's overall approach to discussing {{topicCategory.text}} over time
+              b) Evaluate the consistency and accuracy of their messaging
+              c) Identify any notable shifts in tone, emphasis, or strategy related to this topic
+
+          Provide your analysis in a structured format with clear sections for each point. Include specific quotes or paraphrases from the documents to support your evaluation. Ensure your assessment is objective and based solely on the information provided in the documents.

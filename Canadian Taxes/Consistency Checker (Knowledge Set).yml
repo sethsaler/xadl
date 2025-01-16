@@ -1,0 +1,281 @@
+input:
+    documents:
+        type: document
+    currentPeriodTag: 
+        type: tag
+        multiple: false
+        label: Current Period Tag
+    previousPeriodTag:
+        type: tag
+        multiple: false
+        label: Previous Period Tag
+    workspace:
+        type: workspace
+
+actions:
+    get-period-tags:
+        tool: find-tags
+        category: ["Time Period"]
+
+    get-theme-tags:
+        tool: find-tags
+        category: ["Theme"]
+
+    init-kset:
+        input:
+            periodTags: get-period-tags
+            themeTags: get-theme-tags
+            documents: task/documents
+        tool: knowledge-set
+        knowledgeSetName: "Consistency Checker"
+        operations:
+            -   op: add-dimension
+                key: theme
+                name: Theme
+                priority: 1
+                nodes: themeTags
+            -   op: add-dimension
+                key: period
+                name: Period
+                priority: 2
+                nodes: periodTags
+            -   op: set-nodes
+                nodes: documents   
+
+    summarize-theme-current-period:
+        repeat:
+            function: summarize-theme-for-period
+            for: [periodTag, themeTag]
+        input:
+            themeTag: get-theme-tags
+            documents: task/documents
+            kset: init-kset
+            periodTag: task/currentPeriodTag
+
+    summarize-theme-previous-period:
+        repeat:
+            function: summarize-theme-for-period
+            for: [periodTag, themeTag]
+        input:
+            themeTag: get-theme-tags
+            documents: task/documents
+            kset: init-kset
+            periodTag: task/previousPeriodTag
+
+    compare-periods-for-themes:
+        repeat:
+            function: compare-periods-for-theme
+            for: [curPeriodTag, prevPeriodTag, themeTag]
+        input:
+            themeTag: get-theme-tags
+            curPeriodTag: task/currentPeriodTag
+            prevPeriodTag: task/previousPeriodTag
+            kset: init-kset
+            summarize-theme-current-period: summarize-theme-current-period # dependency
+            summarize-theme-previous-period: summarize-theme-previous-period # dependency
+
+    add-to-workspace:
+        input:
+            workspace: task/workspace
+            summarize-theme-current-period: summarize-theme-current-period # dependency
+            summarize-theme-previous-period: summarize-theme-previous-period #dependency
+            compare-periods-for-themes: compare-periods-for-themes # dependency
+            kset: init-kset
+        tool: workspace
+        operations:
+            -   op: add-items
+                items: kset
+                    
+    # render final results to document
+    # render: 
+    #     input: 
+    #         periodTags: get-period-tags #dependency
+    #         themeTags: get-theme-tags #dependency
+    #     tool: echo
+    #     message: "{% for tag in themeTags%}{{tag.name}}, {% endfor %}"
+
+functions:
+    summarize-theme-for-period:
+        input: 
+            periodTag:
+                type: tag
+            themeTag:
+                type: tag
+            kset: 
+                type: knowledge-set
+            documents: 
+                type: document
+
+        actions:
+            get-snippets:
+                input:
+                    documents: function/documents
+                    periodTag: function/periodTag
+                    themeTag: function/themeTag
+                tool: document-text
+                textFilter:
+                    operator: "and"
+                    tags: [periodTag, themeTag]
+                    
+            summary:
+                input:
+                    snippets: get-snippets
+                    themeTag: function/themeTag
+                skipIfEmpty: snippets
+                tool: llm
+                prompt: |
+                    Below is a series of excerpts from earnings call transcripts. 
+                    Summarize the statements with respect to {{themeTag.name}}.
+                    Limit the response to 100 words.
+                    Highlight key phrases in bold.
+
+                    {% for s in snippets%}{{s.text}}
+                    {% endfor %}
+
+            # summary:
+            #     input:
+            #         snippets: get-snippets
+            #         themeTag: function/themeTag
+            #         periodTag: function/periodTag
+            #     skipIfEmpty: snippets
+            #     tool: echo
+            #     message: "[period summary]{{themeTag.name}} for {{periodTag.name}}[/period summary]"
+
+            create-summary-insight:
+                input:
+                    snippets: get-snippets
+                    summary: summary
+                    themeTag: function/themeTag
+                    periodTag: function/periodTag
+                skipIfEmpty: summary
+                tool: insight
+                text: "{{summary.text}}"
+                tags: [periodTag, themeTag]
+                name: "Summary of {{themeTag.name}} for period {{periodTag.name}}"
+                attributes:
+                    category: theme-by-period
+                    # period: "{{periodTag.name}}"
+                relations:
+                    derived-from: [snippets]   
+
+            add-insight:
+                input:
+                    knowledge: function/kset
+                    summaryInsight: create-summary-insight
+                    snippets: get-snippets
+                tool: knowledge-set
+                operations:
+                    - op: set-nodes
+                      nodes: summaryInsight
+                    - op: set-nodes
+                      nodes: snippets
+
+    compare-periods-for-theme:
+        input:  
+            themeTag:
+                type: tag
+            prevPeriodTag:
+                type: tag
+            curPeriodTag:
+                type: tag
+            kset: 
+                type: knowledge-set
+
+        actions:
+            get-prev-insights:
+                input:
+                    knowledge: function/kset
+                    themeTag: function/themeTag
+                    prevPeriodTag: function/prevPeriodTag
+                tool: knowledge-set-query
+                nodes:
+                    type: insight
+                    attributes:
+                        category: theme-by-period
+                nodeDimensions:
+                    exactMatch: false
+                    match: 
+                      - key: theme
+                        values: themeTag 
+                      - key: period
+                        values: prevPeriodTag 
+
+            get-cur-insights:
+                input:
+                    knowledge: function/kset
+                    themeTag: function/themeTag
+                    curPeriodTag: function/curPeriodTag
+                tool: knowledge-set-query
+                nodes:
+                    type: insight
+                    attributes:
+                        category: theme-by-period
+                nodeDimensions:
+                    exactMatch: false
+                    match: 
+                      - key: theme
+                        values: themeTag 
+                      - key: period
+                        values: curPeriodTag 
+
+            summary:
+                input:
+                    prevInsights: get-prev-insights
+                    curInsights: get-cur-insights
+                    themeTag: function/themeTag
+                    prevPeriodTag: function/prevPeriodTag
+                    curPeriodTag: function/curPeriodTag
+                skipIfEmpty: [prevInsights, curInsights]
+                tool: llm
+                prompt: |
+                    Below are summaries taken from two earnings calls transcripts pertaining to the topic of {{themeTag.name}}. 
+                    The first summary is what was said for the period {{prevPeriodTag.name}}.
+                    The second summary is what was said for the period {{curPeriodTag.name}}.
+                    Write a throughough comparison of the two summaries, indicating in bold descriptions of inconsistencies 
+                    between any forward-looking or predictive statements in the {{prevPeriodTag.name}} summary and any 
+                    corresponding statements in the {{curPeriodTag.name}} summary. 
+
+                    Summary from {{prevPeriodTag.name}}: {% for x in prevInsights%}{{x.text}}{% endfor %}
+
+                    Summary from {{curPeriodTag.name}}: {% for x in curInsights%}{{x.text}}{% endfor %}
+
+            # summary:
+            #     input:
+            #         themeTag: function/themeTag
+            #         prevInsights: get-prev-insights
+            #         curInsights: get-cur-insights
+            #         prevPeriodTag: function/prevPeriodTag
+            #         curPeriodTag: function/curPeriodTag
+            #     skipIfEmpty: [prevInsights, curInsights]
+            #     tool: echo
+            #     message: |
+            #         mega summary: {{themeTag.name}} for {{curPeriodTag.name}} vs {{prevPeriodTag.name}} 
+            #         [curInsight]{% for x in curInsights%}{{x.text}} {% endfor %}[/curInsight]
+            #         [previInsight]{% for x in prevInsights%}{{x.text}} {% endfor %}[/prevInsight]
+
+            create-summary-insight:
+                input:
+                    summary: summary
+                    prevInsights: get-prev-insights
+                    curInsights: get-cur-insights
+                    themeTag: function/themeTag
+                    prevPeriodTag: function/prevPeriodTag
+                    curPeriodTag: function/curPeriodTag
+                skipIfEmpty: summary
+                tool: insight
+                text: "{{summary.text}}"
+                tags: [themeTag]
+                name: "Consistency analysis for {{themeTag.name}} ({{curPeriodTag.name}} vs. {{prevPeriodTag.name}})"
+                attributes:
+                    category: consistency-by-theme
+                relations:
+                    derived-from: [prevInsights, curInsights]   
+
+            add-insight:
+                input:
+                    knowledge: function/kset
+                    summary-insight: create-summary-insight
+                tool: knowledge-set
+                operations:
+                    - op: set-nodes
+                      nodes: summary-insight
