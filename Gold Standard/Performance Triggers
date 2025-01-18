@@ -3,8 +3,6 @@ input:
     type: document
   workspace:
     type: workspace
-  knowledge:
-    type: knowledge-set
 
 actions:
   get-performance-tags:
@@ -38,18 +36,6 @@ actions:
           associated_actions: [List of Associated Actions]
       
       Ensure each trigger is clearly defined with its specific conditions and metrics.
-  
-  add-to-workspace:
-    input:
-      workspace: input/workspace
-      triggerAnalysis: analyze-triggers
-      summary: summarize-triggers
-    tool: workspace
-    operations:
-      - op: add-items
-        items: triggerAnalysis
-      - op: add-items
-        items: summary
 
 functions:
   analyze-performance-trigger:
