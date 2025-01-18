@@ -1,0 +1,14 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  get-performance-triggers:
+    tool: find-tags
+    name: ["Performance", "Trigger"]
+
+  basePrompt:
+    tool: echo
+    message: |
