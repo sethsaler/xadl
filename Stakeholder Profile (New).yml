@@ -1,0 +1,61 @@
+input:
+  earningsCallDocuments:
+    type: document
+    label: Earnings call transcripts
+
+actions:
+  openai:
+    input:
+      earningsCallDocuments: task/earningsCallDocuments
+    tool: llm
+    prompt: |
+      You have been provided with one or more earnings call transcripts. Each transcript contains a question-and-answer section in which various analysts pose questions to the company’s executives.
+
+      {% if earningsCallDocuments %}
+      Here are the earnings call transcripts for analysis:
+      {% for doc in earningsCallDocuments %}
+      Text:
+      {{ doc.xdoc.text }}
+      {% endfor %}
+      {% endif %}
+
+      INSTRUCTIONS:
+
+      1. ANALYST IDENTIFICATION:
+         - Review the Q&A portions of each transcript.
+         - Identify every analyst who asks at least one question.
+         - Count how many questions each analyst asks across all transcripts.
+         - List the analysts in descending order by the total questions asked.
+
+      2. ANALYST PROFILING:
+         For each analyst identified:
+         a) Analyst Introduction:
+            - Provide the analyst’s name and their financial institution or affiliation (if stated).
+         b) Questioning Style:
+            - Characterize their approach (direct, technical, strategic, etc.).
+         c) Areas of Interest:
+            - Highlight recurring topics (e.g., product details, financial performance, strategic direction).
+         d) Notable Patterns or Trends:
+            - Identify any patterns, changes, or notable shifts in focus over time.
+            - Include short, relevant examples from the transcripts in plain text (no Markdown).
+         e) Evolution Over Time (if applicable):
+            - Describe how the analyst’s questions or style may have changed between calls.
+
+      3. PROFILE PRESENTATION:
+         - Begin each analyst profile with a brief introduction, then provide short paragraphs detailing style, interests, and patterns.
+         - List profiles in descending order based on the number of questions asked.
+
+      4. OVERALL ANALYSIS:
+         - Summarize common themes or recurring topics among multiple analysts.
+         - Note any standout or unique questioning approaches.
+         - Discuss how these interests might reflect broader market or industry concerns.
+
+      FINAL OUTPUT REQUIREMENTS:
+      - Present your findings in plain text with no Markdown formatting.
+      - Organize your final answer in clearly labeled sections:
+        1) Introduction
+        2) Analyst Identification and Frequency
+        3) Analyst Profiles
+        4) Overall Analysis
+
+      Follow these instructions carefully and provide a concise, well-structured report based on the transcripts provided.
