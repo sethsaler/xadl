@@ -1,0 +1,185 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Collect Performance Trigger Tags
+  get-performance-trigger-tags:
+    tool: find-tags
+    category: "Performance Triggers"
+
+  # 2) Base Prompt Setup
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are an experienced contract analyst specializing in identifying and evaluating performance obligations and trigger conditions in agreements. Your objectives include:
+
+      1. Identifying all performance obligations and their associated trigger conditions
+      2. Analyzing the specificity and clarity of trigger conditions
+      3. Evaluating timing requirements and deadlines
+      4. Assessing dependencies between different obligations
+      5. Highlighting potential compliance risks or ambiguities
+
+      When analyzing performance triggers:
+      - Focus on explicit conditions and requirements
+      - Note any dependencies or prerequisites
+      - Identify timing constraints and deadlines
+      - Flag any ambiguous or unclear trigger conditions
+
+  # 3) Analysis Prompt
+  performanceAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is text from the agreement containing performance obligations. Please analyze:
+      - The specific conditions that trigger performance obligations
+      - Which party must perform the obligation
+      - Any timing requirements or deadlines
+      - Dependencies on other conditions or obligations
+      - Potential ambiguities or unclear requirements
+
+      Relevant text from agreement:
+
+  # 4) Section Title
+  performanceAnalysisTitle:
+    tool: echo
+    message: Performance Triggers Analysis
+
+  # 5) Initialize Knowledge Set
+  init-knowledge-set:
+    input:
+      documents: task/documents
+      performanceTriggerTags: get-performance-trigger-tags
+    tool: knowledge-set
+    knowledgeSetName: "Performance Triggers Analysis"
+    operations:
+      - op: add-dimension
+        key: trigger
+        name: Performance Triggers
+        nodes: performanceTriggerTags
+        priority: 1
+      - op: set-nodes
+        nodes: documents
+
+  # 6) Analyze Performance Triggers
+  analyze-performance-triggers:
+    repeat:
+      function: analyze-trigger
+      for: tag
+    input:
+      tag: get-performance-trigger-tags
+      documents: task/documents
+      knowledge: init-knowledge-set
+      basePrompt: basePrompt
+      prompt: performanceAnalysisPrompt
+      title: performanceAnalysisTitle
+
+  # 7) Add to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      triggerAnalysis: analyze-performance-triggers
+      knowledgeSet: init-knowledge-set
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeSet
+
+functions:
+  analyze-trigger:
+    input:
+      tag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          tag: function/tag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          tags: [tag]
+
+      run-analysis:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{prompt.text}}
+          
+          Please structure your analysis as follows:
+          
+          1. TRIGGER CONDITIONS:
+          - List each distinct trigger condition
+          - Note whether it's time-based, event-based, or dependent on other factors
+          
+          2. OBLIGATED PARTY:
+          - Identify which party must perform
+          - Note any shared or conditional responsibilities
+          
+          3. PERFORMANCE REQUIREMENTS:
+          - Detail what must be done when triggered
+          - Include any specific standards or criteria
+          
+          4. TIMING:
+          - Specify deadlines or time constraints
+          - Note any grace periods or extensions
+          
+          5. DEPENDENCIES:
+          - List any prerequisites or conditions
+          - Note interconnected obligations
+          
+          6. RISKS/AMBIGUITIES:
+          - Highlight unclear or ambiguous terms
+          - Note potential compliance challenges
+
+          Analysis of provided text:
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          analysis: run-analysis
+          snippets: get-snippets
+          tag: function/tag
+          title: function/title
+        skipIfEmpty: analysis
+        tool: insight
+        text: |
+          {{analysis.text}}
+        name: "{{title.text}} - {{tag.name}}"
+        tags: [tag]
+        attributes:
+          category: performance-trigger-analysis
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
