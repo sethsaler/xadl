@@ -1,0 +1,220 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collection for Participants and Company categories
+  get-participant-tags:
+    tool: find-tags
+    category: "Participants"
+  
+  get-company-tags:
+    tool: find-tags
+    category: "Company"
+
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a financial analyst responsible for identifying and profiling participants in earnings calls. Your objectives include:
+
+      1. Identifying all unique participants mentioned in the call transcripts
+      2. Capturing their institutional affiliations
+      3. Noting their roles (analyst, executive, etc.)
+      4. Organizing the information in a clear, structured format
+
+      When analyzing the participants:
+      - Focus on accuracy of names and affiliations
+      - Include only explicitly stated information
+      - Maintain consistent formatting in your output
+      - Pay special attention to both company executives and external analysts
+      - List each participant only once, even if they appear multiple times
+      - Combine information about the same person from multiple mentions
+
+  # 3) Analysis prompt
+  analysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Review the following transcript excerpt and identify:
+      - Unique names of all participants (list each person only once)
+      - Their affiliated institutions
+      - Their roles in the call
+      
+      Format your response as follows:
+      [Name] - [Institution] - [Role]
+      (List each participant only once, combining information if mentioned multiple times)
+
+      Relevant excerpt:
+
+  # 4) Section Title
+  analysisTitle:
+    tool: echo
+    message: Earnings Call Participants Extraction
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      participantTags: get-participant-tags
+      companyTags: get-company-tags
+    tool: knowledge-set
+    knowledgeSetName: "Earnings Call Participants Extraction"
+    operations:
+      - op: add-dimension
+        key: participant
+        name: Participants
+        nodes: participantTags
+        priority: 1
+      - op: add-dimension
+        key: company
+        name: Company
+        nodes: companyTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # 6) Analyze each Participant tag for each Company tag
+  analyze-each-company-tag:
+    repeat:
+      function: analyze-for-tag
+      for: [tag, companyTag]
+    input:
+      tag: get-participant-tags
+      companyTag: get-company-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: analysisPrompt
+      title: analysisTitle
+
+  # 7) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      companyAnalysis: analyze-each-company-tag
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
+functions:
+  analyze-for-tag:
+    input:
+      tag:
+        type: tag
+      companyTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          tag: function/tag
+          companyTag: function/companyTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [tag, companyTag]
+      
+      get-instruction-prompt-for-tag:
+        input:
+          tag: function/tag
+        tool: echo
+        message: |
+          {% if tag.name == "Conference Call Participants" %}
+          CONFERENCE CALL PARTICIPANTS instructions:
+          OutputFormat: |
+            Extract and format the following information in this exact format, listing each participant only once:
+            **Name:** [Full Name]
+            **Institution:** [Company/Organization]
+            **Role:** [Position/Title or leave blank if not clearly stated]
+            
+          RequiredFields:
+            - Name: "Full name of the participant (list each person only once)"
+            - Institution: "Company or organization they represent"
+            - Role: "Their role or position (e.g., Analyst, CEO, CFO). Leave blank if not clearly stated"
+          {% endif %}
+
+          {% if tag.name == "Company Participants" %}
+          COMPANY PARTICIPANTS instructions:
+          OutputFormat: |
+            Extract and format the following information in this exact format, listing each participant only once:
+            **Name:** [Full Name]
+            **Role:** [Position/Title or leave blank if not clearly stated]
+            
+          RequiredFields:
+            - Name: "Full name of the participant (list each person only once)"
+            - Role: "Their role or position (e.g., CEO, CFO, President). Leave blank if not clearly stated"
+          {% endif %}
+          
+          OverallGuidance:
+          - "Adhere strictly to the output format"
+          - "Use bold tags for labels"
+          - "Include only explicitly stated information"
+          - "Maintain consistent formatting"
+          - "Process both company executives and external analysts"
+          - "Remove any duplicate entries for the same person"
+          - "Combine information about the same person from multiple mentions"
+          - "Ensure each participant appears exactly once in the output"
+          - "Leave Role field blank if no role is clearly stated"
+
+      run-prompt:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-tag
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-snippets
+          tag: function/tag
+          companyTag: function/companyTag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} for {{companyTag.name}}"
+        tags: [tag, companyTag]
+        attributes:
+          category: participant-analysis-insight
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
