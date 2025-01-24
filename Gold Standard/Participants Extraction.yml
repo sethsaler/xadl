@@ -92,16 +92,42 @@ actions:
       prompt: analysisPrompt
       title: analysisTitle
 
-  # 7) Add Results to Workspace
+  # 7) Cross-reference Conference Call Participants
+  cross-reference-participants:
+    input:
+      knowledge: init-kset
+      companyAnalysis: analyze-each-company-tag
+    tool: llm
+    prompt: |
+      Analyze the Conference Call Participants across all companies and identify analysts who appear in multiple earnings calls.
+      
+      For each analyst that appears in multiple calls:
+      
+      OutputFormat:
+      **Analyst:** [Full Name]
+      **Institution:** [Company/Organization]
+      **Role:** [Usually "Analyst"]
+      **Appears In:** [List of Company Names]
+      
+      Guidelines:
+      - Only include analysts who appear in 2 or more different company calls
+      - Match names exactly to avoid false positives
+      - Include their consistent institution affiliation
+      - List all companies where they appear as a participant
+
+  # 8) Add Results to Workspace
   add-to-workspace:
     input:
       workspace: task/workspace
       companyAnalysis: analyze-each-company-tag
+      crossReference: cross-reference-participants
       knowledge: init-kset
     tool: workspace
     operations:
       - op: add-items
         items: knowledge
+      - op: add-items
+        items: crossReference
 
 functions:
   analyze-for-tag:
