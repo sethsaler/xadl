@@ -97,9 +97,12 @@ actions:
     input:
       knowledge: init-kset
       companyAnalysis: analyze-each-company-tag
+      participantTag: get-participant-tags
     tool: llm
     prompt: |
       Analyze the Conference Call Participants across all companies and identify analysts who appear in multiple earnings calls.
+      
+      Focus specifically on participants tagged as "Conference Call Participants" and identify those who appear in multiple earnings calls.
       
       For each analyst that appears in multiple calls:
       
@@ -114,6 +117,10 @@ actions:
       - Match names exactly to avoid false positives
       - Include their consistent institution affiliation
       - List all companies where they appear as a participant
+      - Only consider participants tagged as "Conference Call Participants"
+    filter:
+      tag: participantTag
+      name: "Conference Call Participants"
 
   # 8) Add Results to Workspace
   add-to-workspace:
