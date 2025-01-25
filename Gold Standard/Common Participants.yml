@@ -21,7 +21,7 @@ actions:
       participantTags: get-participant-tags
       companyTags: get-company-tags
     tool: knowledge-set
-    knowledgeSetName: "Earnings Call Participants Extraction"
+    knowledgeSetName: "Common Participants Extraction"
     operations:
       - op: add-dimension
         key: participant
