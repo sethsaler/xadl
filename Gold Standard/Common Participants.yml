@@ -1,0 +1,90 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collection for Participants and Company categories
+  get-participant-tags:
+    tool: find-tags
+    category: "Participants"
+
+  get-company-tags:
+    tool: find-tags
+    category: "Company"
+
+  # 2) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      participantTags: get-participant-tags
+      companyTags: get-company-tags
+    tool: knowledge-set
+    knowledgeSetName: "Earnings Call Participants Extraction"
+    operations:
+      - op: add-dimension
+        key: participant
+        name: Participants
+        nodes: participantTags
+        priority: 1
+      - op: add-dimension
+        key: company
+        name: Company
+        nodes: companyTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # 3) Cross-reference Conference Call Participants
+  cross-reference-participants:
+    input:
+      knowledge: init-kset
+      participantTag: get-participant-tags
+    tool: llm
+    prompt: |
+      Analyze the Conference Call Participants across all companies and identify analysts who appear in multiple earnings calls.
+      
+      Focus specifically on participants tagged as "Conference Call Participants" and identify those who appear in multiple earnings calls.
+      
+      For each analyst that appears in multiple calls:
+      
+      OutputFormat:
+      **Analyst:** [Full Name]
+      **Institution:** [Company/Organization]
+      **Role:** [Usually "Analyst"]
+      **Appears In:** [List of Company Names]
+      
+      Guidelines:
+      - Only include analysts who appear in 2 or more different company calls
+      - Match names exactly to avoid false positives
+      - Include their consistent institution affiliation
+      - List all companies where they appear as a participant
+      - Only consider participants tagged as "Conference Call Participants"
+
+  # 4) Create Insight from Analysis
+  create-cross-reference-insight:
+    input:
+      analysis: cross-reference-participants
+      participantTag: get-participant-tags
+    tool: insight
+    text: |
+      {{analysis.text}}
+    name: "Cross-Referenced Conference Call Participants"
+    tags: [participantTag]
+    attributes:
+      category: participant-cross-reference-insight
+
+  # 5) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      crossReferenceInsight: create-cross-reference-insight
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+      - op: add-items
+        items: crossReferenceInsight
+
