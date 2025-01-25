@@ -1,0 +1,54 @@
+input:
+  documents:
+    type: document
+    label: Source documents
+  participantTags:
+    type: tag
+    label: Participant tags
+
+actions:
+  get-conference-call-participant-tags:
+    tool: find-tags
+    category: "Participants"
+    filter:
+      operator: "and"
+      tags: ["Conference Call Participants"]
+
+  get-participant-tags:
+    tool: find-tags
+    category: Participants
+
+  filter-documents:
+    input:
+      documents: task/documents
+      tags: task/participantTags
+    tool: document-text
+    
+  analyze-participants:
+    input:
+      documents: filter-documents
+      tags: get-participant-tags
+    tool: llm
+    prompt: |
+      # Main instruction
+      Extract unique participant names from the provided documents and generate regex patterns to identify them.
+
+      # Source documents
+      {% for doc in documents %}
+      Document: {{ doc.xdoc.text }}
+      {% endfor %}
+
+      # Detailed instructions
+      1. Identify all unique participants from the earnings calls
+      2. For each participant:
+         a) Extract their full name
+         b) Consider name variations (first+last, last only)
+         c) Generate a comprehensive regex pattern that matches all variations
+
+      # Output format
+      For each participant, output a single line in this format:
+      [Full Name]: [Regex Pattern]
+
+      Example:
+      John Smith: (?:John\s+)?Smith
+      ---
