@@ -3,7 +3,6 @@ input:
     type: document
   workspace:
     type: workspace
-
 actions:
   # 1) Tag Collection for Participants and Company categories
   get-participant-tags:
@@ -13,19 +12,16 @@ actions:
   get-company-tags:
     tool: find-tags
     category: "Company"
-
   # 2) Base configuration for shared prompt elements
   basePrompt:
     tool: echo
     message: |
       # Role and Context Setup
       You are a financial analyst responsible for identifying and profiling participants in earnings calls. Your objectives include:
-
       1. Identifying all unique participants mentioned in the call transcripts
       2. Capturing their institutional affiliations
       3. Noting their roles (analyst, executive, etc.)
       4. Organizing the information in a clear, structured format
-
       When analyzing the participants:
       - Focus on accuracy of names and affiliations
       - Include only explicitly stated information
@@ -33,13 +29,11 @@ actions:
       - Pay special attention to both company executives and external analysts
       - List each participant only once, even if they appear multiple times
       - Combine information about the same person from multiple mentions
-
   # 3) Analysis prompt
   analysisPrompt:
     tool: echo
     message: |
       {{basePrompt}}
-
       Review the following transcript excerpt and identify:
       - Unique names of all participants (list each person only once)
       - Their affiliated institutions
@@ -48,14 +42,11 @@ actions:
       Format your response as follows:
       [Name] - [Institution] - [Role]
       (List each participant only once, combining information if mentioned multiple times)
-
       Relevant excerpt:
-
   # 4) Section Title
   analysisTitle:
     tool: echo
     message: Earnings Call Participants Extraction
-
   # 5) Initialize Knowledge Set
   init-kset:
     input:
@@ -77,7 +68,6 @@ actions:
         priority: 2
       - op: set-nodes
         nodes: documents
-
   # 6) Analyze each Participant tag for each Company tag
   analyze-each-company-tag:
     repeat:
@@ -91,21 +81,16 @@ actions:
       basePrompt: basePrompt
       prompt: analysisPrompt
       title: analysisTitle
-
   # 7) Add Results to Workspace
   add-to-workspace:
     input:
       workspace: task/workspace
       companyAnalysis: analyze-each-company-tag
-      crossReference: cross-reference-participants
       knowledge: init-kset
     tool: workspace
     operations:
       - op: add-items
         items: knowledge
-      - op: add-items
-        items: crossReference
-
 functions:
   analyze-for-tag:
     input:
@@ -123,7 +108,6 @@ functions:
         type: knowledge-set
       title:
         type: text
-
     actions:
       get-snippets:
         input:
@@ -153,7 +137,6 @@ functions:
             - Institution: "Company or organization they represent"
             - Role: "Their role or position (e.g., Analyst, CEO, CFO). Leave blank if not clearly stated"
           {% endif %}
-
           {% if tag.name == "Company Participants" %}
           COMPANY PARTICIPANTS instructions:
           OutputFormat: |
@@ -176,7 +159,6 @@ functions:
           - "Combine information about the same person from multiple mentions"
           - "Ensure each participant appears exactly once in the output"
           - "Leave Role field blank if no role is clearly stated"
-
       run-prompt:
         input:
           snippets: get-snippets
@@ -191,7 +173,6 @@ functions:
           {% for s in snippets %}
           {{s.text}}
           {% endfor %}
-
       create-insight:
         input:
           summary: run-prompt
@@ -209,7 +190,6 @@ functions:
           category: participant-analysis-insight
         relations:
           derived-from: [snippets]
-
       add-insight:
         input:
           knowledge: function/knowledge
