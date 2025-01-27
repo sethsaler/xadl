@@ -1,0 +1,63 @@
+input:
+  agreementTags:
+    type: tag
+    label: Agreement Tags
+  agreementDocuments:
+    type: document
+    label: Agreement Information sources
+
+actions:
+  documentTextSelection:
+    input:
+      documents: task/agreementDocuments
+      tags: task/agreementTags
+    tool: document-text
+
+  openai:
+    input:
+      taggedAgreementInfo: documentTextSelection/default
+    tool: llm
+    prompt: |
+      Using the provided tagged agreement information, generate a structured summary for the relevant stakeholders. Adhere strictly to the following format and instructions:
+
+      **SUMMARY**
+      [Provide a concise overview of the agreement. Highlight any critical credits, name/image/likeness rights, and significant mutual obligations. Identify key issues or unusual clauses requiring stakeholder attention.]
+
+      **AGREEMENT INFORMATION BY CATEGORY**
+
+      **CREDITS OBLIGATIONS**
+      [Summarize all credits-related obligations (e.g., how credits must appear, placement, size, order, any shared or exclusive billing, etc.). Include who is responsible for fulfilling each credit obligation.]
+
+      **NAME/IMAGE/LIKENESS**
+      [Describe any language related to the usage rights of name, image, or likeness. Clearly note the scope of permitted uses, any restrictions, approval processes, and the duration of these rights.]
+
+      **OTHER OBLIGATIONS**
+      - **Party A Obligations**: 
+        [List responsibilities, deliverables, or performance requirements owed by Party A, focusing on relevant entertainment contract clauses such as marketing commitments, distribution responsibilities, or exclusivities.]
+      - **Party B Obligations**:
+        [List responsibilities, deliverables, or performance requirements owed by Party B, highlighting any conditions that require prompt fulfillment, reporting, or payment terms.]
+
+      **REPORTING INSTRUCTIONS**
+      [Provide any instructions for ongoing communication or reporting related to credits, name/image/likeness usage, or other obligations. Include deadlines, frequency of reports, or escalation procedures if issues arise.]
+
+      **IMPORTANT NOTES**
+      [If there are additional categories (e.g., indemnification, confidentiality, compensation terms), outline them here in a similar structured manner as needed. Omit if not present in the tagged content.]
+
+      ---
+      **IMPORTANT REQUIREMENTS FOR THIS SUMMARY**:
+      1. Do not include explanations or descriptions of your reasoning process. Present only final, structured outputs.
+      2. Derive all information solely from the content provided below.
+      3. Do not invent or assume details not found in the provided text. If a piece of information is missing, simply omit it.
+
+      Tagged agreement information:
+      {% if taggedAgreementInfo.data %}
+      {% for doc in taggedAgreementInfo.data %}
+      {% if doc.paragraphs %}
+      {% for paragraph in doc.paragraphs %}
+      ```Text
+      {{ paragraph }}
+      ```
+      {% endfor %}
+      {% endif %}
+      {% endfor %}
+      {% endif %}
