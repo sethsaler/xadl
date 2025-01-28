@@ -1,4 +1,4 @@
-Use [Instructions.md] and [File.yml] together to create the initial structural
+Use [Project Plan.md] and [File.yml] together to create the initial structural
 setup of a YAML file. I need you to create the YAML such that there is a document
 and workspace input. The actions will need to get and use tags from a category
 called [Tag Category or Categories] Then, I need you to create the appropriate actions

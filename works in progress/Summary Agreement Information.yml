@@ -15,7 +15,7 @@ actions:
 
   openai:
     input:
-      taggedAgreementInfo: documentTextSelection/default
+      taggedAgreementInfo: documentTextSelection
     tool: llm
     prompt: |
       Using the provided tagged agreement information, generate a structured summary for the relevant stakeholders. Adhere strictly to the following format and instructions:

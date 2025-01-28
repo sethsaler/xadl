@@ -1,0 +1,158 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # Get tags from Agreement Information category
+  get-agreement-tags:
+    tool: find-tags
+    category: "Agreement Information"
+
+  # Base prompt setup
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are an experienced contract attorney specializing in analyzing and summarizing agreement obligations. Your objectives include:
+
+      1. Identifying all obligations, commitments, and representations made by each party
+      2. Highlighting key deadlines, conditions, and requirements
+      3. Providing clear, actionable summaries that capture both legal and business implications
+      4. Flagging any ambiguities or areas requiring clarification
+
+      When analyzing and summarizing:
+      - Focus on precision and clarity in describing obligations
+      - Maintain strict adherence to the explicit terms
+      - Organize information by party and obligation type
+      - Note any dependencies or interconnected obligations
+
+  # Analysis prompt
+  analysisPrompt:
+    tool: echo 
+    message: |
+      {{basePrompt}}
+
+      Review the agreement text below and provide a structured summary following this format:
+
+      **PARTY A OBLIGATIONS**
+      [List each distinct obligation, including:
+      - Specific actions required
+      - Relevant deadlines or timing
+      - Any conditions or dependencies
+      - Compliance requirements]
+
+      **PARTY B OBLIGATIONS**
+      [Same structure as Party A]
+
+      **MUTUAL OBLIGATIONS**
+      [List shared responsibilities and requirements]
+
+      **KEY CONSIDERATIONS**
+      [Note any critical deadlines, approval requirements, or potential compliance challenges]
+
+      Agreement text for analysis:
+
+  # Initialize Knowledge Set
+  init-knowledge-set:
+    input:
+      documents: task/documents
+      agreementTags: get-agreement-tags
+    tool: knowledge-set
+    knowledgeSetName: "Agreement Obligations Analysis"
+    operations:
+      - op: add-dimension
+        key: category
+        name: Agreement Categories
+        nodes: agreementTags
+        priority: 1
+      - op: set-nodes
+        nodes: documents
+
+  # Analyze each agreement tag
+  analyze-each-tag:
+    repeat:
+      function: analyze-tag-content
+      for: tag
+    input:
+      tag: get-agreement-tags
+      documents: task/documents
+      knowledge: init-knowledge-set
+      basePrompt: basePrompt
+      prompt: analysisPrompt
+
+  # Add results to workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      tagAnalysis: analyze-each-tag
+      knowledge: init-knowledge-set
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
+functions:
+  analyze-tag-content:
+    input:
+      tag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+
+    actions:
+      get-snippets:
+        input:
+          tag: function/tag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          tags: [tag]
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          tag: function/tag
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "Obligation Analysis for {{tag.name}}"
+        tags: [tag]
+        attributes:
+          category: obligation-analysis
+        relations:
+          derived-from: [snippets]
+
+      add-to-knowledge:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
