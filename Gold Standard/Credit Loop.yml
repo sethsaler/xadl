@@ -135,44 +135,47 @@ functions:
         tool: echo
         message: |
           {% if agreementTag.name == "Preamble" %}
-          PREAMBLE instructions:
-              OutputFormat: |
-                  Extract and format the following information in this exact format:
-                  **Talent Name:** [Name]
-                  **Talent Type:** [Category]
-                  **Role:** [Character Name]
-                  **Agreement Name:** [Title]
-                  **Effective Date:** [Date]
-                  **Project Name:** [Title]
-              
-              RequiredFields:
-                  - TalentName: "Name of individual or team members"
-                  - TalentType: "Role category (Writer, Director, Producer, Performer, Physical Producer, Lead Cast)"
-                  - Role: "Character/role name for acting talent (N/A if not applicable)"
-                  - AgreementName: "Formal agreement title"
-                  - EffectiveDate: "Defined effective date or latest signature date. If missing, use the date the agreement was executed and specify that"
-                  - ProjectName: "Project title or working title"
+          PREAMBLE ANALYSIS REQUIREMENTS:
+
+          You must output EXACTLY in this format, with no deviations or additional text:
+
+          **Talent Name:** [Full legal name of talent]
+          **Talent Type:** [One of: Writer, Director, Producer, Performer, Physical Producer, Lead Cast]
+          **Role:** [Character name if acting talent, otherwise "N/A"]
+          **Agreement Name:** [Complete formal title of agreement]
+          **Effective Date:** [Date in MM/DD/YYYY format]
+          **Project Name:** [Official project title]
+
+          Rules:
+          1. Use ONLY the information explicitly stated in the provided text
+          2. Do not add explanatory notes or commentary
+          3. If information is missing, use "Not Specified" - do not make assumptions
+          4. Maintain exact formatting including bold markers and colons
+          5. Each field must be on its own line
           {% endif %}
 
           {% if agreementTag.name == "Credit" %}
-          CREDIT instructions:
-              CreditDetails:
-                  SubjectMatter: "Summarizing the credit obligations in detail."
-                  InformationNeeded:
-                      - "All relevant deal points specifically mentioned in the provided text, such as:"
-                      - "Main titles vs. end titles requirements"
-                      - "Special designations (e.g., guest star, special appearance)"
-                      - "Single card vs. shared card, and any position (first, second, etc.)"
-                      - "Type size or other format requirements"
-                      - "'No less favorable than…' or parity language"
-                      - "Producer or studio discretion over any of the above"
-                      - "Only include these items if they are explicitly mentioned; do not speculate on unmentioned conditions."
-              OutputFormat: "Summarize all credit obligations in a single paragraph, applying **bold formatting** to key terms (e.g., **single card**, **shared card**, **guest star**, etc.) but do not include extraneous language beyond the specific credit details required."
-              OverallGuidance:
-              - "Adhere Rigorously to the Output Format: Provide only the requested fields, in the exact format specified, with no additional text."
-              - "Use Bold Tags: For labels (e.g., **Talent Name:**) and for any special designations within the Credit summary (e.g., **guest star**)."
-              - "Avoid Irrelevant Content: Do not output commentary, explanations, or any information not explicitly requested."
-              - "Maintain Consistency: Ensure each section's format is consistent with these instructions."
+          CREDIT ANALYSIS REQUIREMENTS:
+
+          You must output EXACTLY ONE paragraph in this format:
+
+          Credit Terms: [Single paragraph containing ONLY the explicitly stated credit requirements, with key terms in **bold**]
+
+          Required Elements to Include (ONLY if explicitly mentioned):
+          - Position requirements (e.g., **first position**, **second position**)
+          - Card type (e.g., **single card**, **shared card**)
+          - Special designations (e.g., **guest star**, **special appearance**)
+          - Location requirements (e.g., **main titles**, **end credits**)
+          - Size/format specifications (e.g., **100% size**, **same size as**)
+          - Parity clauses (e.g., **no less favorable than**)
+          - Studio discretion clauses
+
+          Rules:
+          1. Output must begin with "Credit Terms: "
+          2. Include ONLY explicitly stated requirements
+          3. Bold ALL key terms and specifications
+          4. No additional commentary or analysis
+          5. No bullet points or multiple paragraphs
           {% endif %}
 
           {% assign roles = "Preamble,Credit" | split: "," %}

@@ -1,0 +1,208 @@
+input:
+    documents:
+        type: document
+    workspace:
+        type: workspace
+
+actions:
+    get-document-type:
+        tool: find-tags
+        category: ["Document Type"]
+
+    get-role-tags:
+        tool: find-tags
+        category: ["Role"]
+
+    get-state-tags:
+        tool: find-tags
+        category: ["State"]
+
+    init-kset:
+        input:
+            documentTags: get-document-type
+            roleTags: get-role-tags
+            stateTags: get-state-tags
+            documents: task/documents
+        tool: knowledge-set
+        knowledgeSetName: "Role Summaries Demo"
+        operations:
+            - op: add-dimension
+              key: documentType
+              name: Document Type
+              nodes: documentTags
+              priority: 1
+
+            - op: add-dimension
+              key: role
+              name: Role
+              nodes: roleTags
+              priority: 2
+
+            - op: add-dimension
+              key: state
+              name: State
+              nodes: stateTags
+              priority: 3
+
+            - op: set-nodes
+              nodes: documents
+
+    summarize-each-role:
+        repeat:
+            function: role-specific-summarize
+            for: [roleTag]
+        input:
+            roleTag: get-role-tags
+            documents: task/documents
+            knowledge: init-kset
+
+    add-to-workspace:
+        input:
+            workspace: task/workspace
+            summaries: summarize-each-role
+            knowledge: init-kset
+        tool: workspace
+        operations:
+            - op: add-items
+              items: knowledge
+
+functions:
+    role-specific-summarize:
+        input:
+            roleTag:
+                type: tag
+            documents:
+                type: document
+            knowledge:
+                type: knowledge-set
+        actions:
+            echo-role-intro:
+                input:
+                    role: function/roleTag
+                tool: echo
+                message: |
+                    {% if role.name == "Foreman" %}
+                    FOREMAN instructions:
+                    - You oversee job sites and assign tasks.
+                    - Focus on scheduling, work allocation, and problem-solving.
+                    {% endif %}
+
+                    {% if role.name == "Health and Safety Officer" %}
+                    HEALTH AND SAFETY OFFICER instructions:
+                    - You enforce safety rules.
+                    - Focus on hazard identification, risk assessments, and proper documentation.
+                    {% endif %}
+
+                    {% if role.name == "Lineman" %}
+                    LINEMAN instructions:
+                    - You repair and maintain electrical lines.
+                    - Focus on using the right safety gear and following live-line protocols.
+                    {% endif %}
+
+                    {% if role.name == "Traffic Control" %}
+                    TRAFFIC CONTROL instructions:
+                    - You guide vehicles and pedestrians around work zones.
+                    - Focus on clear signage, communicating directions, and staying alert.
+                    {% endif %}
+
+                    {% assign roles = "Foreman,Health and Safety Officer,Lineman,Traffic Control" | split: "," %}
+
+                    {% if roles contains role.name %}
+                    {% else %}
+                    GENERAL instructions for {{role.name}}
+                    - Please follow all safety guidelines and remain informed about your role.
+                    - Communicate any hazards or concerns immediately.
+                    {% endif %}
+
+            get-role-snippets:
+                input:
+                    documents: function/documents
+                    roleTag: function/roleTag
+                tool: document-text
+                textFilter:
+                    operator: "and"
+                    tags: [roleTag]
+
+            generate-role-summary:
+                input:
+                    snippets: get-role-snippets
+                    roleTag: function/roleTag
+                    roleIntro: echo-role-intro
+                skipIfEmpty: snippets
+                tool: llm
+                prompt: |
+                    **Manual Design Guidelines (what to focus on and how to format outputs):**
+                    
+                    1. **Clarity and Readability**
+                       - Use clear, concise language; avoid unnecessary jargon.
+                       - Keep terminology consistent.
+                       - Use readable fonts, adequate size, and line spacing.
+                       - Organize content with headings, bullet points, and lists.
+                    
+                    2. **Audience-Centric Design**
+                       - Tailor content to the user’s knowledge level and experience.
+                       - Provide language options or translations if relevant.
+                       - Be mindful of cultural differences or contexts.
+
+                    3. **Safety Emphasis**
+                       - Highlight critical information (e.g., bold text, icons).
+                       - Use standardized safety symbols (ANSI, ISO).
+                       - Mark emergency procedures clearly and make them easy to find.
+
+                    4. **Accessibility**
+                       - Adhere to accessibility guidelines (e.g., WCAG).
+                       - Offer alternative formats (large print, audio, etc.).
+                       - Ensure text and graphics have sufficient contrast.
+
+                    5. **Comprehensiveness**
+                       - Present step-by-step instructions for complex tasks.
+                       - Use visuals (diagrams, charts, photos, videos) to support text.
+                       - Provide a glossary for technical terms and an index.
+
+                    ---
+                    {{roleIntro.text}}
+
+                    Below are excerpts from our safety manuals for the role **"{{roleTag.name}}"**.
+
+                    {% for x in snippets %}
+                    {{x.text}}
+                    {% endfor %}
+
+            init-role-summary-insight:
+                input:
+                    snippets: get-role-snippets
+                    summary: generate-role-summary
+                    roleTag: function/roleTag
+                skipIfEmpty: summary
+                tool: insight
+                text: "{{summary.text}}"
+                tags: [roleTag]
+                name: "Role-specific summary for {{roleTag.name}}"
+                attributes:
+                    category: "roleInsight"
+                relations:
+                    derived-from: [snippets]
+
+            add-role-summary-to-kset:
+                input:
+                    knowledge: function/knowledge
+                    roleSummaryInsight: init-role-summary-insight
+                tool: knowledge-set
+                operations:
+                    - op: set-nodes
+                      nodes: roleSummaryInsight
+
+    store-snippet:
+        input:
+            snippet:
+                type: document-text
+            knowledge:
+                type: knowledge-set
+        actions:
+            add-single-snippet:
+                tool: knowledge-set
+                input:
+                    knowledge: function/knowledge
+                operations:
+                    - op: set-nodes
+                      nodes: function/snippet

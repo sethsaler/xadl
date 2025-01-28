@@ -6,9 +6,14 @@ input:
 
 actions:
   # Get tags from Agreement Information category
-  get-agreement-tags:
+  get-agreement-info-tags:
     tool: find-tags
-    category: "Agreement Information"
+    category: ["Agreement Information"]
+
+  # Get tags from Document Tags category
+  get-document-tags:
+    tool: find-tags
+    category: ["Document Tags"]
 
   # Base prompt setup
   basePrompt:
@@ -58,15 +63,20 @@ actions:
   init-knowledge-set:
     input:
       documents: task/documents
-      agreementTags: get-agreement-tags
+      agreementTags: get-agreement-info-tags
     tool: knowledge-set
-    knowledgeSetName: "Agreement Obligations Analysis"
+    knowledgeSetName: "Agreement Obligations Analysis" 
     operations:
+      - op: add-dimension
+        key: document
+        name: Source Documents
+        nodes: documents
+        priority: 1
       - op: add-dimension
         key: category
         name: Agreement Categories
         nodes: agreementTags
-        priority: 1
+        priority: 2
       - op: set-nodes
         nodes: documents
 
@@ -76,7 +86,7 @@ actions:
       function: analyze-tag-content
       for: tag
     input:
-      tag: get-agreement-tags
+      tag: get-agreement-info-tags
       documents: task/documents
       knowledge: init-knowledge-set
       basePrompt: basePrompt
