@@ -1,0 +1,138 @@
+input:
+    documents:
+        type: document
+    workspace:
+        type: workspace
+
+actions:
+    get-role-tags:
+        tool: find-tags
+        category: ["Role"]
+
+    init-kset:
+        input:
+            roleTags: get-role-tags
+            documents: task/documents
+        tool: knowledge-set
+        knowledgeSetName: "Tabletop Simulation Design"
+        operations:
+            - op: add-dimension
+              key: role
+              name: Role
+              nodes: roleTags
+              priority: 1
+
+            - op: set-nodes
+              nodes: documents
+
+    design-for-each-role:
+        repeat:
+            function: role-specific-design
+            for: [roleTag]
+        input:
+            roleTag: get-role-tags
+            documents: task/documents
+            knowledge: init-kset
+
+    add-to-workspace:
+        input:
+            workspace: task/workspace
+            designs: design-for-each-role
+            knowledge: init-kset
+        tool: workspace
+        operations:
+            - op: add-items
+              items: knowledge
+
+functions:
+    role-specific-design:
+        input:
+            roleTag:
+                type: tag
+            documents:
+                type: document
+            knowledge:
+                type: knowledge-set
+        actions:
+            get-role-snippets:
+                input:
+                    documents: function/documents
+                    roleTag: function/roleTag
+                tool: document-text
+                textFilter:
+                    operator: "and"
+                    tags: [roleTag]
+
+            generate-role-components:
+                input:
+                    snippets: get-role-snippets
+                    roleTag: function/roleTag
+                skipIfEmpty: snippets
+                tool: llm
+                prompt: |
+                    You are designing components for a tabletop safety simulation game for utility workers. Focus on the role of {{roleTag.name}}.
+                    
+                    Design Guidelines:
+                    1. Component Types
+                       - Role-specific action cards
+                       - Decision scenario cards
+                       - Equipment tokens
+                       - Safety procedure reference sheets
+                       - Team communication cards
+                    
+                    2. Gameplay Elements
+                       - Turn structure mechanics
+                       - Risk assessment challenges
+                       - Time pressure elements
+                       - Team coordination requirements
+                       - Emergency response scenarios
+                    
+                    3. Learning Objectives
+                       - Safety protocol knowledge
+                       - Procedure compliance
+                       - Risk awareness
+                       - Team communication
+                       - Decision-making under pressure
+                    
+                    4. Assessment Metrics
+                       - Safety compliance scoring
+                       - Team coordination rating
+                       - Response time tracking
+                       - Protocol adherence measurement
+                       - Communication effectiveness
+                    
+                    Based on these role-specific documents:
+                    {% for x in snippets %}
+                    {{x.text}}
+                    {% endfor %}
+                    
+                    Please design:
+                    1. Specific game components for this role
+                    2. Role-specific scenarios and challenges
+                    3. Assessment criteria and scoring mechanisms
+                    4. Integration points with other roles
+                    5. Safety learning objectives and outcomes
+
+            create-design-insight:
+                input:
+                    snippets: get-role-snippets
+                    design: generate-role-components
+                    roleTag: function/roleTag
+                skipIfEmpty: design
+                tool: insight
+                text: "{{design.text}}"
+                tags: [roleTag]
+                name: "Simulation components for {{roleTag.name}}"
+                attributes:
+                    category: "gameDesign"
+                relations:
+                    derived-from: [snippets]
+
+            add-design-to-kset:
+                input:
+                    knowledge: function/knowledge
+                    designInsight: create-design-insight
+                tool: knowledge-set
+                operations:
+                    - op: set-nodes
+                      nodes: designInsight
