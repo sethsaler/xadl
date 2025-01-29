@@ -1,0 +1,78 @@
+input:
+    documents:
+        type: document
+    workspace:
+        type: workspace
+   
+actions:
+    # Tagging Documents for Relevant Categories
+    analyst-tags:
+        tool: find-tags
+        category: ["Analyst"]
+
+    render-analyst-summaries:
+        repeat:
+            function: summarize-for-tag
+            for: [tag]
+        input:
+            tag: analyst-tags
+            documents: task/documents
+
+    # Building the Knowledge Set with Relevant Dimensions
+    render-report:
+        input:
+            documents: task/documents
+            analystSummaries: render-analyst-summaries
+        tool: echo
+        message: |
+            **Analyst Profiles**
+
+            {% for s in analystSummaries -%} 
+                {{s.text}}
+            {% endfor -%}
+
+functions:
+    # Generates a summary of the document snippets that match the specified tag
+    summarize-for-tag:
+        input:
+            tag:
+                type: tag
+            documents:
+                type: document
+        actions:
+            # Get the document snippets that match the tag
+            get-snippets:
+                input:
+                    tag: function/tag
+                    documents: function/documents
+                tool: document-text
+                textFilter:
+                    operator: "and"
+                    tags: [tag]
+            # Run a prompt to generate the summary text
+            run-prompt:
+                input:
+                    tag: function/tag
+                    snippets: get-snippets
+                skipIfEmpty: [snippets]
+                tool: llm
+                prompt: |
+                    {{tag.name}} is an investment analyst covering the utilities segment
+                    Create a detailed profile that identifies particular areas of interest for {{tag.name}}. 
+                    Include any notable patterns or trends in their questions. 
+                    Include {{tag.name}} in bold at the start of each summary. Then, Format each profile as a series of paragraphs, with lables identifying each paragraph's purpose (i.e., "Introduction") in bold. 
+                    Include a brief introduction for each analyst.
+                    Organize content with headings. Use clear, concise language. Include a line break after {{tag.name}} and before "Introduction" for each summary. Do not use markdown formatting. Use formatting suitable for a report that could be delievered to a supervisor. Do not use personal pronouns.
+
+                                        
+                    {% for s in snippets%}{{s.text}}
+                    {% endfor %}
+            # Finally, render and return the summary section
+            render-summary:
+                input:
+                    tag: function/tag
+                    summary: run-prompt
+                skipIfEmpty: [summary]
+                tool: echo
+                message: |
+                    {{summary.text}}
