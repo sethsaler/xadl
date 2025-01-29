@@ -34,10 +34,47 @@ actions:
             documents: task/documents
             knowledge: init-kset
 
+    generate-game-content:
+        input:
+            designs: design-for-each-role
+            knowledge: init-kset
+        tool: llm
+        prompt: |
+            Based on the role-specific designs, create a complete tabletop simulation game.
+            
+            For each component:
+            1. Create detailed question cards with:
+               - Scenario description
+               - Multiple choice options
+               - Correct answers and explanations
+               - Difficulty rating
+            
+            2. Design game mechanics:
+               - Turn order and phases
+               - Scoring system
+               - Win conditions
+               - Time limits
+               - Team interaction rules
+            
+            3. Create physical components:
+               - Board layout
+               - Card designs
+               - Token specifications
+               - Reference sheet templates
+            
+            4. Develop facilitation guidelines:
+               - Setup instructions
+               - Scenario progression
+               - Scoring guidelines
+               - Debrief questions
+            
+            Please provide complete specifications for manufacturing and implementation.
+
     add-to-workspace:
         input:
             workspace: task/workspace
             designs: design-for-each-role
+            gameContent: generate-game-content
             knowledge: init-kset
         tool: workspace
         operations:
@@ -113,14 +150,44 @@ functions:
                     4. Integration points with other roles
                     5. Safety learning objectives and outcomes
 
+            generate-role-questions:
+                input:
+                    snippets: get-role-snippets
+                    roleTag: function/roleTag
+                    design: generate-role-components
+                skipIfEmpty: design
+                tool: llm
+                prompt: |
+                    Create a set of scenario-based questions for the {{roleTag.name}} role.
+                    
+                    For each scenario:
+                    1. Write a detailed situation description
+                    2. Create 3-4 multiple choice options
+                    3. Identify correct answer and explanation
+                    4. Specify learning objectives addressed
+                    5. Include relevant safety protocols
+                    6. Add team coordination elements
+                    
+                    Create questions at three difficulty levels:
+                    - Basic protocol knowledge
+                    - Complex decision-making
+                    - Emergency response scenarios
+                    
+                    Ensure questions align with:
+                    - Safety compliance requirements
+                    - Role responsibilities
+                    - Team communication needs
+                    - Risk assessment procedures
+
             create-design-insight:
                 input:
                     snippets: get-role-snippets
                     design: generate-role-components
+                    questions: generate-role-questions
                     roleTag: function/roleTag
                 skipIfEmpty: design
                 tool: insight
-                text: "{{design.text}}"
+                text: "{{design.text}}\n\nQuestions and Scenarios:\n{{questions.text}}"
                 tags: [roleTag]
                 name: "Simulation components for {{roleTag.name}}"
                 attributes:

@@ -1,0 +1,154 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # Get Q&A and Analyst category tags
+  get-qa-tags:
+    tool: find-tags
+    category: "Question and Answer"
+
+  get-analyst-tags:
+    tool: find-tags
+    category: "Analyst"
+
+  # Base prompt for analyst profiling
+  basePrompt:
+    tool: echo
+    message: |
+      You are an expert in analyzing investor relations Q&A patterns and investor psychology. Your task is to:
+      1. Identify unique characteristics of each analyst's questioning style
+      2. Detect patterns in topic selection and follow-up questions
+      3. Assess technical depth and areas of focus
+      4. Predict likely future areas of inquiry based on historical patterns
+
+  # Analysis prompt
+  analysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+      
+      Review the following Q&A exchange and analyze:
+      - Question style (direct, technical, strategic, etc.)
+      - Topic focus and depth of understanding
+      - Follow-up patterns
+      - Underlying concerns or interests
+      
+      Provide a structured analysis that can be used to build an analyst profile.
+
+  # Initialize knowledge set
+  init-kset:
+    input:
+      documents: task/documents
+      qaTags: get-qa-tags
+      analystTags: get-analyst-tags
+    tool: knowledge-set
+    knowledgeSetName: "Analyst Q&A Profiles"
+    operations:
+      - op: add-dimension
+        key: qa
+        name: "Q&A Category"
+        nodes: qaTags
+        priority: 1
+      - op: add-dimension
+        key: analyst
+        name: "Analyst"
+        nodes: analystTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # Analyze each Q&A tag for each analyst tag
+  analyze-qa-tags:
+    repeat:
+      function: analyze-for-tag
+      for: [qaTag, analystTag]
+    input:
+      qaTag: get-qa-tags
+      analystTag: get-analyst-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: analysisPrompt
+
+  # Add to workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      qaAnalysis: analyze-qa-tags
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
+functions:
+  analyze-for-tag:
+    input:
+      qaTag:
+        type: tag
+      analystTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+
+    actions:
+      get-snippets:
+        input:
+          qaTag: function/qaTag
+          analystTag: function/analystTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [qaTag, analystTag]
+
+      analyze-qa:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{prompt.text}}
+          
+          Analyzing Q&A interactions for analyst: {{analystTag.name}}
+          Q&A Category: {{qaTag.name}}
+          
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          analysis: analyze-qa
+          snippets: get-snippets
+          qaTag: function/qaTag
+          analystTag: function/analystTag
+        skipIfEmpty: analysis
+        tool: insight
+        text: "{{analysis.text}}"
+        name: "Analyst Profile: {{analystTag.name}} - {{qaTag.name}}"
+        tags: [qaTag, analystTag]
+        attributes:
+          category: analyst-profile
+        relations:
+          derived-from: [snippets]
+
+      add-to-kset:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight

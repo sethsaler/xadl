@@ -1,0 +1,183 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Collect both tag categories
+  get-qa-tags:
+    tool: find-tags
+    category: "Question and Answer"
+    
+  get-analyst-tags:
+    tool: find-tags
+    category: "Analyst"
+  
+  # 2) Base configuration for analyst profiling
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are an expert in behavioral analysis and investment communications, specializing in understanding analyst questioning patterns and investment focus areas. Your objectives include:
+
+      1. Identifying distinctive questioning patterns and areas of focus for each analyst
+      2. Analyzing the sophistication and depth of technical understanding in their questions
+      3. Mapping recurring themes and concerns in their inquiries
+      4. Predicting potential future questions based on historical patterns
+
+      When analyzing:
+      - Focus on both style (how they ask) and substance (what they ask)
+      - Note any industry-specific terminology or frameworks they consistently use
+      - Identify their apparent investment thesis or concerns
+
+  # 3) Analysis prompt
+  analysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Please analyze the following Q&A interaction to:
+      - Identify the analyst's questioning style (direct, exploratory, technical, etc.)
+      - Note specific areas of focus or concern
+      - Highlight any unique characteristics in their approach
+      - Predict likely future questions based on their pattern
+
+      Analyst: {{analystTag.name}}
+      Q&A Text:
+
+  # 4) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      qaTags: get-qa-tags
+      analystTags: get-analyst-tags
+    tool: knowledge-set
+    knowledgeSetName: "Analyst Q&A Profiles"
+    operations:
+      - op: add-dimension
+        key: qa
+        name: Question and Answer
+        nodes: qaTags
+        priority: 1
+      - op: add-dimension
+        key: analyst
+        name: Analyst
+        nodes: analystTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # 5) Analyze for each combination of Q&A and Analyst tags
+  analyze-qa-tags:
+    repeat:
+      function: analyze-for-tag
+      for: [qaTag, analystTag]
+    input:
+      qaTag: get-qa-tags
+      analystTag: get-analyst-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: analysisPrompt
+
+  # 6) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      qaAnalysis: analyze-qa-tags
+      knowledgeSet: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeSet
+
+functions:
+  analyze-for-tag:
+    input:
+      qaTag:
+        type: tag
+      analystTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+
+    actions:
+      get-snippets:
+        input:
+          qaTag: function/qaTag
+          analystTag: function/analystTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [qaTag, analystTag]
+      
+      run-analysis:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+          analystTag: function/analystTag
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{prompt.text}}
+          
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+          Please structure your response as follows:
+
+          ANALYST PROFILE:
+          Style: [Questioning style characteristics]
+          Focus Areas: [Key topics and concerns]
+          Technical Depth: [Level of technical understanding]
+          Unique Traits: [Distinctive characteristics]
+          
+          PREDICTED QUESTIONS:
+          1. [Most likely future question]
+          2. [Second most likely question]
+          3. [Third most likely question]
+
+          HISTORICAL PATTERN:
+          Topics Frequency: [List most frequent topics]
+          Question Evolution: [How questions have changed over time]
+          
+          CONFIDENCE LEVEL: [High/Medium/Low] based on sample size and consistency
+
+      create-insight:
+        input:
+          analysis: run-analysis
+          snippets: get-snippets
+          qaTag: function/qaTag
+          analystTag: function/analystTag
+        skipIfEmpty: analysis
+        tool: insight
+        text: |
+          {{analysis.text}}
+        name: "Analyst Profile: {{analystTag.name}}"
+        tags: [qaTag, analystTag]
+        attributes:
+          category: analyst-qa-profile
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
