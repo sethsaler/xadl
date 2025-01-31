@@ -1,0 +1,141 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Get Participant Tags
+  get-participant-tags:
+    tool: find-tags
+    category: "Participants"
+  
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a financial analyst responsible for analyzing earnings call transcripts. Your objectives include:
+
+      1. Identifying key topics and themes discussed by each participant
+      2. Analyzing the sentiment and tone of responses
+      3. Tracking recurring themes or concerns raised by analysts
+      4. Noting management's responses to critical questions
+      5. Highlighting any forward-looking statements or guidance
+
+      When analyzing the content:
+      - Focus on factual statements and concrete information
+      - Note any significant changes in tone or emphasis
+      - Track patterns in questions and responses
+      - Identify key metrics and performance indicators discussed
+
+  # 3) Analysis prompt for participant contributions
+  participantAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is text from the earnings call for a specific participant. Please:
+      - Identify the main topics discussed by this participant
+      - Note any specific questions asked or answers provided
+      - Analyze the tone and sentiment of their contributions
+      - Highlight any significant data points or metrics mentioned
+      - Summarize key takeaways from their participation
+
+      Relevant text from the transcript:
+
+  # 4) Section Title
+  analysisTitle:
+    tool: echo
+    message: Earnings Call Participant Analysis
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      participantTags: get-participant-tags
+    tool: knowledge-set
+    knowledgeSetName: "Earnings Call Analysis"
+    operations:
+      - op: add-dimension
+        key: participant
+        name: Participants
+        nodes: participantTags
+        priority: 1
+      - op: set-nodes
+        nodes: documents
+
+  # 6) Analyze each participant's contributions
+  analyze-each-participant:
+    repeat:
+      function: analyze-for-participant
+      for: [tag]
+    input:
+      tag: get-participant-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: participantAnalysisPrompt
+      title: analysisTitle
+
+  # 7) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      participantAnalysis: analyze-each-participant
+      knowledgeSet: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeSet
+
+functions:
+  analyze-for-participant:
+    input:
+      tag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          tag: function/tag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          tags: [tag]
+      
+      run-analysis:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          analysis: run-analysis
+          snippets: get-snippets
+          tag: function/tag
+          title: function/title
+        tool: insight
+        skipIfEmpty: analysis
+        insight:
+          title: "{{title.text}} - {{tag.name}}"
+          content: "{{analysis.text}}"
+          snippets: snippets
