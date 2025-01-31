@@ -40,35 +40,25 @@ actions:
             knowledge: init-kset
         tool: llm
         prompt: |
-            Based on the role-specific designs, create a complete tabletop simulation game.
+            Based on the role-specific designs, create a complete, immersive tabletop simulation game. Incorporate rich narrative elements, detailed character backstories, and realistic safety challenges.
             
-            For each component:
-            1. Create detailed question cards with:
-               - Scenario description
-               - Multiple choice options
-               - Correct answers and explanations
-               - Difficulty rating
-            
-            2. Design game mechanics:
-               - Turn order and phases
-               - Scoring system
-               - Win conditions
-               - Time limits
-               - Team interaction rules
-            
-            3. Create physical components:
-               - Board layout
-               - Card designs
-               - Token specifications
-               - Reference sheet templates
-            
-            4. Develop facilitation guidelines:
-               - Setup instructions
-               - Scenario progression
-               - Scoring guidelines
-               - Debrief questions
-            
-            Please provide complete specifications for manufacturing and implementation.
+            For each component, generate:
+            1. Detailed question cards with:
+               - Scenario descriptions enriched with context
+               - Multiple choice options including plausible alternative answers
+               - Clear correct answers with detailed explanations
+               - Difficulty ratings along with hints for both beginners and experts.
+            2. Role-specific action cards highlighting unique responsibilities.
+            3. Interactive decision points featuring branching outcomes and visual cues.
+            Ensure the game content is engaging, educational, and fun, emphasizing safety and teamwork in a simulation environment.
+
+            Additionally, your output must adhere to the following explicit formatting guidelines:
+            - Begin with a main heading using '# ' followed by the game title.
+            - Use secondary headings (e.g., '## Narrative', '## Components') for major sections.
+            - Present all lists with standard bullet points (e.g., '- item').
+            - Indent sub-items by two spaces for clarity.
+            - Separate each section with at least one blank line.
+            - Conclude with a summary section that highlights key points of the output.
 
     add-to-workspace:
         input:
