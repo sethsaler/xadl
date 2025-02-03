@@ -1,0 +1,382 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collections for Different Categories
+  get-performance-tags:
+    tool: find-tags
+    category: "Performance Obligations"
+  
+  get-payment-tags:
+    tool: find-tags
+    category: "Payment Obligations"
+  
+  get-termination-tags:
+    tool: find-tags
+    category: "Termination"
+  
+  get-sla-tags:
+    tool: find-tags
+    category: "SLA"
+  
+  get-transferability-tags:
+    tool: find-tags
+    category: "Transferability"
+  
+  get-liability-tags:
+    tool: find-tags
+    category: "Liability"
+
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a telecommunications regulatory expert analyzing tariff documents. Your objectives include:
+
+      1. Identifying and summarizing key obligations, requirements, and terms within telecom tariffs
+      2. Highlighting important regulatory compliance aspects and requirements
+      3. Analyzing service level commitments and performance standards
+      4. Evaluating payment terms, liability provisions, and termination conditions
+      5. Assessing transferability and assignment rights
+
+      When analyzing the content:
+      - Focus on explicit terms and conditions
+      - Identify regulatory compliance requirements
+      - Note any unusual or non-standard provisions
+      - Flag potential risks or areas requiring attention
+
+  # 3) Analysis prompt
+  tariffAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is relevant text from the tariff document. Please:
+      - Analyze the specific provisions related to the tagged category
+      - Identify key requirements and obligations
+      - Note any regulatory compliance considerations
+      - Highlight important terms or conditions
+      - Summarize the findings concisely
+
+      Relevant text from the tariff:
+
+  # 4) Section Title
+  analysisTitle:
+    tool: echo
+    message: Tariff Analysis
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      performanceTags: get-performance-tags
+      paymentTags: get-payment-tags
+      terminationTags: get-termination-tags
+      slaTags: get-sla-tags
+      transferabilityTags: get-transferability-tags
+      liabilityTags: get-liability-tags
+    tool: knowledge-set
+    knowledgeSetName: "Telecom Tariff Analysis"
+    operations:
+      - op: set-nodes
+        nodes: documents
+      - op: add-dimension
+        key: performance
+        name: "Performance Obligations"
+        nodes: performanceTags
+        priority: 1
+      - op: add-dimension
+        key: payment
+        name: "Payment Obligations"
+        nodes: paymentTags
+        priority: 2
+      - op: add-dimension
+        key: termination
+        name: "Termination"
+        nodes: terminationTags
+        priority: 3
+      - op: add-dimension
+        key: sla
+        name: "SLA"
+        nodes: slaTags
+        priority: 4
+      - op: add-dimension
+        key: transferability
+        name: "Transferability"
+        nodes: transferabilityTags
+        priority: 5
+      - op: add-dimension
+        key: liability
+        name: "Liability"
+        nodes: liabilityTags
+        priority: 6
+
+  # 6) Analyze content for each category
+  analyze-performance:
+    input:
+      tag: get-performance-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+    function: analyze-for-category
+
+  analyze-payment:
+    input:
+      tag: get-payment-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+    function: analyze-for-category
+
+  analyze-termination:
+    input:
+      tag: get-termination-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+    function: analyze-for-category
+
+  analyze-sla:
+    input:
+      tag: get-sla-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+    function: analyze-for-category
+
+  analyze-transferability:
+    input:
+      tag: get-transferability-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+    function: analyze-for-category
+
+  analyze-liability:
+    input:
+      tag: get-liability-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+    function: analyze-for-category
+
+  # 7) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      performanceAnalysis: analyze-performance
+      paymentAnalysis: analyze-payment
+      terminationAnalysis: analyze-termination
+      slaAnalysis: analyze-sla
+      transferabilityAnalysis: analyze-transferability
+      liabilityAnalysis: analyze-liability
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
+functions:
+  analyze-for-category:
+    input:
+      tag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          tag: function/tag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [tag]
+      
+      get-instruction-prompt-for-tag:
+        input:
+          tag: function/tag
+        tool: echo
+        message: |
+          {% if tag.category == "Performance Obligations" %}
+          PERFORMANCE OBLIGATIONS ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Service Requirements:**
+          [Single paragraph summarizing the core service obligations]
+
+          **Performance Standards:**
+          - List each explicit performance requirement
+          - Include specific metrics and thresholds
+          - Note any time-based requirements
+
+          **Compliance Requirements:**
+          - List regulatory compliance obligations
+          - Include reporting requirements
+          - Note any certification needs
+          {% endif %}
+
+          {% if tag.category == "Payment Obligations" %}
+          PAYMENT OBLIGATIONS ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Payment Terms:**
+          [Single paragraph summarizing payment structure]
+
+          **Fee Schedule:**
+          - List all specified fees and charges
+          - Include payment deadlines
+          - Note any recurring charges
+
+          **Special Conditions:**
+          - List any payment conditions
+          - Include late payment terms
+          - Note any dispute procedures
+          {% endif %}
+
+          {% if tag.category == "Termination" %}
+          TERMINATION ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Termination Rights:**
+          [Single paragraph summarizing termination provisions]
+
+          **Notice Requirements:**
+          - List notice periods
+          - Include notification methods
+          - Note any cure periods
+
+          **Post-Termination Obligations:**
+          - List continuing obligations
+          - Include transition requirements
+          - Note any survival clauses
+          {% endif %}
+
+          {% if tag.category == "SLA" %}
+          SLA ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Service Levels:**
+          [Single paragraph summarizing SLA commitments]
+
+          **Performance Metrics:**
+          - List specific service levels
+          - Include measurement methods
+          - Note reporting requirements
+
+          **Remedies:**
+          - List SLA violation consequences
+          - Include credit calculations
+          - Note exclusions/exceptions
+          {% endif %}
+
+          {% if tag.category == "Transferability" %}
+          TRANSFERABILITY ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Assignment Rights:**
+          [Single paragraph summarizing transfer/assignment provisions]
+
+          **Restrictions:**
+          - List any transfer limitations
+          - Include consent requirements
+          - Note any prohibited transfers
+
+          **Process Requirements:**
+          - List notification requirements
+          - Include documentation needs
+          - Note timing requirements
+          {% endif %}
+
+          {% if tag.category == "Liability" %}
+          LIABILITY ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Liability Provisions:**
+          [Single paragraph summarizing liability framework]
+
+          **Limitations:**
+          - List liability caps
+          - Include excluded damages
+          - Note any carve-outs
+
+          **Indemnification:**
+          - List indemnification obligations
+          - Include trigger events
+          - Note procedural requirements
+          {% endif %}
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-tag
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          tag: function/tag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} for {{tag.name}}"
+        tags: [tag]
+        attributes:
+          category: tariff-analysis-insight
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets

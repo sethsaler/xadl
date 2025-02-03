@@ -1,28 +1,17 @@
-<knowledge-set-instructions>
-  <introduction>
-    Use <project-plan>Project Plan.md</project-plan> and <file>File.yml</file> together to create the initial structural setup of a YAML file.
-  </introduction>
+# Knowledge Set Instructions
 
-  <steps>
-    <step id="1">
-      Create the YAML such that there is a document and workspace input.
-    </step>
-    <step id="2">
-      Retrieve and utilize tags from the category <tag-category>[Tag Category or Categories]</tag-category>.
-    </step>
-    <step id="3">
-      Initialize the knowledge set.
-    </step>
-    <step id="4">
-      Set up appropriate dimensions/nodes.
-    </step>
-    <step id="5">
-      Build out functions to iterate over each tag in <tag-category>[Tag Category or Categories]</tag-category> and evaluate content snippets for <task-instructions>[instructions for the task to be accomplished]</task-instructions>.
-    </step>
-  </steps>
+Use **[Project Plan.md]** and **[File.yml]** together to create the initial structural setup of a YAML file. 
 
-  <additional-notes>
-    <note>Remember that even singular tags will need to be evaluated as part of a for loop with a repeat function and a tag variable.</note>
-    <note>Provide some well-reasoned structural output in the LLM tool section.</note>
-  </additional-notes>
-</knowledge-set-instructions>
+## Requirements
+
+1. Create the YAML such that there is a document and workspace input.
+2. The actions will need to get and use tags from a category called **[Tag Category or Categories]**.
+3. Create the appropriate actions for:
+   - Initializing the knowledge set
+   - Setting up appropriate dimensions/nodes
+   - Building out the functions that would iterate/loop over each of the tags within **[Tag Category or Categories]** to evaluate the content of the snippets with those tags for items **[instructions for the task to be accomplished]**.
+
+## Additional Notes
+
+- Remember that even singular tags will need to be evaluated as part of a for loop with a repeat function and a tag variable.
+- Provide some well-reasoned structural output in the LLM tool section.
