@@ -1,0 +1,180 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collection for Performance Obligations
+  get-performance-tags:
+    tool: find-tags
+    category: "Performance Obligations"
+
+  # 2) Base configuration for prompt
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a telecommunications regulatory expert analyzing tariff documents. Your objectives include:
+
+      1. Identifying and summarizing key obligations and requirements within telecom tariffs
+      2. Highlighting important regulatory compliance aspects
+      3. Analyzing service level commitments and performance standards
+
+      When analyzing the content:
+      - Focus on explicit terms and conditions
+      - Identify regulatory compliance requirements
+      - Note any unusual or non-standard provisions
+      - Flag potential risks or areas requiring attention
+
+  # 3) Analysis prompt
+  tariffAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is relevant text from the tariff document. Please:
+      - Analyze the specific provisions related to the tagged category
+      - Identify key requirements and obligations
+      - Note any regulatory compliance considerations
+      - Highlight important terms or conditions
+      - Summarize the findings concisely
+
+      Relevant text from the tariff:
+
+  # 4) Section Title
+  analysisTitle:
+    tool: echo
+    message: Tariff Analysis
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      performanceTags: get-performance-tags
+    tool: knowledge-set
+    knowledgeSetName: "Telecom Tariff Analysis"
+    operations:
+      - op: set-nodes
+        nodes: documents
+      - op: add-dimension
+        key: performance
+        name: "Performance Obligations"
+        nodes: performanceTags
+        priority: 1
+
+  # 6) Analyze content
+  analyze-performance:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-performance-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  # 7) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      performanceAnalysis: analyze-performance
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
+functions:
+  analyze-for-tag:
+    input:
+      tag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          tag: function/tag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [tag]
+      
+      get-instruction-prompt-for-tag:
+        input:
+          tag: function/tag
+        tool: echo
+        message: |
+          PERFORMANCE OBLIGATIONS ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Service Requirements:**
+          [Single paragraph summarizing the core service obligations]
+
+          **Performance Standards:**
+          - List each explicit performance requirement
+          - Include specific metrics and thresholds
+          - Note any time-based requirements
+
+          **Compliance Requirements:**
+          - List regulatory compliance obligations
+          - Include reporting requirements
+          - Note any certification needs
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-tag
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          tag: function/tag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} for {{tag.name}}"
+        tags: [tag]
+        attributes:
+          category: tariff-analysis-insight
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
