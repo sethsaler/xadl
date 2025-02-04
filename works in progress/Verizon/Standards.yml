@@ -1,0 +1,246 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collections for Performance Obligations
+  get-performance-tags:
+    tool: find-tags
+    category: "Performance Obligations"
+    
+  # 2) Document Type Tags
+  get-document-tags:
+    tool: find-tags
+    category: "Document Type"
+
+  # 3) Base configuration for analyzing performance obligations
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are analyzing Verizon's operating standards regarding performance obligations across various document types. Your objectives include:
+
+      1. Identifying and categorizing all performance obligations and their associated requirements
+      2. Analyzing compliance requirements and operational standards
+      3. Highlighting critical timelines, deliverables, and quality metrics
+      4. Noting any dependencies on specific document types
+
+      When analyzing performance obligations:
+      - Focus on explicit requirements and measurable standards
+      - Note any variations across different document types
+      - Flag potential compliance risks or operational challenges
+
+  # 4) Standards Analysis Prompt
+  standardsAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      If the performance tag is "Interconnect":
+      - Detail technical specifications for interconnection points
+      - List all required testing and verification procedures
+      - Specify response time requirements and SLAs
+      - Document regulatory compliance requirements
+      - Outline escalation procedures
+
+      For all other performance tags:
+      - Categorize the obligation type and priority level
+      - List operational standards and metrics
+      - Summarize compliance requirements
+      - Note verification methods
+      
+      Format results as:
+      
+      ## Interconnect Analysis (if applicable)
+      [Detailed interconnect requirements]
+      
+      ## General Performance Analysis
+      [Summary of other performance obligations]
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      performanceTags: get-performance-tags
+      documentTags: get-document-tags
+    tool: knowledge-set
+    knowledgeSetName: "Performance Standards Analysis"
+    operations:
+      - op: add-dimension
+        key: theme
+        name: Tags
+        nodes: performanceTags
+        priority: 1
+      - op: add-dimension
+        key: document
+        name: Document
+        nodes: documentTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # 6) Analyze each document tag
+  analyze-each-document-tag:
+    repeat:
+      function: analyze-for-tag
+      for: [tag, performanceTag]
+    input:
+      tag: get-document-tags
+      performanceTag: get-performance-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: standardsAnalysisPrompt
+
+  # 7) Add to workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      documentAnalysis: analyze-each-document-tag
+      knowledgeForDocuments: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeForDocuments
+
+functions:
+  analyze-for-tag:
+    input:
+      tag:
+        type: tag
+      performanceTag: 
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      get-instruction-prompt-for-tag:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+
+    actions:
+      get-snippets:
+        input:
+          tag: function/tag
+          performanceTag: function/performanceTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [tag, performanceTag]
+      
+      get-instruction-prompt-for-tag:
+        input:
+          performanceTag: function/performanceTag
+        tool: echo
+        message: |
+          {% if performanceTag.name == "Interconnect" %}
+          INTERCONNECT ANALYSIS REQUIREMENTS:
+
+          You must output EXACTLY in this format:
+
+          **Technical Specifications:**
+          - [List of technical requirements]
+          
+          **Testing Requirements:**
+          - [List of testing procedures]
+          
+          **SLA Requirements:**
+          - [Response time requirements]
+          - [Uptime requirements]
+          - [Performance metrics]
+          
+          **Regulatory Compliance:**
+          - [List of compliance requirements]
+          
+          **Escalation Procedures:**
+          - [List of escalation steps]
+
+          Rules:
+          1. Use ONLY information explicitly stated in the text
+          2. If information is missing, use "Not Specified"
+          3. Maintain exact formatting including bold markers
+          4. Each section must be present
+          {% endif %}
+
+          {% if performanceTag.name == "Network" %}
+          NETWORK REQUIREMENTS ANALYSIS:
+
+          You must output in this format:
+
+          **Network Standards:** [Single paragraph with **bold** key terms]
+          
+          **Performance Metrics:**
+          - [List of specific metrics with thresholds]
+          
+          **Monitoring Requirements:**
+          - [List of monitoring obligations]
+
+          Rules:
+          1. Bold ALL technical specifications and thresholds
+          2. Include only explicitly stated requirements
+          3. Use "Not Specified" for missing information
+          {% endif %}
+
+          {% assign known_tags = "Interconnect,Network" | split: "," %}
+          {% if known_tags contains performanceTag.name %}
+          {% else %}
+          GENERAL PERFORMANCE ANALYSIS:
+
+          Output format:
+          
+          **Obligation Type:** [Category]
+          **Requirements:** [Key requirements]
+          **Metrics:** [Measurable standards]
+          **Timeline:** [Time requirements]
+          **Verification:** [Verification methods]
+          {% endif %}
+
+      run-prompt:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-tag
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-snippets
+          tag: function/tag
+          performanceTag: function/performanceTag
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "Performance Analysis for {{tag.name}}"
+        tags: [tag, performanceTag]
+        attributes:
+          category: performance-analysis-insight
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets

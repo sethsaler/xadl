@@ -1,0 +1,204 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collections
+  get-agreement-info-tags:
+    tool: find-tags
+    category: Agreement Information
+
+  get-counterparty-tags:
+    tool: find-tags
+    category: Counterparty Name
+
+  # 2) Base configuration
+  basePrompt:
+    tool: echo
+    message: |
+      # Entertainment Rights Analysis Expert
+      You are an expert legal analyst specializing in entertainment industry contracts and rights management.
+      Your task is to analyze contractual agreements and clearly identify and categorize rights.
+      
+      Guidelines:
+      - Distinguish between rights granted and rights held back/reserved
+      - Pay special attention to territory, term, and usage restrictions
+      - Note any conditional rights or requirements for exercise
+      - Highlight any unusual or non-standard rights provisions
+      - Consider both explicit and implicit rights implications
+      - Focus on entertainment industry-specific rights (e.g., distribution, exhibition, merchandising)
+      - Note any digital/streaming rights and their limitations
+      - Identify any rights related to derivative works or adaptations
+
+  # 3) Analysis prompt
+  analysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+      
+      Review the following content and provide structured analysis:
+
+  # 4) Section Title  
+  analysisTitle:
+    tool: echo
+    message: Rights Analysis
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      agreementTags: get-agreement-info-tags
+      counterpartyTags: get-counterparty-tags
+    tool: knowledge-set
+    knowledgeSetName: "Rights Analysis"
+    operations:
+      - op: add-dimension
+        key: agreement_info
+        name: "Agreement Information"
+        nodes: agreementTags
+        priority: 1
+      - op: add-dimension
+        key: counterparty
+        name: "Counterparty"
+        nodes: counterpartyTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # 6) Analysis Actions
+  analyze-rights:
+    repeat:
+      function: analyze-for-rights
+      for: [agreementTag, counterpartyTag]
+    input:
+      agreementTag: get-agreement-info-tags
+      counterpartyTag: get-counterparty-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: analysisPrompt
+      title: analysisTitle
+
+  # 7) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      rightsAnalysis: analyze-rights
+      knowledgeForDocuments: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeForDocuments
+
+functions:
+  analyze-for-rights:
+    input:
+      agreementTag:
+        type: tag
+      counterpartyTag:
+        type: tag
+      documents:
+        type: document
+      knowledge:
+        type: knowledge-set
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          agreementTag: function/agreementTag
+          counterpartyTag: function/counterpartyTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          tags: 
+            - agreementTag
+            - counterpartyTag
+        skipIfEmpty: documents
+
+      get-instruction-prompt-for-tag:
+        input:
+          agreementTag: function/agreementTag
+          counterpartyTag: function/counterpartyTag
+        tool: echo
+        message: |
+          Format your response as a JSON object with the following structure:
+          {
+            "rightsGranted": [
+              {
+                "right": "[specific right granted]",
+                "category": "[distribution/exhibition/merchandising/etc]", 
+                "territory": "[geographic scope]",
+                "term": "[duration/period]",
+                "conditions": ["condition1", "condition2"],
+                "restrictions": ["restriction1", "restriction2"]
+              }
+            ],
+            "rightsHeldBack": [
+              {
+                "right": "[specific right reserved]",
+                "category": "[type of right]",
+                "reason": "[why it's held back]",
+                "impact": "[business impact]"
+              }
+            ],
+            "observations": [
+              {
+                "type": "[unusual/conflict/strategic]",
+                "description": "[detailed observation]",
+                "importance": "[high/medium/low]"
+              }
+            ]
+          }
+
+      run-prompt:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-tag
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-snippets
+          agreementTag: function/agreementTag
+          counterpartyTag: function/counterpartyTag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} for {{agreementTag.name}} and {{counterpartyTag.name}}"
+        tags: [agreementTag, counterpartyTag]
+        attributes:
+          category: rights-analysis-insight
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets

@@ -1,54 +1,93 @@
-# Knowledge Set Database Instructions
+# Knowledge Set Instructions
 
 ## Overview
 
-This document provides detailed instructions for implementing and maintaining Knowledge Set YAML files. Follow these guidelines to ensure consistent and effective knowledge set creation.
+This document provides instructions for creating Knowledge Sets focused on analyzing credit-related clauses in talent agreements. Follow these guidelines to ensure consistent and effective legal analysis.
 
-## File Structure Requirements
+## Requirements
 
-### 1. Basic Structure
-Every Knowledge Set YAML file must contain these three main sections:
+1. Create the YAML with document and workspace input types.
+2. The actions will need to get and use tags from two sources:
+   - Agreement Information tags ("Credit", "Preamble")
+   - Document Category tags from "Document Tags" category
+3. Create the appropriate actions for:
+   - Setting up base prompts for legal analysis
+   - Configuring contract analysis prompts
+   - Building functions to analyze credit-related content
+
+## Action Type Structure Requirements
+
+1. All analysis actions MUST use the following structure:
 ```yaml
-input:
-  # Input declarations
-actions:
-  # Action definitions
-functions:
-  # Function definitions
+analyze-[category]:
+  repeat:
+    function: analyze-for-tag
+    for: [tag]
+  input:
+    tag: get-[category]-tags
+    documents: task/documents
+    knowledge: init-kset
+    basePrompt: basePrompt
+    prompt: contractAnalysisPrompt
+    title: contractAnalysisTitle
 ```
 
-### 2. Input Section
-Required input declarations:
-```yaml
-input:
-  documents:
-    type: document
-  workspace:
-    type: workspace
-```
-
-### 3. Actions Section
-Required action types:
-- Tag Collections
-- Prompts
-- Knowledge Set Initialization
-- Analysis Actions
+2. Key points about the structure:
+   - Always use `repeat` with `function` and `for` parameters
+   - The function name must be `analyze-for-tag`
+   - The `for` parameter must be `[tag]`
+   - Never use direct function calls with `function: analyze-for-category`
+   - Keep all input parameters under the `input` section
 
 ## Implementation Guidelines
 
-### 1. Tag Collection Setup
+### 1. Base Prompt Setup
+- Establish the role as in-house counsel
+- Define clear objectives for credit analysis
+- Include guidelines for maintaining legal precision
 
-#### Required Format:
+### 2. Contract Analysis Prompt
+- Build on base prompt
+- Focus on credit obligations and risks
+- Include specific review criteria
+
+### 3. Tag Collection Setup
 ```yaml
-get-[category]-tags:
+get-agreementInformation-tags:
   tool: find-tags
-  [identifier]: [value]
+  name: ["Credit", "Preamble"]
+
+get-documentCategory-tags:
+  tool: find-tags
+  category: "Document Tags"
 ```
 
-#### Rules:
-- Use descriptive category names
-- Choose between `name` or `category` identifier
-- Maintain consistent naming conventions
+## Common Issues to Avoid
+
+1. ❌ Incorrect structure (Do not use):
+```yaml
+analyze-[category]:
+  input:
+    tag: get-[category]-tags
+    documents: task/documents
+    knowledge: init-kset
+  function: analyze-for-category  # Wrong! Use repeat structure instead
+```
+
+2. ✅ Correct structure:
+```yaml
+analyze-[category]:
+  repeat:
+    function: analyze-for-tag
+    for: [tag]
+  input:
+    tag: get-[category]-tags
+    documents: task/documents
+    knowledge: init-kset
+    basePrompt: basePrompt
+    prompt: contractAnalysisPrompt
+    title: contractAnalysisTitle
+```
 
 ### 2. Prompt Configuration
 
@@ -231,39 +270,3 @@ skipIfEmpty: true
 ```yaml
 skipIfEmpty: snippets
 ```
-
-## Maintenance Guidelines
-
-### 1. Version Control
-- Use semantic versioning
-- Document all changes
-- Maintain changelog
-
-### 2. Documentation
-- Update instructions with changes
-- Include examples
-- Document edge cases
-
-### 3. Testing
-- Validate YAML syntax
-- Test all conditions
-- Verify output format
-
-## Support and Resources
-
-### 1. Tools
-- document-text
-- find-tags
-- knowledge-set
-- llm
-- insight
-
-### 2. Templates
-- Liquid template guide
-- YAML best practices
-- Schema validation
-
-### 3. Documentation
-- Knowledge Set guide
-- Tool documentation
-- Example implementations

@@ -1,54 +1,57 @@
-# Knowledge Set Database Project Plan
+# Project Plan
 
-## Project Overview
+## Objective
+Create a YAML workflow that analyzes credit-related clauses in talent agreements. The workflow will find specific tags ("Credit", "Preamble"), set up prompts for legal analysis, and save the results to a knowledge set and workspace.
 
-The Knowledge Set Database project aims to create a structured system for analyzing and extracting insights from [Document Type] documents. This plan outlines the key components, requirements, and implementation steps.
+## Collect Tags
+1. Agreement Information Tags:
+   - Use `find-tags` to collect "Credit" and "Preamble" tags
+   - Purpose: Identify relevant credit and introductory clauses
 
-## Document Analysis Requirements
+2. Document Category Tags:
+   - Use `find-tags` to gather tags from the "Document Tags" category
+   - Purpose: Organize documents by their type and relevance
 
-### Document Categories
-- Primary Category: [Primary Document Category]
-- Secondary Categories: [List of Secondary Categories]
-- Special Considerations: [Any Special Document Handling Requirements]
+## Define Prompts
+1. Base Prompt:
+   - Establish role as in-house counsel
+   - Set context for talent agreement analysis
+   - Define objectives for credit obligation review
+   - Include guidelines for maintaining legal precision
 
-### Tag Structure
-1. Primary Tags:
-   - Category: [Primary Tag Category]
-   - Expected Tags: [List Expected Tags]
-   - Purpose: [Tag Purpose]
+2. Contract Analysis Prompt:
+   - Build on base prompt
+   - Specify criteria for analyzing credit clauses
+   - Include guidelines for risk assessment
+   - Focus on compliance and obligation tracking
 
-2. Secondary Tags:
-   - Category: [Secondary Tag Category]
-   - Expected Tags: [List Expected Tags]
-   - Purpose: [Tag Purpose]
+## Initialize the Knowledge Set
+Use knowledge-set action to:
+- Create/update knowledge set with documents
+- Associate relevant tags
+- Prepare for insight storage
+- Set up appropriate dimensions
 
-## Analysis Requirements
+## Analyze Credit Clauses
+Implement analyze-for-tag function to:
+- Extract tagged document snippets
+- Process through LLM with legal analysis prompts
+- Create insights about credit obligations and risks
+- Track compliance requirements
 
-### Content Analysis Goals
-1. Primary Objectives:
-   - [Primary Objective 1]
-   - [Primary Objective 2]
-   - [Primary Objective 3]
+## Store Results
+- Add insights about credit obligations
+- Include relevant contract snippets
+- Save to knowledge set and workspace
+- Maintain traceability to source documents
 
-2. Key Metrics:
-   - [Metric 1]
-   - [Metric 2]
-   - [Metric 3]
-
-### Output Requirements
-1. Format:
-   ```
-   [Specify Required Output Format]
-   ```
-
-2. Required Sections:
-   - [Section 1]
-   - [Section 2]
-   - [Section 3]
-
-## Implementation Plan
-
-### Phase 1: Setup
+## YAML Structure
+Ensure final YAML includes:
+- Proper input declarations (document, workspace)
+- Tag collection actions for both categories
+- Well-structured prompts with legal context
+- Analysis function with repeat structure
+- Complete input references for all components
 1. Create base YAML structure
    - Input declarations
    - Basic action framework
