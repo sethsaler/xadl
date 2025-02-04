@@ -30,6 +30,10 @@ actions:
     tool: find-tags
     category: "Liability"
 
+  get-company-tags:
+    tool: find-tags
+    name: ["Frontier", "Verizon"]
+
   # 2) Base configuration for shared prompt elements
   basePrompt:
     tool: echo
@@ -79,6 +83,7 @@ actions:
       slaTags: get-sla-tags
       transferabilityTags: get-transferability-tags
       liabilityTags: get-liability-tags
+      companyTags: get-company-tags
     tool: knowledge-set
     knowledgeSetName: "Telecom Tariff Analysis"
     operations:
@@ -114,6 +119,11 @@ actions:
         name: "Liability"
         nodes: liabilityTags
         priority: 6
+      - op: add-dimension
+        key: company
+        name: "Company"
+        nodes: companyTags
+        priority: 7
 
   # 6) Analyze content for each category
   analyze-performance:
@@ -188,21 +198,17 @@ actions:
       prompt: tariffAnalysisPrompt
       title: analysisTitle
 
-  # 7) Add Results to Workspace
-  add-to-workspace:
+  analyze-company:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
     input:
-      workspace: task/workspace
-      performanceAnalysis: analyze-performance
-      paymentAnalysis: analyze-payment
-      terminationAnalysis: analyze-termination
-      slaAnalysis: analyze-sla
-      transferabilityAnalysis: analyze-transferability
-      liabilityAnalysis: analyze-liability
+      tag: get-company-tags
+      documents: task/documents
       knowledge: init-kset
-    tool: workspace
-    operations:
-      - op: add-items
-        items: knowledge
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
 
 functions:
   analyze-for-tag:
@@ -211,15 +217,14 @@ functions:
         type: tag
       documents:
         type: document
+      knowledge:
+        type: knowledge-set
       basePrompt:
         type: text
       prompt:
         type: text
-      knowledge:
-        type: knowledge-set
       title:
         type: text
-
     actions:
       get-snippets:
         input:
@@ -227,8 +232,8 @@ functions:
           documents: function/documents
         tool: document-text
         textFilter:
-          operator: "and"
           tags: [tag]
+        skipIfEmpty: documents
 
       get-instruction-prompt-for-tag:
         input:
@@ -347,6 +352,25 @@ functions:
           - Highlight potential financial exposure and mitigation strategies
           - Note any competitive advantages or disadvantages in liability terms
           - Identify potential risks or opportunities for risk management improvement
+          {% endif %}
+
+          {% if tag.name == "Frontier" or tag.name == "Verizon" %}
+          COMPANY ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Company Overview:**
+          [Single paragraph summarizing the company's market position and strategic focus]
+
+          **Service Portfolio:**
+          - List key service offerings and target markets
+          - Include unique value propositions
+          - Note any service differentiators
+
+          **Strategic Position:**
+          - Highlight competitive strengths and weaknesses
+          - Note market share and growth trajectory
+          - Identify potential opportunities and threats
           {% endif %}
 
       analyze-content:

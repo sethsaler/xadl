@@ -30,6 +30,10 @@ actions:
     tool: find-tags
     category: "Liability"
 
+  get-state-tags:
+    tool: find-tags
+    name: ["Ohio", "Iowa", "Michigan", "Florida"]
+
   # 2) Base configuration for shared prompt elements
   basePrompt:
     tool: echo
@@ -114,6 +118,11 @@ actions:
         name: "Liability"
         nodes: liabilityTags
         priority: 6
+      - op: add-dimension
+        key: state
+        name: "State"
+        nodes: stateTags
+        priority: 7
 
   # 6) Analyze content for each category
   analyze-performance:
@@ -188,6 +197,18 @@ actions:
       prompt: tariffAnalysisPrompt
       title: analysisTitle
 
+  analyze-state:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-state-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
   # 7) Add Results to Workspace
   add-to-workspace:
     input:
@@ -198,6 +219,7 @@ actions:
       slaAnalysis: analyze-sla
       transferabilityAnalysis: analyze-transferability
       liabilityAnalysis: analyze-liability
+      stateAnalysis: analyze-state
       knowledge: init-kset
     tool: workspace
     operations:

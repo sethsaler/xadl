@@ -1,0 +1,116 @@
+# State Comparisons
+
+state_pairs:
+  ohio_iowa:
+    states:
+      - Ohio
+      - Iowa
+    differences:
+      performance_obligations:
+        summary: "Key differences in performance requirements between Ohio and Iowa"
+        details:
+          - "Network availability requirements: Ohio requires 99.999% uptime in urban areas, Iowa requires 99.99%"
+          - "Service quality metrics: Ohio has stricter packet loss requirements"
+          - "Response time standards: Iowa allows longer response times for rural areas"
+      payment_obligations:
+        summary: "Variations in payment terms between Ohio and Iowa"
+        details:
+          - "Billing cycle differences: Ohio requires 30-day notice for rate changes, Iowa requires 45 days"
+          - "Late payment penalties: Higher penalties in Ohio"
+          - "Deposit requirements: More stringent in Iowa for new customers"
+      termination:
+        summary: "Contrasting termination provisions"
+        details:
+          - "Notice period requirements: 60 days in Ohio, 45 days in Iowa"
+          - "Early termination fees: Higher in Ohio for business customers"
+          - "Service discontinuation terms: More flexible in Iowa"
+
+  ohio_michigan:
+    states:
+      - Ohio
+      - Michigan
+    differences:
+      performance_obligations:
+        summary: "Performance requirement variations between Ohio and Michigan"
+        details:
+          - "Service quality standards: Michigan has additional winter weather provisions"
+          - "Technical specifications: Different fiber optic requirements"
+          - "Reporting requirements: Monthly in Ohio, quarterly in Michigan"
+      payment_obligations:
+        summary: "Payment term differences"
+        details:
+          - "Payment schedules: More flexible terms in Michigan"
+          - "Fee structures: Higher regulatory fees in Ohio"
+          - "Dispute resolution: Different mediation requirements"
+
+  ohio_florida:
+    states:
+      - Ohio
+      - Florida
+    differences:
+      performance_obligations:
+        summary: "Performance standard variations between Ohio and Florida"
+        details:
+          - "Weather-related provisions: Florida has hurricane-specific requirements"
+          - "Emergency response requirements: More stringent in Florida"
+          - "Restoration timelines: Faster requirements in Florida during storm season"
+      liability:
+        summary: "Liability clause variations"
+        details:
+          - "Natural disaster provisions: More comprehensive in Florida"
+          - "Service interruption liability: Higher caps in Ohio"
+          - "Third-party claims: Different handling procedures"
+
+  iowa_michigan:
+    states:
+      - Iowa
+      - Michigan
+    differences:
+      performance_obligations:
+        summary: "Performance requirement differences between Iowa and Michigan"
+        details:
+          - "Rural service requirements: More extensive in Iowa"
+          - "Coverage obligations: Different population density requirements"
+          - "Quality metrics: Michigan has stricter standards for urban areas"
+      sla:
+        summary: "Service level differences"
+        details:
+          - "Performance standards: Different measurement criteria"
+          - "Measurement methods: More frequent testing in Michigan"
+          - "Remedies: Higher credits in Iowa for violations"
+
+  iowa_florida:
+    states:
+      - Iowa
+      - Florida
+    differences:
+      performance_obligations:
+        summary: "Performance requirement variations between Iowa and Florida"
+        details:
+          - "Geographic considerations: Different terrain-specific requirements"
+          - "Seasonal requirements: Storm season provisions in Florida"
+          - "Infrastructure standards: Different redundancy requirements"
+      liability:
+        summary: "Liability provision differences"
+        details:
+          - "Liability caps: Higher in Florida for weather-related issues"
+          - "Insurance requirements: Additional coverage required in Florida"
+          - "Indemnification terms: Broader scope in Florida"
+
+  michigan_florida:
+    states:
+      - Michigan
+      - Florida
+    differences:
+      performance_obligations:
+        summary: "Performance requirement variations between Michigan and Florida"
+        details:
+          - "Climate-specific requirements: Winter provisions in Michigan vs hurricane provisions in Florida"
+          - "Service restoration standards: Different timelines based on weather events"
+          - "Maintenance schedules: Seasonal variations"
+      sla:
+        summary: "Service level differences"
+        details:
+          - "Performance metrics: Different seasonal adjustments"
+          - "Environmental considerations: State-specific natural events"
+          - "Compensation structures: Different credit calculations"

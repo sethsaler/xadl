@@ -1,0 +1,158 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collections for Categories
+  get-category-tags:
+    tool: find-tags
+    category: "Document Category"
+  
+  get-topic-tags:
+    tool: find-tags
+    name: ["Topic A", "Topic B"]
+
+  # 2) Base configuration
+  basePrompt:
+    tool: echo
+    message: |
+      # Analysis Context
+      You are an expert analyst examining documents. Your objectives:
+      1. Identify key themes and patterns
+      2. Extract relevant information
+      3. Provide structured analysis
+
+      Guidelines:
+      - Focus on explicit content
+      - Maintain objectivity
+      - Provide evidence-based insights
+
+  # 3) Analysis prompt
+  analysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+      
+      Review the following content and provide structured analysis:
+
+  # 4) Section Title
+  analysisTitle:
+    tool: echo
+    message: Document Analysis
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      categoryTags: get-category-tags
+      topicTags: get-topic-tags
+    tool: knowledge-set
+    knowledgeSetName: "Example Analysis"
+    operations:
+      - op: add-dimension
+        key: category
+        name: "Document Category"
+        nodes: categoryTags
+        priority: 1
+      - op: add-dimension
+        key: topic
+        name: "Topic"
+        nodes: topicTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # 6) Analysis Actions
+  analyze-categories:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-category-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: analysisPrompt
+      title: analysisTitle
+
+functions:
+  analyze-for-tag:
+    input:
+      tag:
+        type: tag
+      documents:
+        type: document
+      knowledge:
+        type: knowledge-set
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          tag: function/tag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          tags: [tag]
+        skipIfEmpty: documents
+
+      get-instruction-prompt-for-tag:
+        input:
+          tag: function/tag
+        tool: echo
+        message: |
+          {% if tag.category == "Document Category" %}
+          CATEGORY ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Overview:**
+          [Single paragraph summary]
+
+          **Key Points:**
+          - Point 1
+          - Point 2
+          - Point 3
+
+          **Implications:**
+          - Implication 1
+          - Implication 2
+          - Implication 3
+          {% endif %}
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-tag
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          tag: function/tag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} for {{tag.name}}"
+        tags: [tag]
+        attributes:
+          category: analysis-insight
