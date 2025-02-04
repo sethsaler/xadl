@@ -1,0 +1,501 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collections for Different Categories
+  get-category-tags:
+    tool: find-tags
+    category: "Category"
+  
+  get-provider-tags:
+    tool: find-tags
+    category: "Provider"
+
+  get-state-tags:
+    tool: find-tags
+    category: "State"
+
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a telecommunications regulatory expert analyzing tariff documents. Your objectives include:
+
+      1. Identifying and summarizing key obligations, requirements, and terms within telecom tariffs
+      2. Highlighting important regulatory compliance aspects and requirements
+      3. Analyzing service level commitments and performance standards
+      4. Evaluating payment terms, liability provisions, and termination conditions
+      5. Assessing transferability and assignment rights
+
+      When analyzing the content:
+      - Focus on explicit terms and conditions
+      - Identify regulatory compliance requirements
+      - Note any unusual or non-standard provisions
+      - Flag potential risks or areas requiring attention
+
+  # 3) Analysis prompt
+  tariffAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is relevant text from the tariff document. Please:
+      - Analyze the specific provisions related to the tagged category
+      - Identify key requirements and obligations
+      - Note any regulatory compliance considerations
+      - Highlight important terms or conditions
+      - Summarize the findings concisely
+
+      Relevant text from the tariff:
+
+  # 4) Section Title
+  analysisTitle:
+    tool: echo
+    message: Tariff Analysis
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      categoryTags: get-category-tags
+      providerTags: get-provider-tags
+      stateTags: get-state-tags
+    tool: knowledge-set
+    knowledgeSetName: "Telecom Tariff Analysis"
+    operations:
+      - op: set-nodes
+        nodes: documents
+      - op: add-dimension
+        key: category
+        name: "Category"
+        nodes: categoryTags
+        priority: 1
+      - op: add-dimension
+        key: provider
+        name: "Provider"
+        nodes: providerTags
+        priority: 2
+      - op: add-dimension
+        key: state
+        name: "State"
+        nodes: stateTags
+        priority: 3
+
+  # 6) Analyze content for each category
+  analyze-category:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-category-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-provider:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-provider-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-state:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-state-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  # 7) Generate Summary Insights
+  summarize-by-category:
+    repeat:
+      function: summarize-for-category
+      for: [categoryTag]
+    input:
+      categoryTag: get-category-tags
+      documents: task/documents
+      knowledge: init-kset
+      categoryAnalysis: analyze-category
+
+  summarize-by-state:
+    input:
+      stateAnalysis: analyze-state
+      knowledge: init-kset
+    tool: llm
+    prompt: |
+      Analyze all state-specific insights and provide a comprehensive summary:
+      - Compare regulatory frameworks across states
+      - Identify common compliance requirements
+      - Highlight key differences in state mandates
+      - Note cross-state operational implications
+
+  create-category-summary-insight:
+    input:
+      categoryAnalysis: analyze-category
+      knowledge: init-kset
+      summarize-by-category: summarize-by-category
+    tool: insight
+    text: |
+      {{summarize-by-category.text}}
+    name: "Category Analysis Summary"
+    attributes:
+      category: category-summary-insight
+    relations:
+      derived-from: [categoryAnalysis]
+
+  create-state-summary-insight:
+    input:
+      summary: summarize-by-state
+      stateAnalysis: analyze-state
+    tool: insight
+    text: |
+      {{summary.text}}
+    name: "State Analysis Summary"
+    attributes:
+      category: state-summary-insight
+    relations:
+      derived-from: [stateAnalysis]
+
+  # 8) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      categoryAnalysis: analyze-category
+      providerAnalysis: analyze-provider
+      stateAnalysis: analyze-state
+      categorySummary: create-category-summary-insight
+      stateSummary: create-state-summary-insight
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
+functions:
+  analyze-for-tag:
+    input:
+      tag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          documents: function/documents
+          tag: function/tag
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [tag]
+
+      get-instruction-prompt-for-tag:
+        input:
+          tag: function/tag
+        tool: echo
+        message: |
+          {% if tag.name == "Liability" %}
+          LIABILITY ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Risk Exposure:**
+          [Single paragraph summarizing liability framework and its strategic importance]
+
+          **Key Liabilities:**
+          - List major liability categories (company and customer)
+          - Include damage caps and excluded damages
+          - Note any indemnification obligations
+
+          **Strategic Considerations:**
+          - Highlight potential financial exposure and mitigation strategies
+          - Note any competitive advantages or disadvantages in liability terms
+          - Identify potential risks or opportunities for risk management improvement
+          {% endif %}
+
+          {% if tag.name == "Payment Obligations" %}
+          PAYMENT OBLIGATIONS ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Revenue Structure:**
+          [Single paragraph summarizing billing cycles, pricing models, and their impact on cash flow]
+
+          **Financial Safeguards:**
+          - List key terms (e.g., deposits, minimum contract periods)
+          - Include any usage measurement and verification processes
+          - Note dispute resolution procedures
+
+          **Strategic Implications:**
+          - Highlight impact on revenue stability and recognition
+          - Note any competitive pricing considerations
+          - Identify potential risks or opportunities for optimization
+          {% endif %}
+
+          {% if tag.name == "Performance Obligations" %}
+          PERFORMANCE OBLIGATIONS ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Service Overview:**
+          [Single paragraph summarizing core service obligations and their strategic importance]
+
+          **Key Performance Indicators:**
+          - List critical KPIs (e.g., network connectivity, capacity, latency)
+          - Include benchmarks and reporting frequency
+          - Note any performance-related penalties or incentives
+
+          **Strategic Considerations:**
+          - Highlight impact on service quality and customer satisfaction
+          - Note any competitive advantages or disadvantages
+          - Identify potential risks or areas for improvement
+          {% endif %}
+
+          {% if tag.name == "SLA" %}
+          SLA ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Service Level Commitments:**
+          [Single paragraph summarizing key SLA terms and their strategic importance]
+
+          **Performance Metrics:**
+          - List critical service levels and restoration guarantees
+          - Include measurement methods and reporting frequency
+          - Note penalties for non-compliance
+
+          **Strategic Implications:**
+          - Highlight impact on customer satisfaction and trust
+          - Note any competitive advantages or challenges in meeting SLAs
+          - Identify potential risks or opportunities for service improvement
+          {% endif %}
+
+          {% if tag.name == "Termination" %}
+          TERMINATION ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Cancellation Overview:**
+          [Single paragraph summarizing key termination provisions and their impact on revenue]
+
+          **Risk Mitigation:**
+          - List conditions for service cancellation (both company and customer-initiated)
+          - Include financial penalties or recovery mechanisms
+          - Note any churn mitigation strategies
+
+          **Strategic Considerations:**
+          - Highlight impact on customer retention and revenue stability
+          - Note any competitive advantages or disadvantages in termination policies
+          - Identify potential risks or opportunities for improvement
+          {% endif %}
+
+          {% if tag.name == "Term Provisions" %}
+          TERM PROVISIONS ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Term Structure:**
+          [Single paragraph summarizing contract duration and renewal provisions]
+
+          **Key Terms:**
+          - List initial term length and renewal conditions
+          - Include early termination provisions
+          - Note any term-based pricing or incentives
+
+          **Strategic Implications:**
+          - Highlight impact on customer retention and revenue predictability
+          - Note any competitive advantages in term structure
+          - Identify potential risks or opportunities for term optimization
+          {% endif %}
+
+          {% if tag.name == "Transferability" %}
+          TRANSFERABILITY ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Service Flexibility:**
+          [Single paragraph summarizing transfer/assignment provisions and their strategic importance]
+
+          **Operational Considerations:**
+          - List key policies for service changes or transfers
+          - Include any location change or upgrade procedures
+          - Note impact on contract terms and revenue recognition
+
+          **Strategic Implications:**
+          - Highlight impact on customer retention and service adaptability
+          - Note any competitive advantages in service flexibility
+          - Identify potential risks or opportunities for process improvement
+          {% endif %}
+
+          {% if tag.category == "Provider" %}
+          PROVIDER ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Provider Overview:**
+          [Single paragraph summarizing provider characteristics and market position]
+
+          **Service Capabilities:**
+          - List key service offerings and capabilities
+          - Include provider-specific requirements
+          - Note any unique provider features
+
+          **Strategic Considerations:**
+          - Highlight competitive positioning
+          - Note market strengths and weaknesses
+          - Identify potential opportunities or challenges
+          {% endif %}
+
+          {% if tag.category == "State" %}
+          STATE ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **State Regulatory Framework:**
+          [Single paragraph summarizing state-specific regulatory environment]
+
+          **Key Requirements:**
+          - List state-specific regulations and compliance needs
+          - Include reporting and filing requirements
+          - Note any unique state mandates
+
+          **Strategic Implications:**
+          - Highlight impact on operations in the state
+          - Note any state-specific competitive factors
+          - Identify potential regulatory risks or opportunities
+          {% endif %}
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-tag
+          prompt: function/prompt
+          tag: function/tag
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          snippets: get-snippets
+          summary: analyze-content
+          tag: function/tag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: "{{summary.text}}"
+        tags: [tag]
+        name: "{{title.text}} for {{tag.name}}"
+        attributes:
+          category: tariff-analysis-insight
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          summaryInsight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: summaryInsight
+          - op: set-nodes
+            nodes: snippets
+
+  summarize-for-category:
+    input:
+      categoryTag:
+        type: tag
+      knowledge:
+        type: knowledge-set
+      documents:
+        type: document
+
+    actions:
+      get-category-insights:
+        input:
+          knowledge: function/knowledge
+          categoryTag: function/categoryTag
+        tool: knowledge-set-query
+        nodes:
+          type: insight
+          attributes:
+            category: tariff-analysis-insight
+        nodeDimensions:
+          exactMatch: false
+          match:
+            - key: category
+              values: categoryTag
+
+      summary:
+        input:
+          insights: get-category-insights
+          categoryTag: function/categoryTag
+        skipIfEmpty: insights
+        tool: llm
+        prompt: |
+          Below are insights related to the category {{categoryTag.name}} from various tariff analyses.
+          Provide a comprehensive roll-up summary that:
+          - Synthesizes key themes and patterns across all insights
+          - Highlights critical requirements and obligations
+          - Identifies strategic implications and recommendations
+          - Notes any significant variations or inconsistencies
+
+          {% for insight in insights %}
+          {{insight.text}}
+          {% endfor %}
+
+      create-summary-insight:
+        input:
+          summary: summary
+          insights: get-category-insights
+          categoryTag: function/categoryTag
+        skipIfEmpty: summary
+        tool: insight
+        text: "{{summary.text}}"
+        tags: [categoryTag]
+        name: "Category Summary for {{categoryTag.name}}"
+        attributes:
+          category: category-summary-insight
+        relations:
+          derived-from: [insights]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          summaryInsight: create-summary-insight
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: summaryInsight

@@ -5,207 +5,178 @@ input:
     type: workspace
 
 actions:
-  # 1) Tag Collections for Performance Obligations
+  # Tag Collections
+  get-document-type-tags:
+    tool: find-tags
+    name: ["Interconnect Agreement", "External Reference"]
+
   get-performance-tags:
     tool: find-tags
     category: "Performance Obligations"
-    
-  # 2) Document Type Tags
-  get-document-tags:
-    tool: find-tags
-    category: "Document Type"
 
-  # 3) Base configuration for analyzing performance obligations
+  # Base configuration for shared prompt elements
   basePrompt:
     tool: echo
     message: |
-      # Role and Context Setup
-      You are analyzing Verizon's operating standards regarding performance obligations across various document types. Your objectives include:
+      # Telecom Agreement Analysis Expert
+      You are a telecommunications industry expert responsible for analyzing:
+      1. Performance obligations and commitments
+      2. Technical requirements and specifications
+      3. Service level agreements and standards
+      4. Operational requirements and dependencies
+      5. Compliance requirements and risks
 
-      1. Identifying and categorizing all performance obligations and their associated requirements
-      2. Analyzing compliance requirements and operational standards
-      3. Highlighting critical timelines, deliverables, and quality metrics
-      4. Noting any dependencies on specific document types
+      When analyzing content:
+      - Focus on explicit requirements and obligations
+      - Identify key technical specifications
+      - Note service level commitments
+      - Highlight compliance requirements
 
-      When analyzing performance obligations:
-      - Focus on explicit requirements and measurable standards
-      - Note any variations across different document types
-      - Flag potential compliance risks or operational challenges
-
-  # 4) Standards Analysis Prompt
-  standardsAnalysisPrompt:
+  # Analysis prompt building on base
+  analysisPrompt:
     tool: echo
     message: |
       {{basePrompt}}
+      Review the following content and analyze:
+      - Key performance requirements
+      - Service level commitments
+      - Technical specifications
+      - Operational obligations
+      - Compliance requirements
 
-      If the performance tag is "Interconnect":
-      - Detail technical specifications for interconnection points
-      - List all required testing and verification procedures
-      - Specify response time requirements and SLAs
-      - Document regulatory compliance requirements
-      - Outline escalation procedures
-
-      For all other performance tags:
-      - Categorize the obligation type and priority level
-      - List operational standards and metrics
-      - Summarize compliance requirements
-      - Note verification methods
-      
-      Format results as:
-      
-      ## Interconnect Analysis (if applicable)
-      [Detailed interconnect requirements]
-      
-      ## General Performance Analysis
-      [Summary of other performance obligations]
-
-  # 5) Initialize Knowledge Set
+  # Initialize Knowledge Set
   init-kset:
     input:
       documents: task/documents
-      performanceTags: get-performance-tags
-      documentTags: get-document-tags
+      docTypes: get-document-type-tags
+      perfObligations: get-performance-tags
     tool: knowledge-set
-    knowledgeSetName: "Performance Standards Analysis"
+    knowledgeSetName: "Performance Obligations Analysis"
     operations:
       - op: add-dimension
-        key: theme
-        name: Tags
-        nodes: performanceTags
+        key: doc-type
+        name: "Document Type"
+        nodes: docTypes
         priority: 1
       - op: add-dimension
-        key: document
-        name: Document
-        nodes: documentTags
+        key: performance
+        name: "Performance Obligations"
+        nodes: perfObligations
         priority: 2
-      - op: set-nodes
-        nodes: documents
 
-  # 6) Analyze each document tag
-  analyze-each-document-tag:
+  # Analysis Actions for Each Document Type
+  analyze-interconnect:
     repeat:
-      function: analyze-for-tag
-      for: [tag, performanceTag]
+      function: analyze-performance
+      for: perfObligation
     input:
-      tag: get-document-tags
-      performanceTag: get-performance-tags
+      docType: "Interconnect Agreement"
+      perfObligation: get-performance-tags
       documents: task/documents
       knowledge: init-kset
       basePrompt: basePrompt
-      prompt: standardsAnalysisPrompt
+      prompt: analysisPrompt
+      title: "Interconnect Agreement Performance Analysis"
 
-  # 7) Add to workspace
-  add-to-workspace:
+  analyze-external-refs:
+    repeat:
+      function: analyze-performance
+      for: perfObligation
     input:
-      workspace: task/workspace
-      documentAnalysis: analyze-each-document-tag
-      knowledgeForDocuments: init-kset
-    tool: workspace
-    operations:
-      - op: add-items
-        items: knowledgeForDocuments
+      docType: "External Reference"
+      perfObligation: get-performance-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: analysisPrompt
+      title: "External Reference Performance Analysis"
 
 functions:
-  analyze-for-tag:
+  analyze-performance:
     input:
-      tag:
-        type: tag
-      performanceTag: 
+      docType:
+        type: text
+      perfObligation:
         type: tag
       documents:
         type: document
+      knowledge:
+        type: knowledge-set
       basePrompt:
-        type: text
-      get-instruction-prompt-for-tag:
         type: text
       prompt:
         type: text
-      knowledge:
-        type: knowledge-set
+      title:
+        type: text
 
     actions:
+      # Extract relevant snippets
       get-snippets:
         input:
-          tag: function/tag
-          performanceTag: function/performanceTag
+          docType: function/docType
+          perfObligation: function/perfObligation
           documents: function/documents
         tool: document-text
         textFilter:
           operator: "and"
-          tags: [tag, performanceTag]
-      
-      get-instruction-prompt-for-tag:
-        input:
-          performanceTag: function/performanceTag
+          tags: [perfObligation]
+          categories: ["Document Type"]
+          names: [docType]
+
+      # Get instruction prompt based on obligation type
+      get-instruction-prompt:
         tool: echo
         message: |
-          {% if performanceTag.name == "Interconnect" %}
-          INTERCONNECT ANALYSIS REQUIREMENTS:
+          PERFORMANCE OBLIGATION ANALYSIS REQUIREMENTS:
 
-          You must output EXACTLY in this format:
+          You must output EXACTLY in this JSON format:
 
-          **Technical Specifications:**
-          - [List of technical requirements]
-          
-          **Testing Requirements:**
-          - [List of testing procedures]
-          
-          **SLA Requirements:**
-          - [Response time requirements]
-          - [Uptime requirements]
-          - [Performance metrics]
-          
-          **Regulatory Compliance:**
-          - [List of compliance requirements]
-          
-          **Escalation Procedures:**
-          - [List of escalation steps]
+          {
+            "obligations": [
+              {
+                "requirement": "Specific performance requirement",
+                "category": "One of: Technical, Operational, Service Level, Compliance",
+                "impact": "One of: High, Medium, Low",
+                "details": "Technical and operational specifications"
+              }
+            ],
+            "summary": {
+              "key_points": ["List of critical requirements"],
+              "risks": ["List of compliance/operational risks"],
+              "dependencies": ["List of technical/operational dependencies"]
+            }
+          }
 
           Rules:
-          1. Use ONLY information explicitly stated in the text
-          2. If information is missing, use "Not Specified"
-          3. Maintain exact formatting including bold markers
-          4. Each section must be present
-          {% endif %}
+          1. Use ONLY explicitly stated requirements
+          2. Categorize each obligation accurately
+          3. Assess impact based on requirement criticality
+          4. Include all technical specifications
+          5. Note all dependencies and risks
 
-          {% if performanceTag.name == "Network" %}
-          NETWORK REQUIREMENTS ANALYSIS:
 
-          You must output in this format:
-
-          **Network Standards:** [Single paragraph with **bold** key terms]
-          
-          **Performance Metrics:**
-          - [List of specific metrics with thresholds]
-          
-          **Monitoring Requirements:**
-          - [List of monitoring obligations]
-
-          Rules:
-          1. Bold ALL technical specifications and thresholds
-          2. Include only explicitly stated requirements
-          3. Use "Not Specified" for missing information
-          {% endif %}
-
-          {% assign known_tags = "Interconnect,Network" | split: "," %}
-          {% if known_tags contains performanceTag.name %}
-          {% else %}
-          GENERAL PERFORMANCE ANALYSIS:
-
-          Output format:
-          
-          **Obligation Type:** [Category]
-          **Requirements:** [Key requirements]
-          **Metrics:** [Measurable standards]
-          **Timeline:** [Time requirements]
-          **Verification:** [Verification methods]
-          {% endif %}
-
-      run-prompt:
+      # Existing analysis for interconnect agreement
+      analyze-interconnect:
         input:
           snippets: get-snippets
+          basePrompt: function/basePrompt 
+          instructionPrompt: get-instruction-prompt
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+      
+      # Additional analysis for external references
+      analyze-external:
+        input:
+          snippets: get-external-snippets
           basePrompt: function/basePrompt
-          instructionPrompt: get-instruction-prompt-for-tag
+          instructionPrompt: get-instruction-prompt
           prompt: function/prompt
         tool: llm
         skipIfEmpty: snippets
@@ -216,31 +187,31 @@ functions:
           {{s.text}}
           {% endfor %}
 
-      create-insight:
+      # Combine the insights
+      create-combined-insight:
         input:
-          summary: run-prompt
-          snippets: get-snippets
-          tag: function/tag
-          performanceTag: function/performanceTag
-        skipIfEmpty: summary
+          interconnectAnalysis: analyze-interconnect
+          externalAnalysis: analyze-external
+          perfObligation: function/perfObligation
+        skipIfEmpty: interconnectAnalysis
         tool: insight
         text: |
-          {{summary.text}}
-        name: "Performance Analysis for {{tag.name}}"
-        tags: [tag, performanceTag]
-        attributes:
-          category: performance-analysis-insight
-        relations:
-          derived-from: [snippets]
+          {{interconnectAnalysis.text}}
 
-      add-insight:
+          **Related External Reference Requirements:**
+          {{externalAnalysis.text}}
+        name: "Combined Performance Analysis - {{perfObligation.name}}"
+        tags: [perfObligation]
+        attributes:
+          category: performance-obligation-analysis
+
+
+      # Add to knowledge set
+      add-to-knowledge:
         input:
           knowledge: function/knowledge
           insight: create-insight
-          snippets: get-snippets
         tool: knowledge-set
         operations:
-          - op: set-nodes
+          - op: add-nodes
             nodes: insight
-          - op: set-nodes
-            nodes: snippets

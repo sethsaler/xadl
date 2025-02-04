@@ -85,6 +85,7 @@ actions:
         operations:
             -   op: add-items
                 items: kset
+                
 
 functions:
     summarize-theme-for-period:
@@ -108,7 +109,7 @@ functions:
                 textFilter:
                     operator: "and"
                     tags: [periodTag, themeTag]
-
+                    
             summary:
                 input:
                     snippets: get-snippets
@@ -116,11 +117,22 @@ functions:
                 skipIfEmpty: snippets
                 tool: llm
                 prompt: |
-                    Below are excerpts from earnings call transcripts. Please craft a concise summary focusing on the topic of {{themeTag.name}}. 
-                    Restrict your response to no more than 100 words. Emphasize your most important points by making them **bold**.
+                    Below is a series of excerpts from earnings call transcripts. 
+                    Summarize the statements with respect to {{themeTag.name}}.
+                    Limit the response to 100 words.
+                    Highlight key phrases in bold.
 
-                    {% for s in snippets %}{{s.text}}
+                    {% for s in snippets%}{{s.text}}
                     {% endfor %}
+
+            # summary:
+            #     input:
+            #         snippets: get-snippets
+            #         themeTag: function/themeTag
+            #         periodTag: function/periodTag
+            #     skipIfEmpty: snippets
+            #     tool: echo
+            #     message: "[period summary]{{themeTag.name}} for {{periodTag.name}}[/period summary]"
 
             create-summary-insight:
                 input:
@@ -135,8 +147,9 @@ functions:
                 name: "Summary of {{themeTag.name}} for period {{periodTag.name}}"
                 attributes:
                     category: theme-by-period
+                    # period: "{{periodTag.name}}"
                 relations:
-                    derived-from: [snippets]
+                    derived-from: [snippets]   
 
             add-insight:
                 input:
@@ -174,7 +187,7 @@ functions:
                         category: theme-by-period
                 nodeDimensions:
                     exactMatch: false
-                    match:
+                    match: 
                       - key: theme
                         values: themeTag 
                       - key: period
@@ -192,7 +205,7 @@ functions:
                         category: theme-by-period
                 nodeDimensions:
                     exactMatch: false
-                    match:
+                    match: 
                       - key: theme
                         values: themeTag 
                       - key: period
@@ -203,31 +216,30 @@ functions:
                     prevInsights: get-prev-insights
                     curInsights: get-cur-insights
                     themeTag: function/themeTag
-                    prevPeriodTag: function:prevPeriodTag
-                    curPeriodTag: function:curPeriodTag
+                    prevPeriodTag: function/prevPeriodTag
+                    curPeriodTag: function/curPeriodTag
                 skipIfEmpty: [prevInsights, curInsights]
                 tool: llm
                 prompt: |
-                    Below are two summarized statements from earnings call transcripts focusing on {{themeTag.name}} in two different periods.
-                    The first covers {{prevPeriodTag.name}}, and the second covers {{curPeriodTag.name}}.
-                    Please write an in-depth comparison of how each period addresses {{themeTag.name}}. 
-                    In particular, highlight any **inconsistencies** in bold, especially those related to forward-looking or predictive statements 
-                    that contradict or differ between {{prevPeriodTag.name}} and {{curPeriodTag.name}}.
+                    Below are summaries taken from two earnings calls transcripts pertaining to the topic of {{themeTag.name}}. 
+                    The first summary is what was said for the period {{prevPeriodTag.name}}.
+                    The second summary is what was said for the period {{curPeriodTag.name}}.
+                    Write a throughough comparison of the two summaries, indicating in bold descriptions of inconsistencies 
+                    between any forward-looking or predictive statements in the {{prevPeriodTag.name}} summary and any 
+                    corresponding statements in the {{curPeriodTag.name}} summary. 
 
-                    Summary from {{prevPeriodTag.name}}: 
-                    {% for x in prevInsights %}{{x.text}}{% endfor %}
+                    Summary from {{prevPeriodTag.name}}: {% for x in prevInsights%}{{x.text}}{% endfor %}
 
-                    Summary from {{curPeriodTag.name}}:
-                    {% for x in curInsights %}{{x.text}}{% endfor %}
+                    Summary from {{curPeriodTag.name}}: {% for x in curInsights%}{{x.text}}{% endfor %}
 
             create-summary-insight:
                 input:
                     summary: summary
                     prevInsights: get-prev-insights
                     curInsights: get-cur-insights
-                    themeTag: function:themeTag
-                    prevPeriodTag: function:prevPeriodTag
-                    curPeriodTag: function:curPeriodTag
+                    themeTag: function/themeTag
+                    prevPeriodTag: function/prevPeriodTag
+                    curPeriodTag: function/curPeriodTag
                 skipIfEmpty: summary
                 tool: insight
                 text: "{{summary.text}}"
@@ -236,11 +248,11 @@ functions:
                 attributes:
                     category: consistency-by-theme
                 relations:
-                    derived-from: [prevInsights, curInsights]
+                    derived-from: [prevInsights, curInsights]   
 
             add-insight:
                 input:
-                    knowledge: function:kset
+                    knowledge: function/kset
                     summary-insight: create-summary-insight
                 tool: knowledge-set
                 operations:
