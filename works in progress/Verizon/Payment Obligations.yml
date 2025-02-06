@@ -6,9 +6,9 @@ input:
 
 actions:
   # 1) Tag Collection
-  get-performance-tags:
+  get-payment-tags:
     tool: find-tags
-    category: "Performance Obligations"
+    category: "Payment Obligations"
 
   get-company-tags:
     tool: find-tags
@@ -19,19 +19,19 @@ actions:
     tool: echo
     message: |
       # Role and Context Setup
-      You are a telecommunications regulatory expert analyzing performance obligations in tariff documents. Focus on:
+      You are a telecommunications regulatory expert analyzing payment obligations in tariff documents. Focus on:
 
-      1. Service quality and performance standards
-      2. Network reliability requirements
-      3. Technical specifications and standards
-      4. Maintenance and support obligations
-      5. Service level measurement and reporting
+      1. Billing cycles and payment terms
+      2. Rate structures and pricing models
+      3. Late payment penalties and fees
+      4. Deposit requirements and credit policies
+      5. Dispute resolution procedures
 
       When analyzing the content:
-      - Focus on explicit performance requirements
-      - Identify compliance obligations
+      - Focus on explicit payment requirements
+      - Identify billing compliance obligations
       - Note any unusual or non-standard provisions
-      - Flag potential operational risks
+      - Flag potential financial risks
 
   # 3) Analysis prompt
   tariffAnalysisPrompt:
@@ -39,34 +39,34 @@ actions:
     message: |
       {{basePrompt}}
 
-      Below is relevant text from the tariff document. Please analyze the performance obligations:
-      - Identify specific service quality requirements
-      - Note technical specifications and standards
-      - Highlight maintenance and support obligations
-      - Summarize measurement and reporting requirements
+      Below is relevant text from the tariff document. Please analyze the payment obligations:
+      - Identify specific payment terms and schedules
+      - Note rate structures and pricing models
+      - Highlight fees, penalties, and deposits
+      - Summarize billing and collection procedures
 
       Relevant text from the tariff:
 
   # 4) Section Title
   analysisTitle:
     tool: echo
-    message: Performance Obligations Analysis
+    message: Payment Obligations Analysis
 
   # 5) Initialize Knowledge Set
   init-kset:
     input:
       documents: task/documents
-      performanceTags: get-performance-tags
+      paymentTags: get-payment-tags
       companyTags: get-company-tags
     tool: knowledge-set
-    knowledgeSetName: "Performance Obligations Analysis"
+    knowledgeSetName: "Payment Obligations Analysis"
     operations:
       - op: set-nodes
         nodes: documents
       - op: add-dimension
-        key: performance
-        name: "Performance Obligations"
-        nodes: performanceTags
+        key: payment
+        name: "Payment Obligations"
+        nodes: paymentTags
         priority: 1
       - op: add-dimension
         key: company
@@ -75,12 +75,12 @@ actions:
         priority: 2
 
   # 6) Analyze content
-  analyze-performance:
+  analyze-payment:
     repeat:
       function: analyze-for-tag
       for: [tag]
     input:
-      tag: get-performance-tags
+      tag: get-payment-tags
       documents: task/documents
       knowledge: init-kset
       basePrompt: basePrompt
@@ -110,19 +110,19 @@ actions:
       knowledge: init-kset
       companyAnalysis: analyze-company
 
-  create-performance-summary-insight:
+  create-payment-summary-insight:
     input:
-      performanceAnalysis: analyze-performance
-      performanceTag: get-performance-tags
+      paymentAnalysis: analyze-payment
+      paymentTag: get-payment-tags
       knowledge: init-kset
     tool: insight
-    text: "{{performanceAnalysis.text}}"
-    tags: [performanceTag]
-    name: "Performance Obligations Summary"
+    text: "{{paymentAnalysis.text}}"
+    tags: [paymentTag]
+    name: "Payment Obligations Summary"
     attributes:
-      category: performance-summary-insight
+      category: payment-summary-insight
     relations:
-      derived-from: [performanceAnalysis]
+      derived-from: [paymentAnalysis]
 
   create-company-summary-insight:
     input:
@@ -133,7 +133,7 @@ actions:
     tool: insight
     text: "{{summary.text}}"
     tags: [companyTag]
-    name: "Company Performance Analysis Summary"
+    name: "Company Payment Analysis Summary"
     attributes:
       category: company-summary-insight
     relations:
@@ -143,9 +143,9 @@ actions:
   add-to-workspace:
     input:
       workspace: task/workspace
-      performanceAnalysis: analyze-performance
+      paymentAnalysis: analyze-payment
       companyAnalysis: analyze-company
-      performanceSummary: create-performance-summary-insight
+      paymentSummary: create-payment-summary-insight
       companySummary: create-company-summary-insight
       knowledge: init-kset
     tool: workspace
@@ -205,7 +205,7 @@ functions:
         tags: [tag]
         name: "{{title.text}} for {{tag.name}}"
         attributes:
-          category: performance-analysis-insight
+          category: payment-analysis-insight
         relations:
           derived-from: [snippets]
 
@@ -239,7 +239,7 @@ functions:
         nodes:
           type: insight
           attributes:
-            category: performance-analysis-insight
+            category: payment-analysis-insight
         nodeDimensions:
           exactMatch: false
           match:
@@ -253,16 +253,16 @@ functions:
         skipIfEmpty: insights
         tool: llm
         prompt: |
-          Below are performance-related insights for {{companyTag.name}}.
+          Below are payment-related insights for {{companyTag.name}}.
           
           Provide a structured summary using this format:
 
-          [Performance Framework]
-          • Single bullet summarizing overall performance obligations
+          [Payment Framework]
+          • Single bullet summarizing overall payment structure
           
           [Key Requirements]
-          • List critical performance metrics
-          • Note measurement and reporting requirements
+          • List critical payment terms
+          • Note billing and collection procedures
           • Highlight unique obligations
           
           [Compliance Status]
@@ -284,9 +284,9 @@ functions:
         tool: insight
         text: "{{summary.text}}"
         tags: [companyTag]
-        name: "Performance Analysis: {{companyTag.name}}"
+        name: "Payment Analysis: {{companyTag.name}}"
         attributes:
-          category: company-performance-summary
+          category: company-payment-summary
         relations:
           derived-from: [insights]
 
@@ -297,4 +297,4 @@ functions:
         tool: knowledge-set
         operations:
           - op: set-nodes
-            nodes: summaryInsight
+            nodes: summaryInsight 

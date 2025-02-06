@@ -6,9 +6,9 @@ input:
 
 actions:
   # 1) Tag Collection
-  get-performance-tags:
+  get-transferability-tags:
     tool: find-tags
-    category: "Performance Obligations"
+    category: "Transferability"
 
   get-company-tags:
     tool: find-tags
@@ -19,19 +19,19 @@ actions:
     tool: echo
     message: |
       # Role and Context Setup
-      You are a telecommunications regulatory expert analyzing performance obligations in tariff documents. Focus on:
+      You are a telecommunications regulatory expert analyzing transferability provisions in tariff documents. Focus on:
 
-      1. Service quality and performance standards
-      2. Network reliability requirements
-      3. Technical specifications and standards
-      4. Maintenance and support obligations
-      5. Service level measurement and reporting
+      1. Assignment and transfer rights
+      2. Change of control provisions
+      3. Service portability requirements
+      4. Location change procedures
+      5. Consent and notification obligations
 
       When analyzing the content:
-      - Focus on explicit performance requirements
-      - Identify compliance obligations
+      - Focus on explicit transfer requirements
+      - Identify regulatory compliance obligations
       - Note any unusual or non-standard provisions
-      - Flag potential operational risks
+      - Flag potential transfer risks
 
   # 3) Analysis prompt
   tariffAnalysisPrompt:
@@ -39,34 +39,34 @@ actions:
     message: |
       {{basePrompt}}
 
-      Below is relevant text from the tariff document. Please analyze the performance obligations:
-      - Identify specific service quality requirements
-      - Note technical specifications and standards
-      - Highlight maintenance and support obligations
-      - Summarize measurement and reporting requirements
+      Below is relevant text from the tariff document. Please analyze the transferability provisions:
+      - Identify specific transfer conditions
+      - Note consent requirements
+      - Highlight restrictions and limitations
+      - Summarize procedural requirements
 
       Relevant text from the tariff:
 
   # 4) Section Title
   analysisTitle:
     tool: echo
-    message: Performance Obligations Analysis
+    message: Transferability Analysis
 
   # 5) Initialize Knowledge Set
   init-kset:
     input:
       documents: task/documents
-      performanceTags: get-performance-tags
+      transferabilityTags: get-transferability-tags
       companyTags: get-company-tags
     tool: knowledge-set
-    knowledgeSetName: "Performance Obligations Analysis"
+    knowledgeSetName: "Transferability Analysis"
     operations:
       - op: set-nodes
         nodes: documents
       - op: add-dimension
-        key: performance
-        name: "Performance Obligations"
-        nodes: performanceTags
+        key: transferability
+        name: "Transferability"
+        nodes: transferabilityTags
         priority: 1
       - op: add-dimension
         key: company
@@ -75,12 +75,12 @@ actions:
         priority: 2
 
   # 6) Analyze content
-  analyze-performance:
+  analyze-transferability:
     repeat:
       function: analyze-for-tag
       for: [tag]
     input:
-      tag: get-performance-tags
+      tag: get-transferability-tags
       documents: task/documents
       knowledge: init-kset
       basePrompt: basePrompt
@@ -110,19 +110,19 @@ actions:
       knowledge: init-kset
       companyAnalysis: analyze-company
 
-  create-performance-summary-insight:
+  create-transferability-summary-insight:
     input:
-      performanceAnalysis: analyze-performance
-      performanceTag: get-performance-tags
+      transferabilityAnalysis: analyze-transferability
+      transferabilityTag: get-transferability-tags
       knowledge: init-kset
     tool: insight
-    text: "{{performanceAnalysis.text}}"
-    tags: [performanceTag]
-    name: "Performance Obligations Summary"
+    text: "{{transferabilityAnalysis.text}}"
+    tags: [transferabilityTag]
+    name: "Transferability Provisions Summary"
     attributes:
-      category: performance-summary-insight
+      category: transferability-summary-insight
     relations:
-      derived-from: [performanceAnalysis]
+      derived-from: [transferabilityAnalysis]
 
   create-company-summary-insight:
     input:
@@ -133,7 +133,7 @@ actions:
     tool: insight
     text: "{{summary.text}}"
     tags: [companyTag]
-    name: "Company Performance Analysis Summary"
+    name: "Company Transferability Analysis Summary"
     attributes:
       category: company-summary-insight
     relations:
@@ -143,9 +143,9 @@ actions:
   add-to-workspace:
     input:
       workspace: task/workspace
-      performanceAnalysis: analyze-performance
+      transferabilityAnalysis: analyze-transferability
       companyAnalysis: analyze-company
-      performanceSummary: create-performance-summary-insight
+      transferabilitySummary: create-transferability-summary-insight
       companySummary: create-company-summary-insight
       knowledge: init-kset
     tool: workspace
@@ -205,7 +205,7 @@ functions:
         tags: [tag]
         name: "{{title.text}} for {{tag.name}}"
         attributes:
-          category: performance-analysis-insight
+          category: transferability-analysis-insight
         relations:
           derived-from: [snippets]
 
@@ -239,7 +239,7 @@ functions:
         nodes:
           type: insight
           attributes:
-            category: performance-analysis-insight
+            category: transferability-analysis-insight
         nodeDimensions:
           exactMatch: false
           match:
@@ -253,17 +253,17 @@ functions:
         skipIfEmpty: insights
         tool: llm
         prompt: |
-          Below are performance-related insights for {{companyTag.name}}.
+          Below are transferability-related insights for {{companyTag.name}}.
           
           Provide a structured summary using this format:
 
-          [Performance Framework]
-          • Single bullet summarizing overall performance obligations
+          [Transfer Framework]
+          • Single bullet summarizing overall transfer provisions
           
           [Key Requirements]
-          • List critical performance metrics
-          • Note measurement and reporting requirements
-          • Highlight unique obligations
+          • List critical transfer conditions
+          • Note consent requirements
+          • Highlight restrictions and limitations
           
           [Compliance Status]
           • List key requirements being met
@@ -284,9 +284,9 @@ functions:
         tool: insight
         text: "{{summary.text}}"
         tags: [companyTag]
-        name: "Performance Analysis: {{companyTag.name}}"
+        name: "Transferability Analysis: {{companyTag.name}}"
         attributes:
-          category: company-performance-summary
+          category: company-transferability-summary
         relations:
           derived-from: [insights]
 
@@ -297,4 +297,4 @@ functions:
         tool: knowledge-set
         operations:
           - op: set-nodes
-            nodes: summaryInsight
+            nodes: summaryInsight 

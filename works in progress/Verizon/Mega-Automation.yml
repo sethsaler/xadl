@@ -6,10 +6,30 @@ input:
 
 actions:
   # 1) Tag Collections for Different Categories
-  get-category-tags:
+  get-performance-tags:
     tool: find-tags
-    category: "Category"
+    category: "Performance Obligations"
   
+  get-payment-tags:
+    tool: find-tags
+    category: "Payment Obligations"
+  
+  get-termination-tags:
+    tool: find-tags
+    category: "Termination"
+  
+  get-sla-tags:
+    tool: find-tags
+    category: "SLA"
+  
+  get-transferability-tags:
+    tool: find-tags
+    category: "Transferability"
+  
+  get-liability-tags:
+    tool: find-tags
+    category: "Liability"
+
   get-provider-tags:
     tool: find-tags
     name: ["Verizon", "Frontier"]
@@ -17,6 +37,10 @@ actions:
   get-state-tags:
     tool: find-tags
     category: "State"
+
+  get-document-tags:
+    tool: find-tags
+    category: "Document"
 
   # 2) Base configuration for shared prompt elements
   basePrompt:
@@ -61,37 +85,133 @@ actions:
   init-kset:
     input:
       documents: task/documents
-      categoryTags: get-category-tags
+      performanceTags: get-performance-tags
+      paymentTags: get-payment-tags
+      terminationTags: get-termination-tags
+      slaTags: get-sla-tags
+      transferabilityTags: get-transferability-tags
+      liabilityTags: get-liability-tags
       providerTags: get-provider-tags
       stateTags: get-state-tags
+      documentTags: get-document-tags
     tool: knowledge-set
     knowledgeSetName: "Telecom Tariff Analysis"
     operations:
       - op: set-nodes
         nodes: documents
       - op: add-dimension
-        key: category
-        name: "Category"
-        nodes: categoryTags
+        key: performance
+        name: "Performance Obligations"
+        nodes: performanceTags
         priority: 1
+      - op: add-dimension
+        key: payment
+        name: "Payment Obligations"
+        nodes: paymentTags
+        priority: 2
+      - op: add-dimension
+        key: termination
+        name: "Termination"
+        nodes: terminationTags
+        priority: 3
+      - op: add-dimension
+        key: sla
+        name: "SLA"
+        nodes: slaTags
+        priority: 4
+      - op: add-dimension
+        key: transferability
+        name: "Transferability"
+        nodes: transferabilityTags
+        priority: 5
+      - op: add-dimension
+        key: liability
+        name: "Liability"
+        nodes: liabilityTags
+        priority: 6
       - op: add-dimension
         key: provider
         name: "Provider"
         nodes: providerTags
-        priority: 2
+        priority: 7
       - op: add-dimension
         key: state
         name: "State"
         nodes: stateTags
-        priority: 3
+        priority: 8
+      - op: add-dimension
+        key: document
+        name: "Document"
+        nodes: documentTags
+        priority: 9
 
   # 6) Analyze content for each category
-  analyze-category:
+  analyze-performance:
     repeat:
       function: analyze-for-tag
       for: [tag]
     input:
-      tag: get-category-tags
+      tag: get-performance-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-payment:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-payment-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-termination:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-termination-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-sla:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-sla-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-transferability:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-transferability-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-liability:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-liability-tags
       documents: task/documents
       knowledge: init-kset
       basePrompt: basePrompt
@@ -122,16 +242,78 @@ actions:
       prompt: tariffAnalysisPrompt
       title: analysisTitle
 
+  analyze-document:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-document-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
   # 7) Generate Summary Insights
+  summarize-by-document:
+    input:
+      documentAnalysis: analyze-document
+      knowledge: init-kset
+      documentTag: get-document-tags
+    tool: llm
+    prompt: |
+      Below are document-specific insights from the tariff analysis.
+      
+      Provide a structured summary using exactly this format:
+
+      [Document Overview]
+      • Single bullet summarizing document scope and purpose
+      
+      [Key Provisions]
+      • List major terms and conditions by category
+      • Note any unique document features
+      • Highlight critical compliance requirements
+      
+      [Cross-Document Analysis]
+      • List common themes across documents
+      • Note significant variations between documents
+      • Identify potential conflicts or gaps
+      
+      [Strategic Implications]
+      • List key operational impacts
+      • Note document strengths and weaknesses
+      • Highlight potential risks or opportunities
+
+      Source Insights:
+      {% for insight in documentAnalysis %}
+      {{insight.text}}
+      {% endfor %}
+
+  create-document-summary-insight:
+    input:
+      summary: summarize-by-document
+      documentAnalysis: analyze-document
+      knowledge: init-kset
+    tool: insight
+    text: "{{summary.text}}"
+    tags: [documentTag]
+    name: "Document Analysis Summary"
+    attributes:
+      category: document-summary-insight
+      format-version: "1.0"
+      analysis-type: "document-rollup"
+    relations:
+      derived-from: [documentAnalysis]
+
   summarize-by-category:
     repeat:
       function: summarize-for-category
       for: [categoryTag]
     input:
-      categoryTag: get-category-tags
+      categoryTag: get-performance-tags
       documents: task/documents
       knowledge: init-kset
-      categoryAnalysis: analyze-category
+      categoryAnalysis: analyze-performance
 
   summarize-by-state:
     input:
@@ -145,34 +327,6 @@ actions:
       - Identify common compliance requirements
       - Highlight key differences in state mandates
       - Note cross-state operational implications
-
-  create-category-summary-insight:
-    input:
-      categoryAnalysis: analyze-category
-      knowledge: init-kset
-      summarize-by-category: summarize-by-category
-    tool: insight
-    text: |
-      {{summarize-by-category.text}}
-    name: "Category Analysis Summary"
-    attributes:
-      category: category-summary-insight
-    relations:
-      derived-from: [categoryAnalysis]
-
-  create-state-summary-insight:
-    input:
-      summary: summarize-by-state
-      stateAnalysis: analyze-state
-      knowledge: init-kset
-    tool: insight
-    text: |
-      {{summary.text}}
-    name: "State Analysis Summary"
-    attributes:
-      category: state-summary-insight
-    relations:
-      derived-from: [stateAnalysis]
 
   summarize-by-provider-state:
     repeat:
@@ -189,7 +343,7 @@ actions:
       for: [providerTag]
     input:
       providerTag: get-provider-tags
-      categoryTag: get-category-tags
+      categoryTag: get-performance-tags
       knowledge: init-kset
 
   create-provider-state-insight:
@@ -199,11 +353,13 @@ actions:
       providerAnalysis: analyze-provider
       knowledge: init-kset
     tool: insight
-    text: |
-      {{providerStateSummary.text}}
-    name: "Provider-State Analysis Summary"
+    text: "{{providerStateSummary.text}}"
+    tags: [providerTag]
+    name: "Provider-State Analysis: {{providerTag.name}}"
     attributes:
       category: provider-state-summary-insight
+      format-version: "1.0"
+      analysis-type: "provider-state-rollup"
     relations:
       derived-from: [stateAnalysis, providerAnalysis]
 
@@ -211,14 +367,16 @@ actions:
     input:
       providerCategorySummary: summarize-by-provider-category
       providerAnalysis: analyze-provider
-      categoryAnalysis: analyze-category
+      categoryAnalysis: analyze-performance
       knowledge: init-kset
     tool: insight
-    text: |
-      {{providerCategorySummary.text}}
-    name: "Provider-Category Analysis Summary"
+    text: "{{providerCategorySummary.text}}"
+    tags: [providerTag, categoryTag]
+    name: "Provider-Category Analysis: {{providerTag.name}}"
     attributes:
       category: provider-category-summary-insight
+      format-version: "1.0"
+      analysis-type: "provider-category-rollup"
     relations:
       derived-from: [providerAnalysis, categoryAnalysis]
 
@@ -226,14 +384,10 @@ actions:
   add-to-workspace:
     input:
       workspace: task/workspace
-      categoryAnalysis: analyze-category
-      providerAnalysis: analyze-provider
-      stateAnalysis: analyze-state
-      categorySummary: create-category-summary-insight
-      stateSummary: create-state-summary-insight
+      knowledge: init-kset
+      documentSummary: create-document-summary-insight
       providerStateSummary: create-provider-state-insight
       providerCategorySummary: create-provider-category-insight
-      knowledge: init-kset
     tool: workspace
     operations:
       - op: add-items
@@ -474,6 +628,25 @@ functions:
           - Identify potential regulatory risks or opportunities
           {% endif %}
 
+          {% if tag.category == "Document" %}
+          DOCUMENT ANALYSIS REQUIREMENTS:
+
+          You must output in this format:
+
+          **Document Overview:**
+          [Single paragraph summarizing document scope and purpose]
+
+          **Key Provisions:**
+          - List major terms and conditions
+          - Include document-specific requirements
+          - Note any unique document features
+
+          **Strategic Implications:**
+          - Highlight impact on operations
+          - Note document strengths and weaknesses
+          - Identify potential risks or opportunities
+          {% endif %}
+
       analyze-content:
         input:
           snippets: get-snippets
@@ -540,7 +713,7 @@ functions:
         nodeDimensions:
           exactMatch: false
           match:
-            - key: category
+            - key: performance
               values: categoryTag
 
       summary:
@@ -714,7 +887,7 @@ functions:
             - key: provider
               nodes: providerTag
               values: providerTag
-            - key: category
+            - key: performance
               nodes: categoryTag
               values: categoryTag
 

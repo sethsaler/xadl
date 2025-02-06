@@ -9,30 +9,30 @@ actions:
   get-performance-tags:
     tool: find-tags
     category: "Performance Obligations"
-  
+
   get-payment-tags:
     tool: find-tags
     category: "Payment Obligations"
-  
+
   get-termination-tags:
     tool: find-tags
     category: "Termination"
-  
+
   get-sla-tags:
     tool: find-tags
     category: "SLA"
-  
+
   get-transferability-tags:
     tool: find-tags
     category: "Transferability"
-  
+
   get-liability-tags:
     tool: find-tags
-    category: "Liability"
+    category: "Liabilities"
 
   get-company-tags:
     tool: find-tags
-    name: ["Frontier", "Verizon"]
+    name: ["Verizon"]
 
   # 2) Base configuration for shared prompt elements
   basePrompt:
@@ -41,17 +41,17 @@ actions:
       # Role and Context Setup
       You are a telecommunications regulatory expert analyzing tariff documents. Your objectives include:
 
-      1. Identifying and summarizing key obligations, requirements, and terms within telecom tariffs
-      2. Highlighting important regulatory compliance aspects and requirements
-      3. Analyzing service level commitments and performance standards
-      4. Evaluating payment terms, liability provisions, and termination conditions
-      5. Assessing transferability and assignment rights
+      1. Identifying and summarizing key obligations, requirements, and terms within telecom tariffs.
+      2. Highlighting important regulatory compliance aspects and requirements.
+      3. Analyzing service level commitments and performance standards.
+      4. Evaluating payment terms, liability provisions, and termination conditions.
+      5. Assessing transferability and assignment rights.
 
       When analyzing the content:
-      - Focus on explicit terms and conditions
-      - Identify regulatory compliance requirements
-      - Note any unusual or non-standard provisions
-      - Flag potential risks or areas requiring attention
+      - Focus on explicit terms and conditions.
+      - Identify regulatory compliance requirements.
+      - Note any unusual or non-standard provisions.
+      - Flag potential risks or areas requiring attention.
 
   # 3) Analysis prompt
   tariffAnalysisPrompt:
@@ -60,11 +60,11 @@ actions:
       {{basePrompt}}
 
       Below is relevant text from the tariff document. Please:
-      - Analyze the specific provisions related to the tagged category
-      - Identify key requirements and obligations
-      - Note any regulatory compliance considerations
-      - Highlight important terms or conditions
-      - Summarize the findings concisely
+      - Analyze the specific provisions related to the tagged category.
+      - Identify key requirements and obligations.
+      - Note any regulatory compliance considerations.
+      - Highlight important terms or conditions.
+      - Summarize the findings concisely.
 
       Relevant text from the tariff:
 
@@ -94,36 +94,43 @@ actions:
         name: "Performance Obligations"
         nodes: performanceTags
         priority: 1
+        skipIfEmpty: true
       - op: add-dimension
         key: payment
         name: "Payment Obligations"
         nodes: paymentTags
         priority: 2
+        skipIfEmpty: true
       - op: add-dimension
         key: termination
         name: "Termination"
         nodes: terminationTags
         priority: 3
+        skipIfEmpty: true
       - op: add-dimension
         key: sla
         name: "SLA"
         nodes: slaTags
         priority: 4
+        skipIfEmpty: true
       - op: add-dimension
         key: transferability
         name: "Transferability"
         nodes: transferabilityTags
         priority: 5
+        skipIfEmpty: true
       - op: add-dimension
         key: liability
-        name: "Liability"
+        name: "Liabilities"
         nodes: liabilityTags
         priority: 6
+        skipIfEmpty: true
       - op: add-dimension
         key: company
         name: "Company"
         nodes: companyTags
         priority: 7
+        skipIfEmpty: true
 
   # 6) Analyze content for each category
   analyze-performance:
@@ -209,6 +216,23 @@ actions:
       basePrompt: basePrompt
       prompt: tariffAnalysisPrompt
       title: analysisTitle
+
+  # 7) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      performanceAnalysis: analyze-performance
+      paymentAnalysis: analyze-payment
+      terminationAnalysis: analyze-termination
+      slaAnalysis: analyze-sla
+      transferabilityAnalysis: analyze-transferability
+      liabilityAnalysis: analyze-liability
+      companyAnalysis: analyze-company
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
 
 functions:
   analyze-for-tag:
@@ -335,8 +359,8 @@ functions:
           - Identify potential risks or opportunities for process improvement
           {% endif %}
 
-          {% if tag.category == "Liability" %}
-          LIABILITY ANALYSIS REQUIREMENTS:
+          {% if tag.category == "Liabilities" %}
+          LIABILITIES ANALYSIS REQUIREMENTS:
 
           You must output in this format:
 
