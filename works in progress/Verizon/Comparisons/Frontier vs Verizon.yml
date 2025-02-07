@@ -6,6 +6,10 @@ input:
 
 actions:
   # 1) Tag Collections for Different Categories
+  get-document-tags:
+    tool: find-tags
+    category: "Document"
+
   get-performance-tags:
     tool: find-tags
     category: "Performance Obligations"
@@ -77,58 +81,58 @@ actions:
   init-kset:
     input:
       documents: task/documents
+      documentTags: get-document-tags
       performanceTags: get-performance-tags
       paymentTags: get-payment-tags
       terminationTags: get-termination-tags
       slaTags: get-sla-tags
       transferabilityTags: get-transferability-tags
       liabilityTags: get-liability-tags
-      companyTags: get-company-tags
     tool: knowledge-set
     knowledgeSetName: "Telecom Tariff Analysis"
     operations:
       - op: set-nodes
         nodes: documents
       - op: add-dimension
+        key: document
+        name: "Document"
+        nodes: documentTags
+        priority: 1
+        skipIfEmpty: true
+      - op: add-dimension
         key: performance
         name: "Performance Obligations"
         nodes: performanceTags
-        priority: 1
+        priority: 2
         skipIfEmpty: true
       - op: add-dimension
         key: payment
         name: "Payment Obligations"
         nodes: paymentTags
-        priority: 2
+        priority: 3
         skipIfEmpty: true
       - op: add-dimension
         key: termination
         name: "Termination"
         nodes: terminationTags
-        priority: 3
+        priority: 4
         skipIfEmpty: true
       - op: add-dimension
         key: sla
         name: "SLA"
         nodes: slaTags
-        priority: 4
+        priority: 5
         skipIfEmpty: true
       - op: add-dimension
         key: transferability
         name: "Transferability"
         nodes: transferabilityTags
-        priority: 5
+        priority: 6
         skipIfEmpty: true
       - op: add-dimension
         key: liability
         name: "Liabilities"
         nodes: liabilityTags
-        priority: 6
-        skipIfEmpty: true
-      - op: add-dimension
-        key: company
-        name: "Company"
-        nodes: companyTags
         priority: 7
         skipIfEmpty: true
 

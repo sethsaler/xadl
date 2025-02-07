@@ -1,0 +1,985 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collections for Different Categories
+  get-document-tags:
+    tool: find-tags
+    category: "Document"
+
+  get-performance-tags:
+    tool: find-tags
+    category: "Performance Obligations"
+
+  get-payment-tags:
+    tool: find-tags
+    category: "Payment Obligations"
+
+  get-termination-tags:
+    tool: find-tags
+    category: "Termination"
+
+  get-sla-tags:
+    tool: find-tags
+    category: "SLA"
+
+  get-transferability-tags:
+    tool: find-tags
+    category: "Transferability"
+
+  get-liability-tags:
+    tool: find-tags
+    category: "Liabilities"
+
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a telecommunications regulatory expert analyzing tariff documents. Your objectives include:
+
+      1. Identifying and summarizing key obligations, requirements, and terms within telecom tariffs.
+      2. Highlighting important regulatory compliance aspects and requirements.
+      3. Analyzing service level commitments and performance standards.
+      4. Evaluating payment terms, liability provisions, and termination conditions.
+      5. Assessing transferability and assignment rights.
+
+      When analyzing the content:
+      - Focus on explicit terms and conditions.
+      - Identify regulatory compliance requirements.
+      - Note any unusual or non-standard provisions.
+      - Flag potential risks or areas requiring attention.
+
+  # 3) Analysis prompt
+  tariffAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is relevant text from the tariff document. Please:
+      - Analyze the specific provisions related to the tagged category.
+      - Identify key requirements and obligations.
+      - Note any regulatory compliance considerations.
+      - Highlight important terms or conditions.
+      - Summarize the findings concisely.
+
+      Relevant text from the tariff:
+
+  # 4) Section Title
+  analysisTitle:
+    tool: echo
+    message: Tariff Analysis
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      documentTags: get-document-tags
+      performanceTags: get-performance-tags
+      paymentTags: get-payment-tags
+      terminationTags: get-termination-tags
+      slaTags: get-sla-tags
+      transferabilityTags: get-transferability-tags
+      liabilityTags: get-liability-tags
+    tool: knowledge-set
+    knowledgeSetName: "Telecom Tariff Analysis"
+    operations:
+      - op: set-nodes
+        nodes: documents
+      - op: add-dimension
+        key: document
+        name: "Document"
+        nodes: documentTags
+        priority: 1
+        skipIfEmpty: true
+      - op: add-dimension
+        key: performance
+        name: "Performance Obligations"
+        nodes: performanceTags
+        priority: 2
+        skipIfEmpty: true
+      - op: add-dimension
+        key: payment
+        name: "Payment Obligations"
+        nodes: paymentTags
+        priority: 3
+        skipIfEmpty: true
+      - op: add-dimension
+        key: termination
+        name: "Termination"
+        nodes: terminationTags
+        priority: 4
+        skipIfEmpty: true
+      - op: add-dimension
+        key: sla
+        name: "SLA"
+        nodes: slaTags
+        priority: 5
+        skipIfEmpty: true
+      - op: add-dimension
+        key: transferability
+        name: "Transferability"
+        nodes: transferabilityTags
+        priority: 6
+        skipIfEmpty: true
+      - op: add-dimension
+        key: liability
+        name: "Liabilities"
+        nodes: liabilityTags
+        priority: 7
+        skipIfEmpty: true
+
+  # 6) Analyze content for each category
+  analyze-performance:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-performance-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-payment:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-payment-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-termination:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-termination-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-sla:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-sla-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-transferability:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-transferability-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-liability:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-liability-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-documents:
+    repeat:
+      function: analyze-document-performance
+      for: [document]
+    input:
+      document: task/documents
+      performanceTags: get-performance-tags
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-documents-payment:
+    repeat:
+      function: analyze-document-payment
+      for: [document]
+    input:
+      document: task/documents
+      paymentTags: get-payment-tags
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-documents-termination:
+    repeat:
+      function: analyze-document-termination
+      for: [document]
+    input:
+      document: task/documents
+      terminationTags: get-termination-tags
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-documents-sla:
+    repeat:
+      function: analyze-document-sla
+      for: [document]
+    input:
+      document: task/documents
+      slaTags: get-sla-tags
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-documents-transferability:
+    repeat:
+      function: analyze-document-transferability
+      for: [document]
+    input:
+      document: task/documents
+      transferabilityTags: get-transferability-tags
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  analyze-documents-liability:
+    repeat:
+      function: analyze-document-liability
+      for: [document]
+    input:
+      document: task/documents
+      liabilityTags: get-liability-tags
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+
+  # 7) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      performanceAnalysis: analyze-performance
+      paymentAnalysis: analyze-payment
+      terminationAnalysis: analyze-termination
+      slaAnalysis: analyze-sla
+      transferabilityAnalysis: analyze-transferability
+      liabilityAnalysis: analyze-liability
+      documentPerformanceAnalysis: analyze-documents
+      documentPaymentAnalysis: analyze-documents-payment
+      documentTerminationAnalysis: analyze-documents-termination
+      documentSlaAnalysis: analyze-documents-sla
+      documentTransferabilityAnalysis: analyze-documents-transferability
+      documentLiabilityAnalysis: analyze-documents-liability
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
+functions:
+  analyze-for-tag:
+    input:
+      tag:
+        type: tag
+      documents:
+        type: document
+      knowledge:
+        type: knowledge-set
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      title:
+        type: text
+    actions:
+      get-snippets:
+        input:
+          documents: function/documents
+          tag: function/tag
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [tag]
+
+      get-instruction-prompt-for-tag:
+        input:
+          tag: function/tag
+        tool: echo
+        message: |
+          {% if tag.category == "Performance Obligations" %}
+          PERFORMANCE OBLIGATIONS ANALYSIS REQUIREMENTS:
+
+          You must output in this exact format with all sections:
+
+          **Service Overview:**
+          [Single paragraph summarizing core service obligations and their strategic importance. Include key service quality commitments and technical standards.]
+
+          **Key Performance Indicators:**
+          - List critical KPIs (e.g., network connectivity, capacity, latency, uptime)
+          - Include specific benchmarks with numerical targets where available
+          - Detail measurement methodologies and reporting frequency
+          - Note performance-related penalties, credits and incentive structures
+          - Specify any third-party monitoring or auditing requirements
+
+          **Strategic Considerations:**
+          - Highlight direct impact on service quality and customer satisfaction metrics
+          - Analyze competitive positioning relative to industry standards
+          - Identify operational risks and mitigation strategies
+          - Note opportunities for performance optimization
+          - Assess compliance with regulatory requirements
+          {% endif %}
+
+          {% if tag.category == "Payment Obligations" %}
+          PAYMENT OBLIGATIONS ANALYSIS REQUIREMENTS:
+
+          You must output in this exact format with all sections:
+
+          **Revenue Structure:**
+          [Single paragraph summarizing billing cycles, pricing models, payment terms and their impact on cash flow. Include key revenue recognition principles.]
+
+          **Financial Safeguards:**
+          - List payment terms, grace periods and late payment consequences
+          - Detail deposit requirements and credit verification processes
+          - Specify usage measurement methods and billing verification procedures
+          - Document dispute resolution process and timelines
+          - Note any revenue assurance mechanisms
+          - Include collection and write-off policies
+
+          **Strategic Implications:**
+          - Analyze impact on revenue predictability and working capital
+          - Evaluate pricing competitiveness and value proposition
+          - Identify revenue leakage risks and controls
+          - Note opportunities for process automation or optimization
+          - Assess compliance with accounting standards
+          {% endif %}
+
+          {% if tag.category == "Termination" %}
+          TERMINATION ANALYSIS REQUIREMENTS:
+
+          You must output in this exact format with all sections:
+
+          **Cancellation Overview:**
+          [Single paragraph summarizing termination rights, notice periods, and financial implications. Include both customer and provider perspectives.]
+
+          **Risk Mitigation:**
+          - List all valid termination triggers for both parties
+          - Detail notice requirements and cure periods
+          - Specify early termination charges and calculations
+          - Document service transition requirements
+          - Note customer data handling post-termination
+          - Include wind-down procedures and timelines
+
+          **Strategic Considerations:**
+          - Analyze impact on customer lifetime value and churn metrics
+          - Evaluate termination terms against competitive offerings
+          - Identify opportunities to improve retention
+          - Note compliance with consumer protection regulations
+          - Assess operational risks during service transitions
+          {% endif %}
+
+          {% if tag.category == "SLA" %}
+          SLA ANALYSIS REQUIREMENTS:
+
+          You must output in this exact format with all sections:
+
+          **Service Level Commitments:**
+          [Single paragraph summarizing SLA framework, key metrics, and remedies. Include service quality guarantees and their business impact.]
+
+          **Performance Metrics:**
+          - List each SLA metric with specific numerical targets
+          - Detail measurement methodologies and tools
+          - Specify reporting frequency and validation processes
+          - Document service credit calculations and claim procedures
+          - Note exclusions and force majeure conditions
+          - Include incident response requirements
+
+          **Strategic Implications:**
+          - Analyze SLA impact on customer satisfaction and retention
+          - Evaluate service levels against industry benchmarks
+          - Identify operational risks and mitigation strategies
+          - Note opportunities for service improvement
+          - Assess compliance with regulatory requirements
+          {% endif %}
+
+          {% if tag.category == "Transferability" %}
+          TRANSFERABILITY ANALYSIS REQUIREMENTS:
+
+          You must output in this exact format with all sections:
+
+          **Service Flexibility:**
+          [Single paragraph summarizing transfer rights, assignment conditions, and change management framework. Include impact on service continuity.]
+
+          **Operational Considerations:**
+          - List specific transfer and assignment conditions
+          - Detail consent requirements and approval processes
+          - Specify location change procedures and limitations
+          - Document service modification rights
+          - Note impact on pricing and contract terms
+          - Include technical requirements for transfers
+
+          **Strategic Implications:**
+          - Analyze impact on customer mobility and satisfaction
+          - Evaluate flexibility against market standards
+          - Identify operational risks in transfer processes
+          - Note opportunities for process improvement
+          - Assess compliance with regulatory requirements
+          {% endif %}
+
+          {% if tag.category == "Liabilities" %}
+          LIABILITY ANALYSIS REQUIREMENTS:
+
+          You must output in this exact format with all sections:
+
+          **Risk Exposure:**
+          [Single paragraph summarizing liability framework, risk allocation, and insurance requirements. Include strategic rationale for liability structure.]
+
+          **Key Liabilities:**
+          - List all liability categories with specific caps
+          - Detail indemnification obligations for both parties
+          - Specify insurance requirements and coverage limits
+          - Document warranty terms and disclaimers
+          - Note excluded damages and limitations
+          - Include force majeure provisions
+
+          **Strategic Considerations:**
+          - Analyze potential financial exposure scenarios
+          - Evaluate liability terms against industry standards
+          - Identify risk transfer opportunities
+          - Note insurance coverage gaps
+          - Assess compliance with regulatory requirements
+          {% endif %}
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-tag
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight-by-tag:  # Renamed from create-insight
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          tag: function/tag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} for {{tag.name}}"
+        tags: [tag]
+        attributes:
+          category: tariff-analysis-insight
+        relations:
+          derived-from: [snippets]
+
+      add-insight-by-tag:  # Renamed from add-insight
+        input:
+          knowledge: function/knowledge
+          insight: create-insight-by-tag
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
+
+  analyze-document-performance:
+    input:
+      document:
+        type: document
+      performanceTags:
+        type: tag
+      knowledge:
+        type: knowledge-set
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      title:
+        type: text
+    actions:
+      get-snippets:
+        input:
+          documents: function/document
+          performanceTags: function/performanceTags
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [performanceTags]
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          DOCUMENT PERFORMANCE OBLIGATIONS SUMMARY:
+          
+          Analyze all performance obligations for this specific document. Include:
+          
+          1. Service quality requirements
+          2. Technical specifications and standards
+          3. Performance metrics and targets
+          4. Monitoring and reporting requirements
+          5. Performance-related penalties or credits
+          6. Service level commitments
+          7. Unique or unusual provisions
+          
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight-performance:  # Renamed from create-insight
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          document: function/document
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} - Performance Summary for {{document.name}}"
+        tags: [document, performanceTags]  # Modified tags to include both document and performanceTags
+        attributes:
+          category: document-performance-summary
+        relations:
+          derived-from: [snippets]
+
+      add-insight-performance:  # Renamed from add-insight
+        input:
+          knowledge: function/knowledge
+          insight: create-insight-performance
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
+
+  analyze-document-payment:
+    input:
+      document:
+        type: document
+      paymentTags:
+        type: tag
+      knowledge:
+        type: knowledge-set
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      title:
+        type: text
+    actions:
+      get-snippets:
+        input:
+          documents: function/document
+          paymentTags: function/paymentTags
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [paymentTags]
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          DOCUMENT PAYMENT OBLIGATIONS SUMMARY:
+          
+          Analyze all payment obligations for this specific document. Include:
+          
+          1. Billing requirements and cycles
+          2. Deposit requirements
+          3. Dispute resolution processes
+          4. Measurement and verification procedures
+          5. Payment terms and conditions
+          6. Late payment consequences
+          7. Unique or unusual provisions
+          
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight-payment:  # Renamed from create-insight
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          document: function/document
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} - Payment Summary for {{document.name}}"
+        tags: [document, paymentTags]  # Modified tags to include both document and paymentTags
+        attributes:
+          category: document-payment-summary
+        relations:
+          derived-from: [snippets]
+
+      add-insight-payment:  # Renamed from add-insight
+        input:
+          knowledge: function/knowledge
+          insight: create-insight-payment
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
+
+  analyze-document-termination:
+    input:
+      document:
+        type: document
+      terminationTags:
+        type: tag
+      knowledge:
+        type: knowledge-set
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      title:
+        type: text
+    actions:
+      get-snippets:
+        input:
+          documents: function/document
+          terminationTags: function/terminationTags
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [terminationTags]
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          DOCUMENT TERMINATION SUMMARY:
+          
+          Analyze all termination provisions for this specific document. Include:
+          
+          1. Termination rights and triggers
+          2. Notice periods and requirements
+          3. Cure periods and remediation
+          4. Early termination fees
+          5. Post-termination obligations
+          6. Wind-down procedures
+          7. Unique or unusual provisions
+          
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight-termination:  # Renamed from create-insight
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          document: function/document
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} - Termination Summary for {{document.name}}"
+        tags: [document, terminationTags]  # Modified tags to include both document and terminationTags
+        attributes:
+          category: document-termination-summary
+        relations:
+          derived-from: [snippets]
+
+      add-insight-termination:  # Renamed from add-insight
+        input:
+          knowledge: function/knowledge
+          insight: create-insight-termination
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
+
+  analyze-document-sla:
+    input:
+      document:
+        type: document
+      slaTags:
+        type: tag
+      knowledge:
+        type: knowledge-set
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      title:
+        type: text
+    actions:
+      get-snippets:
+        input:
+          documents: function/document
+          slaTags: function/slaTags
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [slaTags]
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          DOCUMENT SLA SUMMARY:
+          
+          Analyze all SLA provisions for this specific document. Include:
+          
+          1. Service level metrics and targets
+          2. Performance measurement methods
+          3. Reporting requirements and frequency
+          4. Credit and penalty mechanisms
+          5. Exclusions and force majeure
+          6. Review and adjustment procedures
+          7. Unique or unusual provisions
+          
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight-sla:  # Renamed from create-insight
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          document: function/document
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} - SLA Summary for {{document.name}}"
+        tags: [document, slaTags]  # Modified tags to include both document and slaTags
+        attributes:
+          category: document-sla-summary
+        relations:
+          derived-from: [snippets]
+
+      add-insight-sla:  # Renamed from add-insight
+        input:
+          knowledge: function/knowledge
+          insight: create-insight-sla
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
+
+  analyze-document-transferability:
+    input:
+      document:
+        type: document
+      transferabilityTags:
+        type: tag
+      knowledge:
+        type: knowledge-set
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      title:
+        type: text
+    actions:
+      get-snippets:
+        input:
+          documents: function/document
+          transferabilityTags: function/transferabilityTags
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [transferabilityTags]
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          DOCUMENT TRANSFERABILITY SUMMARY:
+          
+          Analyze all transferability provisions for this specific document. Include:
+          
+          1. Assignment and transfer rights
+          2. Consent requirements
+          3. Change of control provisions
+          4. Notice requirements
+          5. Successor obligations
+          6. Restrictions and limitations
+          7. Unique or unusual provisions
+          
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight-transferability:  # Renamed from create-insight
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          document: function/document
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} - Transferability Summary for {{document.name}}"
+        tags: [document, transferabilityTags]  # Modified tags to include both document and transferabilityTags
+        attributes:
+          category: document-transferability-summary
+        relations:
+          derived-from: [snippets]
+
+      add-insight-transferability:  # Renamed from add-insight
+        input:
+          knowledge: function/knowledge
+          insight: create-insight-transferability
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
+
+  analyze-document-liability:
+    input:
+      document:
+        type: document
+      liabilityTags:
+        type: tag
+      knowledge:
+        type: knowledge-set
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      title:
+        type: text
+    actions:
+      get-snippets:
+        input:
+          documents: function/document
+          liabilityTags: function/liabilityTags
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [liabilityTags]
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          DOCUMENT LIABILITY SUMMARY:
+          
+          Analyze all liability provisions for this specific document. Include:
+          
+          1. Liability limitations and caps
+          2. Indemnification obligations
+          3. Insurance requirements
+          4. Warranty provisions
+          5. Disclaimer of warranties
+          6. Force majeure provisions
+          7. Unique or unusual provisions
+          
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight-liability:  # Renamed from create-insight
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          document: function/document
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} - Liability Summary for {{document.name}}"
+        tags: [document, liabilityTags]  # Modified tags to include both document and liabilityTags
+        attributes:
+          category: document-liability-summary
+        relations:
+          derived-from: [snippets]
+
+      add-insight-liability:  # Renamed from add-insight
+        input:
+          knowledge: function/knowledge
+          insight: create-insight-liability
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets

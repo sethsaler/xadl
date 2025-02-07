@@ -1,0 +1,312 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collections for Different Categories
+  get-document-tags:
+    tool: find-tags
+    name: ["Florida No. 7", "Florida No. 8", "Ohio No. 4", "Iowa"]
+
+  get-category-tags:
+    tool: find-tags
+    category: "Category"
+
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a document analysis expert focused on summarizing and comparing document content across categories. Your objectives include:
+
+      1. Providing clear summaries of how each category is handled in different documents
+      2. Identifying key differences in how categories are treated across documents
+      3. Highlighting significant variations in approach or requirements
+      4. Creating actionable comparisons that highlight important distinctions
+
+      When analyzing documents:
+      - Focus on the main points and key requirements
+      - Highlight unique approaches or specifications
+      - Note significant differences in handling or implementation
+      - Identify where documents take different approaches to the same category
+
+  # 3) Analysis prompt
+  categoryAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is relevant text from the document sections. Please:
+      - Analyze the specific category terms and their usage
+      - Compare terminology across document sections
+      - Identify material differences and conflicts
+      - Note standardization opportunities
+      - Summarize the findings concisely
+
+      Relevant text for comparison:
+
+  # 4) Section Title
+  analysisTitle:
+    tool: echo
+    message: Category Discrepancy Analysis
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      documentTags: get-document-tags
+      categoryTags: get-category-tags
+    tool: knowledge-set
+    knowledgeSetName: "Document Category Analysis and Comparison"
+    operations:
+      - op: set-nodes
+        nodes: documents
+      - op: add-dimension
+        key: document
+        name: "Document"
+        nodes: documentTags
+        priority: 1
+        skipIfEmpty: true
+      - op: add-dimension
+        key: category
+        name: "Category"
+        nodes: categoryTags
+        priority: 2
+        skipIfEmpty: true
+
+  # 6) Analyze content for each category-document pair
+  analyze-categories:
+    repeat:
+      function: analyze-category-for-document
+      for: [documentTag, categoryTag]
+    input:
+      documentTag: get-document-tags
+      categoryTag: get-category-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: categoryAnalysisPrompt
+      title: analysisTitle
+    output:
+      type: array
+      items:
+        type: insight
+
+  # Compare documents for each category
+  compare-documents:
+    repeat:
+      function: compare-documents-for-category
+      for: [categoryTag]
+    input:
+      categoryTag: get-category-tags
+      knowledge: init-kset
+      analyze-categories: analyze-categories # dependency
+
+  # 8) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      categoryAnalysis: analyze-categories
+      documentComparisons: compare-documents
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
+functions:
+  analyze-category-for-document:
+    input:
+      documentTag:
+        type: tag
+      categoryTag:
+        type: tag
+      documents:
+        type: document
+      knowledge:
+        type: knowledge-set
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      title:
+        type: text
+    actions:
+      get-snippets:
+        input:
+          documents: function/documents
+          documentTag: function/documentTag
+          categoryTag: function/categoryTag
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [documentTag, categoryTag]
+
+      get-instruction-prompt-for-category:
+        input:
+          categoryTag: function/categoryTag
+          documentTag: function/documentTag
+        tool: echo
+        message: |
+          DOCUMENT SUMMARY FOR CATEGORY:
+
+          Analyze how {{categoryTag.name}} is handled in {{documentTag.name}}. Provide a clear summary in this format:
+
+          **Summary:**
+          [Concise summary of how this category is handled in this document]
+
+          **Key Points:**
+          - List the main requirements or specifications
+          - Note any unique approaches or special conditions
+          - Highlight critical implementation details
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-category
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-category-insight:
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          categoryTag: function/categoryTag
+          documentTag: function/documentTag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "Document Analysis: {{categoryTag.name}} in {{documentTag.name}}"
+        tags: [documentTag, categoryTag]
+        attributes:
+          category: document-category-analysis
+          analysisType: single-document
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-category-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
+
+  compare-documents-for-category:
+    input:
+      categoryTag:
+        type: tag
+      knowledge:
+        type: knowledge-set
+    actions:
+      get-category-insights:
+        input:
+          knowledge: function/knowledge
+          categoryTag: function/categoryTag
+        tool: knowledge-set-query
+        nodes:
+          type: insight
+          attributes:
+            category: document-category-analysis
+        nodeDimensions:
+          exactMatch: false
+          match:
+            - key: category
+              values: categoryTag
+
+      analyze-differences:
+        input:
+          insights: get-category-insights
+          categoryTag: function/categoryTag
+        skipIfEmpty: insights
+        tool: llm
+        prompt: |
+          Compare how {{categoryTag.name}} is handled across all documents. Analyze each unique pair of documents.
+          
+          Structure the comparison as follows:
+
+          {% for i in range(insights|length) %}
+          {% for j in range(i + 1, insights|length) %}
+          
+          COMPARISON: {{insights[i].documentTag.name}} vs {{insights[j].documentTag.name}}
+
+          Differences in Obligations and Requirements:
+          - How do core requirements differ?
+          - Where are technical specifications different?
+          - What measurement/reporting variations exist?
+          - How do compliance approaches vary?
+
+          Differences in Terms and Conditions:
+          - What definitional differences exist?
+          - How do scopes and limitations vary?
+          - What timeline variations exist?
+          - Where do processes differ?
+
+          Differences in Risk and Responsibility:
+          - How does risk allocation vary?
+          - What liability differences exist?
+          - How do warranties and disclaimers differ?
+          - What indemnification variations exist?
+
+          Differences in Financial Impact:
+          - What cost variations exist?
+          - How do payment terms differ?
+          - What penalty/credit differences exist?
+          - How do financial safeguards vary?
+
+          Differences in Operations:
+          - How do implementation approaches vary?
+          - What service delivery differences exist?
+          - How do quality controls differ?
+          - What monitoring variations exist?
+
+          {% endfor %}
+          {% endfor %}
+
+          Document insights to compare:
+          {% for insight in insights %}
+          Document: {{insight.documentTag.name}}
+          {{insight.text}}
+          {% endfor %}
+
+      create-comparison-insight:
+        input:
+          summary: analyze-differences
+          insights: get-category-insights
+          categoryTag: function/categoryTag
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "Cross-Document Comparison Matrix: {{categoryTag.name}}"
+        tags: [categoryTag]
+        attributes:
+          category: document-comparison-analysis
+          analysisType: cross-document
+          comparisonType: pairwise-matrix
+        relations:
+          derived-from: [insights]
+
+      add-comparison:
+        input:
+          knowledge: function/knowledge
+          insight: create-comparison-insight
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
