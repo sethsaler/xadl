@@ -6,10 +6,6 @@ input:
 
 actions:
   # 1) Tag Collections for Different Categories
-  get-document-tags:
-    tool: find-tags
-    category: "Document"
-
   get-performance-tags:
     tool: find-tags
     category: "Performance Obligations"
@@ -77,7 +73,6 @@ actions:
   init-kset:
     input:
       documents: task/documents
-      documentTags: get-document-tags
       performanceTags: get-performance-tags
       paymentTags: get-payment-tags
       terminationTags: get-termination-tags
@@ -90,46 +85,40 @@ actions:
       - op: set-nodes
         nodes: documents
       - op: add-dimension
-        key: document
-        name: "Document"
-        nodes: documentTags
-        priority: 1
-        skipIfEmpty: true
-      - op: add-dimension
         key: performance
         name: "Performance Obligations"
         nodes: performanceTags
-        priority: 2
+        priority: 1
         skipIfEmpty: true
       - op: add-dimension
         key: payment
         name: "Payment Obligations"
         nodes: paymentTags
-        priority: 3
+        priority: 2
         skipIfEmpty: true
       - op: add-dimension
         key: termination
         name: "Termination"
         nodes: terminationTags
-        priority: 4
+        priority: 3
         skipIfEmpty: true
       - op: add-dimension
         key: sla
         name: "SLA"
         nodes: slaTags
-        priority: 5
+        priority: 4
         skipIfEmpty: true
       - op: add-dimension
         key: transferability
         name: "Transferability"
         nodes: transferabilityTags
-        priority: 6
+        priority: 5
         skipIfEmpty: true
       - op: add-dimension
         key: liability
         name: "Liabilities"
         nodes: liabilityTags
-        priority: 7
+        priority: 6
         skipIfEmpty: true
 
   # 6) Analyze content for each category
@@ -576,7 +565,7 @@ functions:
         text: |
           {{summary.text}}
         name: "{{title.text}} - Performance Summary for {{document.name}}"
-        tags: [document, performanceTags]  # Modified tags to include both document and performanceTags
+        tags: [performanceTags]  # Modified tags to only include performanceTags
         attributes:
           category: document-performance-summary
         relations:
@@ -654,7 +643,7 @@ functions:
         text: |
           {{summary.text}}
         name: "{{title.text}} - Payment Summary for {{document.name}}"
-        tags: [document, paymentTags]  # Modified tags to include both document and paymentTags
+        tags: [paymentTags]  # Modified tags to only include paymentTags
         attributes:
           category: document-payment-summary
         relations:
@@ -732,7 +721,7 @@ functions:
         text: |
           {{summary.text}}
         name: "{{title.text}} - Termination Summary for {{document.name}}"
-        tags: [document, terminationTags]  # Modified tags to include both document and terminationTags
+        tags: [terminationTags]  # Modified tags to only include terminationTags
         attributes:
           category: document-termination-summary
         relations:
@@ -810,7 +799,7 @@ functions:
         text: |
           {{summary.text}}
         name: "{{title.text}} - SLA Summary for {{document.name}}"
-        tags: [document, slaTags]  # Modified tags to include both document and slaTags
+        tags: [slaTags]  # Modified tags to only include slaTags
         attributes:
           category: document-sla-summary
         relations:
@@ -888,7 +877,7 @@ functions:
         text: |
           {{summary.text}}
         name: "{{title.text}} - Transferability Summary for {{document.name}}"
-        tags: [document, transferabilityTags]  # Modified tags to include both document and transferabilityTags
+        tags: [transferabilityTags]  # Modified tags to only include transferabilityTags
         attributes:
           category: document-transferability-summary
         relations:
@@ -966,7 +955,7 @@ functions:
         text: |
           {{summary.text}}
         name: "{{title.text}} - Liability Summary for {{document.name}}"
-        tags: [document, liabilityTags]  # Modified tags to include both document and liabilityTags
+        tags: [liabilityTags]  # Modified tags to only include liabilityTags
         attributes:
           category: document-liability-summary
         relations:
