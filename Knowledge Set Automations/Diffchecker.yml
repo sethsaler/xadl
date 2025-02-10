@@ -1,0 +1,300 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Get document and theme tags
+  get-period-tags:
+    tool: find-tags
+    category: ["Time Period"]
+
+  get-theme-tags:
+    tool: find-tags
+    category: ["Theme"]
+
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a financial analyst examining earnings call transcripts. Your objectives include:
+
+      1. Identifying key changes in messaging and strategy between sequential periods
+      2. Highlighting significant shifts in company focus or direction
+      3. Noting changes in forward-looking statements and predictions
+      4. Tracking evolution of specific themes over time
+
+      When analyzing transcripts:
+      - Focus on concrete statements and commitments
+      - Track changes in projections and forecasts
+      - Note shifts in strategic priorities
+      - Flag significant changes in tone or emphasis
+
+      For time periods:
+      - Parse tags in format "Q{quarter} {year}" (e.g. "Q1 2023")
+      - Convert to dates (Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec)
+      - Sort chronologically in descending order (newest first)
+
+  # 3) Analysis prompt
+  themeAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is relevant text from the earnings call transcript. Please:
+      - Analyze the specific statements related to the tagged theme
+      - Identify key messages and commitments
+      - Note any forward-looking statements
+      - Highlight important metrics or targets
+      - Summarize the findings concisely
+      - For time periods, follow the date parsing and sorting rules defined above
+
+      Relevant text from the transcript:
+
+  # 4) Initialize Knowledge Set
+  init-kset:
+    input:
+      periodTags: get-period-tags
+      themeTags: get-theme-tags
+      documents: task/documents
+    tool: knowledge-set
+    knowledgeSetName: "Sequential Period Comparison Analysis"
+    operations:
+      - op: add-dimension
+        key: theme
+        name: Theme
+        priority: 1
+        nodes: themeTags
+      - op: add-dimension
+        key: period
+        name: Period
+        priority: 2
+        nodes: periodTags
+      - op: set-nodes
+        nodes: documents
+
+  # 5) Analyze themes for each period
+  analyze-themes:
+    repeat:
+      function: analyze-theme-for-period
+      for: [periodTag, themeTag]
+    input:
+      themeTag: get-theme-tags
+      periodTag: get-period-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: themeAnalysisPrompt
+
+  # 6) Compare sequential periods for each theme
+  compare-themes:
+    repeat:
+      function: compare-sequential-periods
+      for: [themeTag]
+    input:
+      themeTag: get-theme-tags
+      periodTags: get-period-tags
+      knowledge: init-kset
+      analyze-themes: analyze-themes
+
+  # 7) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      themeAnalysis: analyze-themes
+      themeComparisons: compare-themes
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
+functions:
+  analyze-theme-for-period:
+    input:
+      periodTag:
+        type: tag
+      themeTag:
+        type: tag
+      knowledge:
+        type: knowledge-set
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          documents: function/documents
+          periodTag: function/periodTag
+          themeTag: function/themeTag
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [periodTag, themeTag]
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          themeTag: function/themeTag
+          periodTag: function/periodTag
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          Analyze statements about {{themeTag.name}} from period {{periodTag.name}}. Provide:
+
+          **Summary:**
+          [Concise summary of theme treatment in this period]
+
+          **Key Messages:**
+          - Main points and emphasis
+          - Strategic priorities
+          - Forward-looking statements
+          - Notable metrics or targets
+
+          Text to analyze:
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-theme-insight:
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          themeTag: function/themeTag
+          periodTag: function/periodTag
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "Theme Analysis: {{themeTag.name}} in {{periodTag.name}}"
+        tags: [periodTag, themeTag]
+        attributes:
+          category: theme-period-analysis
+          analysisType: single-period
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-theme-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
+
+  compare-sequential-periods:
+    input:
+      themeTag:
+        type: tag
+      periodTags:
+        type: tag
+        multiple: true
+      knowledge:
+        type: knowledge-set
+
+    actions:
+      sort-period-tags:
+        input:
+          periodTags: function/periodTags
+        tool: llm
+        prompt: |
+          Sort these period tags in descending chronological order (newest first):
+          {% for tag in periodTags %}
+          - {{tag.name}}
+          {% endfor %}
+          
+          Return only the sorted tag names, one per line.
+
+      get-period-insights:
+        input:
+          knowledge: function/knowledge
+          themeTag: function/themeTag
+          periodTags: sort-period-tags
+        tool: knowledge-set-query
+        nodes:
+          type: insight
+          attributes:
+            category: theme-period-analysis
+          tags: [themeTag]
+
+      analyze-sequential-differences:
+        input:
+          insights: get-period-insights
+          themeTag: function/themeTag
+          sortedPeriods: sort-period-tags
+        skipIfEmpty: insights
+        tool: llm
+        prompt: |
+          Compare how {{themeTag.name}} evolved between each period and its immediate predecessor.
+          Only compare periods that have available insights - do not compare against periods without data.
+
+          {% for i in range(sortedPeriods|length - 1) %}
+          {% if insights[i] and insights[i+1] %}
+          SEQUENTIAL COMPARISON: {{sortedPeriods[i]}} vs {{sortedPeriods[i+1]}}
+          
+          Changes in Messaging:
+          - How have key messages evolved since the previous quarter?
+          - What immediate shifts in priorities are evident?
+          - How has the tone changed from last period?
+
+          Changes in Commitments:
+          - What new commitments were made this period?
+          - Which commitments from last period changed?
+          - What commitments from last period were achieved/missed?
+
+          Changes in Strategy:
+          - How has strategic focus shifted since last period?
+          - What new initiatives emerged this period?
+          - What initiatives from last period changed?
+
+          Changes in Metrics:
+          - How have key metrics changed since last period?
+          - What new metrics were introduced this period?
+          - What metrics from last period are no longer emphasized?
+          {% endif %}
+          {% endfor %}
+
+          Available insights to compare (newest to oldest):
+          {% for insight in insights %}
+          Period: {{insight.periodTag.name}}
+          {{insight.text}}
+          {% endfor %}
+
+      create-comparison-insight:
+        input:
+          summary: analyze-sequential-differences
+          insights: get-period-insights
+          themeTag: function/themeTag
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "Sequential Period Analysis: {{themeTag.name}} (Quarter-over-Quarter)"
+        tags: [themeTag]
+        attributes:
+          category: sequential-comparison-analysis
+          analysisType: cross-period
+          comparisonType: adjacent-quarters
+        relations:
+          derived-from: [insights]
+
+      add-comparison:
+        input:
+          knowledge: function/knowledge
+          insight: create-comparison-insight
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight 
