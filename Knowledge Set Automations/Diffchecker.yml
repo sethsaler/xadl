@@ -34,7 +34,10 @@ actions:
 
       For time periods:
       - Parse tags in format "Q{quarter} {year}" (e.g. "Q1 2023")
-      - Convert to dates (Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec)
+      - Order sequentially where:
+        - Higher years come first
+        - Within same year, higher quarters come first
+        - Q1 2025 > Q4 2024 > Q3 2024 etc.
       - Sort chronologically in descending order (newest first)
 
   # 3) Analysis prompt
