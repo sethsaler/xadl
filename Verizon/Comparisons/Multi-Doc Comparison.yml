@@ -436,58 +436,59 @@ functions:
           COMPREHENSIVE ANALYSIS OF {{tag.name}} ACROSS ALL DOCUMENTS
 
           1. Quantitative Metrics:
-          Create a table comparing key numerical values across documents:
+          Create a table comparing key numerical values across documents. For each value, include a brief parenthetical explanation of what the metric represents or applies to:
           | Metric | Florida No. 7 | Florida No. 8 | Ohio No. 4 | Iowa |
           |--------|---------------|---------------|------------|------|
-          [Extract all numerical values, time periods, percentages, dollar amounts]
+          [Extract all numerical values, time periods, percentages, dollar amounts with explanations]
+          Example: Response Time | 4 hrs (network outage) | 2 hrs (critical failure) | 6 hrs (service disruption) | 3 hrs (system down)
 
           2. Technical Requirements Matrix:
-          Create a feature comparison matrix:
+          Create a feature comparison matrix with explanatory notes:
           | Requirement | Florida No. 7 | Florida No. 8 | Ohio No. 4 | Iowa |
           |------------|---------------|---------------|------------|------|
-          [List each technical requirement and mark as Required/Optional/Not Specified]
+          [List each technical requirement with contextual notes about implementation]
 
           3. Process Comparison:
           For each key process (e.g., notification, reporting, compliance):
-          - Timeline requirements
-          - Required documentation
-          - Approval processes
-          - Specific steps/stages
+          - Timeline requirements (with explanation of triggering events)
+          - Required documentation (with purpose)
+          - Approval processes (with scope)
+          - Specific steps/stages (with context)
           
           4. Jurisdiction-Specific Elements:
-          Document-specific requirements:
-          - Florida No. 7: [unique requirements]
-          - Florida No. 8: [unique requirements]
-          - Ohio No. 4: [unique requirements]
-          - Iowa: [unique requirements]
+          Document-specific requirements with contextual explanations:
+          - Florida No. 7: [unique requirements with rationale]
+          - Florida No. 8: [unique requirements with rationale]
+          - Ohio No. 4: [unique requirements with rationale]
+          - Iowa: [unique requirements with rationale]
 
           5. Compliance Requirements:
-          For each document:
-          - Reporting frequency: [daily/weekly/monthly/quarterly/annually]
-          - Required metrics: [list specific measurements]
-          - Audit requirements: [frequency and scope]
-          - Record retention periods: [specific timeframes]
+          For each document (include context for requirements):
+          - Reporting frequency: [daily/weekly/monthly/quarterly/annually] (explain what triggers each report)
+          - Required metrics: [list specific measurements with purpose]
+          - Audit requirements: [frequency and scope with explanation]
+          - Record retention periods: [specific timeframes with context]
 
           6. Risk Analysis:
-          Compare across documents:
-          - Financial penalties: [specific amounts/calculations]
-          - Service level guarantees: [specific metrics]
-          - Liability caps: [specific amounts]
-          - Insurance requirements: [coverage amounts]
+          Compare across documents with explanatory context:
+          - Financial penalties: [specific amounts/calculations] (explain what triggers each penalty)
+          - Service level guarantees: [specific metrics] (explain measurement criteria)
+          - Liability caps: [specific amounts] (explain what the cap covers)
+          - Insurance requirements: [coverage amounts] (explain coverage purpose)
 
           7. Implementation Requirements:
-          Technical specifications:
-          - Equipment requirements: [specific models/types]
-          - Protocol requirements: [specific standards]
-          - Testing requirements: [specific procedures]
-          - Documentation requirements: [specific deliverables]
+          Technical specifications with contextual notes:
+          - Equipment requirements: [specific models/types] (explain purpose)
+          - Protocol requirements: [specific standards] (explain applicability)
+          - Testing requirements: [specific procedures] (explain validation criteria)
+          - Documentation requirements: [specific deliverables] (explain intended use)
 
           8. Qualitative Assessment:
-          For each document:
-          - Strengths: [specific advantages]
-          - Weaknesses: [specific limitations]
-          - Unique features: [distinctive elements]
-          - Risk factors: [specific concerns]
+          For each document with supporting context:
+          - Strengths: [specific advantages with explanation]
+          - Weaknesses: [specific limitations with impact]
+          - Unique features: [distinctive elements with purpose]
+          - Risk factors: [specific concerns with potential impact]
 
           Document insights to compare:
           {% for insight in insights %}
