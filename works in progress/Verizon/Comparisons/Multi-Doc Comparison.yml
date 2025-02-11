@@ -12,19 +12,23 @@ actions:
 
   get-performance-tags:
     tool: find-tags
-    name: ["Performance Data"]
+    category: "Performance Obligations"
 
   get-payment-tags:
     tool: find-tags
-    name: ["Billing", "Dispute", "Non-Recurring Charges"]
+    category: "Payment Obligations"
 
   get-termination-tags:
     tool: find-tags
-    name: ["Company Cancellation", "Customer Cancellation"]
+    category: "Termination"
 
   get-sla-tags:
     tool: find-tags
     category: "SLA"
+
+  get-transferability-tags:
+    tool: find-tags
+    category: "Transferability"
 
   get-liability-tags:
     tool: find-tags
@@ -37,24 +41,17 @@ actions:
       # Role and Context Setup
       You are a telecommunications regulatory expert analyzing tariff documents. Your objectives include:
 
-      1. Providing clear summaries of how each category is handled in different documents
-      2. Identifying key differences in how categories are treated across documents
-      3. Highlighting significant variations in approach or requirements
-      4. Creating actionable comparisons that highlight important distinctions
+      1. Providing comprehensive summaries of how each category is handled across all documents
+      2. Identifying key patterns and variations in how categories are treated
+      3. Creating holistic comparisons that highlight important distinctions
+      4. Synthesizing insights across the full document set
 
       When analyzing documents:
       - Focus on explicit terms and conditions
       - Identify regulatory compliance requirements
       - Note any unusual or non-standard provisions
       - Flag potential risks or areas requiring attention
-      - Pay special attention to:
-        * SLA metrics and targets
-        * Termination conditions and notice periods
-        * Payment terms and structures
-        * Dispute resolution processes
-        * Nonrecurring charges
-        * Performance data requirements
-        * Cancellation impacts and procedures
+      - Look for patterns and trends across documents
 
   # 3) Analysis prompt
   tariffAnalysisPrompt:
@@ -62,49 +59,19 @@ actions:
     message: |
       {{basePrompt}}
 
-      For the given category, analyze the document focusing on:
+      Below is relevant text from the tariff document. Please:
+      - Analyze the specific provisions related to the tagged category
+      - Identify key requirements and obligations
+      - Note any regulatory compliance considerations
+      - Highlight important terms or conditions
+      - Summarize the findings concisely
 
-      1. Service Level Agreements (SLAs):
-         - Service metrics and their targets
-         - Measurement methodologies
-         - Breach remedies and reporting requirements
-
-      2. Termination Provisions:
-         - Termination clauses and notice periods
-         - Post-termination obligations
-         - Financial implications
-
-      3. Payment Obligations:
-         - Payment terms and currencies
-         - Billing cycles and processes
-         - Rate structures and volume considerations
-
-      4. Dispute Resolution:
-         - Resolution processes and timelines
-         - Governing law and jurisdiction
-         - Confidentiality requirements
-
-      5. Nonrecurring Charges:
-         - Triggering events
-         - Pricing mechanisms
-         - Billing processes
-
-      6. Cancellation Impacts:
-         - Customer cancellation provisions
-         - Company cancellation terms
-         - Migration obligations
-
-      7. Performance Data:
-         - Required metrics
-         - Reporting frequencies
-         - Data security requirements
-
-      Text to analyze:
+      Relevant text from the tariff:
 
   # 4) Section Title
   analysisTitle:
     tool: echo
-    message: Tariff Analysis
+    message: Multi-Document Tariff Analysis
 
   # 5) Initialize Knowledge Set
   init-kset:
@@ -115,47 +82,54 @@ actions:
       paymentTags: get-payment-tags
       terminationTags: get-termination-tags
       slaTags: get-sla-tags
+      transferabilityTags: get-transferability-tags
       liabilityTags: get-liability-tags
     tool: knowledge-set
-    knowledgeSetName: "Tariff Document Analysis and Comparison"
+    knowledgeSetName: "Multi-Document Tariff Analysis and Comparison"
     operations:
       - op: set-nodes
         nodes: documents
       - op: add-dimension
-        key: performance
-        name: "Performance Obligations" 
-        nodes: performanceTags
+        key: document
+        name: "Document"
+        nodes: documentTags
         priority: 1
+        skipIfEmpty: true
+      - op: add-dimension
+        key: performance
+        name: "Performance Obligations"
+        nodes: performanceTags
+        priority: 2
         skipIfEmpty: true
       - op: add-dimension
         key: payment
         name: "Payment Obligations"
         nodes: paymentTags
-        priority: 2
+        priority: 3
         skipIfEmpty: true
       - op: add-dimension
         key: termination
         name: "Termination"
         nodes: terminationTags
-        priority: 3
+        priority: 4
         skipIfEmpty: true
       - op: add-dimension
         key: sla
         name: "SLA"
         nodes: slaTags
-        priority: 4
+        priority: 5
+        skipIfEmpty: true
+      - op: add-dimension
+        key: transferability
+        name: "Transferability"
+        nodes: transferabilityTags
+        priority: 6
         skipIfEmpty: true
       - op: add-dimension
         key: liability
         name: "Liabilities"
         nodes: liabilityTags
-        priority: 5
-        skipIfEmpty: true
-      - op: add-dimension
-        key: document
-        name: "Document"
-        nodes: documentTags
-        priority: 6
+        priority: 7
         skipIfEmpty: true
 
   # 6) Analyze content for each category
@@ -227,6 +201,23 @@ actions:
       items:
         type: insight
 
+  analyze-transferability:
+    repeat:
+      function: analyze-category-for-document
+      for: [documentTag, tag]
+    input:
+      documentTag: get-document-tags
+      tag: get-transferability-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+    output:
+      type: array
+      items:
+        type: insight
+
   analyze-liability:
     repeat:
       function: analyze-category-for-document
@@ -244,10 +235,10 @@ actions:
       items:
         type: insight
 
-  # 7) Compare documents for each category
+  # 7) Compare all documents for each category
   compare-documents-performance:
     repeat:
-      function: compare-documents-for-category
+      function: compare-all-documents-for-category
       for: [tag]
     input:
       tag: get-performance-tags
@@ -256,7 +247,7 @@ actions:
 
   compare-documents-payment:
     repeat:
-      function: compare-documents-for-category
+      function: compare-all-documents-for-category
       for: [tag]
     input:
       tag: get-payment-tags
@@ -265,7 +256,7 @@ actions:
 
   compare-documents-termination:
     repeat:
-      function: compare-documents-for-category
+      function: compare-all-documents-for-category
       for: [tag]
     input:
       tag: get-termination-tags
@@ -274,16 +265,25 @@ actions:
 
   compare-documents-sla:
     repeat:
-      function: compare-documents-for-category
+      function: compare-all-documents-for-category
       for: [tag]
     input:
       tag: get-sla-tags
       knowledge: init-kset
       analyze-categories: analyze-sla
 
+  compare-documents-transferability:
+    repeat:
+      function: compare-all-documents-for-category
+      for: [tag]
+    input:
+      tag: get-transferability-tags
+      knowledge: init-kset
+      analyze-categories: analyze-transferability
+
   compare-documents-liability:
     repeat:
-      function: compare-documents-for-category
+      function: compare-all-documents-for-category
       for: [tag]
     input:
       tag: get-liability-tags
@@ -298,11 +298,13 @@ actions:
       paymentAnalysis: analyze-payment
       terminationAnalysis: analyze-termination
       slaAnalysis: analyze-sla
+      transferabilityAnalysis: analyze-transferability
       liabilityAnalysis: analyze-liability
       performanceComparisons: compare-documents-performance
       paymentComparisons: compare-documents-payment
       terminationComparisons: compare-documents-termination
       slaComparisons: compare-documents-sla
+      transferabilityComparisons: compare-documents-transferability
       liabilityComparisons: compare-documents-liability
       knowledge: init-kset
     tool: workspace
@@ -348,23 +350,14 @@ functions:
 
           Analyze how {{tag.name}} is handled in {{documentTag.name}}. Provide a clear summary in this format:
 
-          **Quantitative Elements:**
-          - List all numerical specifications (e.g. SLA targets, payment terms, notice periods)
-          - Format as "Metric: Value" (e.g. "Uptime SLA: 99.99%")
-          - Include units where applicable
-          - Note any thresholds or triggers
+          **Summary:**
+          [Concise summary of how this category is handled in this document]
 
-          **Qualitative Elements:**
-          - List key provisions and requirements
-          - Include direct quotes for critical language
+          **Key Points:**
+          - List the main requirements or specifications
           - Note any unique approaches or special conditions
-          - Highlight regulatory compliance requirements
-
-          **Source Text References:**
-          For each key provision, include:
-          - Brief context
-          - Direct quote from source
-          - Section/page reference if available
+          - Highlight critical implementation details
+          - Identify regulatory compliance requirements
 
       analyze-content:
         input:
@@ -411,7 +404,7 @@ functions:
           - op: set-nodes
             nodes: snippets
 
-  compare-documents-for-category:
+  compare-all-documents-for-category:
     input:
       tag:
         type: tag
@@ -436,100 +429,65 @@ functions:
         skipIfEmpty: insights
         tool: llm
         prompt: |
-          Compare how {{tag.name}} is handled across all tariff documents. Analyze each unique pair of documents.
+          Compare how {{tag.name}} is handled across all tariff documents simultaneously. Extract and compare specific metrics and requirements.
           
           Structure the comparison as follows:
 
-          {% for i in range(insights|length) %}
-          {% for j in range(i + 1, insights|length) %}
+          COMPREHENSIVE ANALYSIS OF {{tag.name}} ACROSS ALL DOCUMENTS
+
+          1. Quantitative Metrics:
+          Create a table comparing key numerical values across documents:
+          | Metric | Florida No. 7 | Florida No. 8 | Ohio No. 4 | Iowa |
+          |--------|---------------|---------------|------------|------|
+          [Extract all numerical values, time periods, percentages, dollar amounts]
+
+          2. Technical Requirements Matrix:
+          Create a feature comparison matrix:
+          | Requirement | Florida No. 7 | Florida No. 8 | Ohio No. 4 | Iowa |
+          |------------|---------------|---------------|------------|------|
+          [List each technical requirement and mark as Required/Optional/Not Specified]
+
+          3. Process Comparison:
+          For each key process (e.g., notification, reporting, compliance):
+          - Timeline requirements
+          - Required documentation
+          - Approval processes
+          - Specific steps/stages
           
-          COMPARISON: {{insights[i].documentTag.name}} vs {{insights[j].documentTag.name}}
+          4. Jurisdiction-Specific Elements:
+          Document-specific requirements:
+          - Florida No. 7: [unique requirements]
+          - Florida No. 8: [unique requirements]
+          - Ohio No. 4: [unique requirements]
+          - Iowa: [unique requirements]
 
-          1. SLA Changes:
-          Quantitative Differences:
-          - List specific metric changes (e.g. "Uptime SLA: 99.9% → 99.99%")
-          - Note any threshold changes
-          - Compare measurement intervals
-          
-          Qualitative Differences:
-          - Quote relevant text showing methodology changes
-          - Highlight changes in breach definitions
-          - Compare remedy procedures with source text
+          5. Compliance Requirements:
+          For each document:
+          - Reporting frequency: [daily/weekly/monthly/quarterly/annually]
+          - Required metrics: [list specific measurements]
+          - Audit requirements: [frequency and scope]
+          - Record retention periods: [specific timeframes]
 
-          2. Termination Changes:
-          Quantitative Differences:
-          - Compare notice periods
-          - List any changed financial penalties
-          - Note timeline changes
-          
-          Qualitative Differences:
-          - Quote language showing changes in termination rights
-          - Compare post-termination obligations with source text
-          - Highlight changes in procedures
+          6. Risk Analysis:
+          Compare across documents:
+          - Financial penalties: [specific amounts/calculations]
+          - Service level guarantees: [specific metrics]
+          - Liability caps: [specific amounts]
+          - Insurance requirements: [coverage amounts]
 
-          3. Payment Changes:
-          Quantitative Differences:
-          - Compare payment terms (e.g. "Net 30 → Net 45")
-          - List rate changes
-          - Note volume threshold changes
-          
-          Qualitative Differences:
-          - Quote language showing billing process changes
-          - Compare dispute procedures with source text
-          - Highlight changes in payment conditions
+          7. Implementation Requirements:
+          Technical specifications:
+          - Equipment requirements: [specific models/types]
+          - Protocol requirements: [specific standards]
+          - Testing requirements: [specific procedures]
+          - Documentation requirements: [specific deliverables]
 
-          4. Dispute Resolution Changes:
-          Quantitative Differences:
-          - Compare resolution timelines
-          - List any changed financial thresholds
-          - Note procedural deadlines
-          
-          Qualitative Differences:
-          - Quote language showing jurisdiction changes
-          - Compare escalation procedures with source text
-          - Highlight changes in resolution methods
-
-          5. Nonrecurring Charge Changes:
-          Quantitative Differences:
-          - Compare specific charge amounts
-          - List threshold changes
-          - Note timing changes
-          
-          Qualitative Differences:
-          - Quote language showing trigger event changes
-          - Compare billing procedures with source text
-          - Highlight changes in charge applications
-
-          6. Cancellation Impact Changes:
-          Quantitative Differences:
-          - Compare notice periods
-          - List any changed penalties
-          - Note timeline changes
-          
-          Qualitative Differences:
-          - Quote language showing obligation changes
-          - Compare migration requirements with source text
-          - Highlight changes in procedures
-
-          7. Performance Data Changes:
-          Quantitative Differences:
-          - Compare reporting frequencies
-          - List metric threshold changes
-          - Note timing requirements
-          
-          Qualitative Differences:
-          - Quote language showing methodology changes
-          - Compare data handling requirements with source text
-          - Highlight changes in security measures
-
-          For each difference noted above:
-          - If quantitative: Show exact numerical changes
-          - If qualitative: Include relevant quotes from both documents
-          - Provide section/page references where available
-          - Note if any changes require operational adjustments
-
-          {% endfor %}
-          {% endfor %}
+          8. Qualitative Assessment:
+          For each document:
+          - Strengths: [specific advantages]
+          - Weaknesses: [specific limitations]
+          - Unique features: [distinctive elements]
+          - Risk factors: [specific concerns]
 
           Document insights to compare:
           {% for insight in insights %}
@@ -546,12 +504,20 @@ functions:
         tool: insight
         text: |
           {{summary.text}}
-        name: "Tariff Comparison Matrix: {{tag.name}}"
+        name: "Multi-Document Tariff Analysis: {{tag.name}}"
         tags: [tag]
         attributes:
           category: tariff-comparison-analysis
           analysisType: cross-document
-          comparisonType: pairwise-matrix
+          comparisonType: multi-document
+          hasQuantitativeMetrics: "true"
+          hasTechnicalMatrix: "true"
+          hasProcessComparison: "true"
+          hasJurisdictionalElements: "true"
+          hasComplianceRequirements: "true"
+          hasRiskAnalysis: "true"
+          hasImplementationRequirements: "true"
+          hasQualitativeAssessment: "true"
         relations:
           derived-from: [insights]
 

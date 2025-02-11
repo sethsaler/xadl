@@ -8,21 +8,33 @@ actions:
     input:
       human: task/human
       context: task/context
-    tool: llm                                                                                                                            
-    prompt:                                                                                                                       
-      - I am currently working on a document and need some help with analysis of the wording and subject matter in the document.
-      - |                                                                                                                       
-          {% if context.entity-by-type.xdoc %}                                                                        
-          Here is the content of the document that I am working on:                                                             
-          {% for item in context.entity-by-type.xdoc %}                                                               
-          {{ item.text }}                                                                                                       
-          {% endfor %}                                                                                                          
-          {% endif %}                                                                                                           
-      - |                                                                                                                       
-          {% if context.focus %}                                                                                      
-          When considering you response, please pay specific attention to the follow pieces of text:                            
-          {% for item in context.focus %}                                                                             
-          - {{ item.text }}                                                                                                     
-          {% endfor %}                                                                                                          
-          {% endif %}                                                                                                           
-      - "Now that you understand the context, can you help me with this query: {{ human.text }}"
+    tool: llm
+    stream: true                                                                                                                          
+    prompt:
+      - "You are assisting with an analysis of a document. Your task is to carefully evaluate the wording and subject matter strictly based on the text provided below. Please ensure that every point you make is supported directly by the source document."
+      
+      - |
+          {% if context.entity-by-type.xdoc %}
+          **Document Content:**  
+          Please read the following text carefully as it forms the basis of your analysis.
+          
+          {% for item in context.entity-by-type.xdoc %}
+          {{ item.text }}
+          
+          {% endfor %}
+          {% endif %}
+      
+      - |
+          {% if context.focus %}
+          **Focus Areas:**  
+          The following sections require extra attention. When crafting your response, ensure that these pieces are considered and referenced as appropriate.
+          
+          {% for item in context.focus %}
+          - {{ item.text }}
+          
+          {% endfor %}
+          {% endif %}
+      
+      - "Using only the information provided above, please address the following query: {{ human.text }}.  
+        If the document does not contain sufficient details to answer any part of the query, please clearly state that your analysis is limited by the available text. Cite or quote relevant portions of the document to support your analysis where possible."
+
