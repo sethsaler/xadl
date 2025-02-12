@@ -3,12 +3,15 @@ input:
     type: document
   workspace:
     type: workspace
+  standard-document-tag:
+    type: text
+    label: "Name of the document tag to use as the standard for comparison"
 
 actions:
   # 1) Tag Collections for Different Categories
   get-document-tags:
     tool: find-tags
-    name: ["Florida No. 7", "Florida No. 8", "Frontier Florida"]
+    category: "Document"
 
   get-performance-tags:
     tool: find-tags
@@ -127,6 +130,7 @@ actions:
     repeat:
       function: analyze-category-for-document
       for: [documentTag, tag]
+      skipIfEmpty: [documentTag, tag]
     input:
       documentTag: get-document-tags
       tag: get-performance-tags
@@ -144,6 +148,7 @@ actions:
     repeat:
       function: analyze-category-for-document
       for: [documentTag, tag]
+      skipIfEmpty: [documentTag, tag]
     input:
       documentTag: get-document-tags
       tag: get-payment-tags
@@ -161,6 +166,7 @@ actions:
     repeat:
       function: analyze-category-for-document
       for: [documentTag, tag]
+      skipIfEmpty: [documentTag, tag]
     input:
       documentTag: get-document-tags
       tag: get-termination-tags
@@ -178,26 +184,10 @@ actions:
     repeat:
       function: analyze-category-for-document
       for: [documentTag, tag]
+      skipIfEmpty: [documentTag, tag]
     input:
       documentTag: get-document-tags
       tag: get-sla-tags
-      documents: task/documents
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: tariffAnalysisPrompt
-      title: analysisTitle
-    output:
-      type: array
-      items:
-        type: insight
-
-  analyze-transferability:
-    repeat:
-      function: analyze-category-for-document
-      for: [documentTag, tag]
-    input:
-      documentTag: get-document-tags
-      tag: get-transferability-tags
       documents: task/documents
       knowledge: init-kset
       basePrompt: basePrompt
@@ -212,6 +202,7 @@ actions:
     repeat:
       function: analyze-category-for-document
       for: [documentTag, tag]
+      skipIfEmpty: [documentTag, tag]
     input:
       documentTag: get-document-tags
       tag: get-liability-tags
@@ -230,55 +221,56 @@ actions:
     repeat:
       function: compare-against-standard-for-category
       for: [tag]
+      skipIfEmpty: tag
     input:
       tag: get-performance-tags
       knowledge: init-kset
       analyze-categories: analyze-performance
+      standard-document-tag: task/standard-document-tag
 
   compare-documents-payment:
     repeat:
       function: compare-against-standard-for-category
       for: [tag]
+      skipIfEmpty: tag
     input:
       tag: get-payment-tags
       knowledge: init-kset
       analyze-categories: analyze-payment
+      standard-document-tag: task/standard-document-tag
 
   compare-documents-termination:
     repeat:
       function: compare-against-standard-for-category
       for: [tag]
+      skipIfEmpty: tag
     input:
       tag: get-termination-tags
       knowledge: init-kset
       analyze-categories: analyze-termination
+      standard-document-tag: task/standard-document-tag
 
   compare-documents-sla:
     repeat:
       function: compare-against-standard-for-category
       for: [tag]
+      skipIfEmpty: tag
     input:
       tag: get-sla-tags
       knowledge: init-kset
       analyze-categories: analyze-sla
-
-  compare-documents-transferability:
-    repeat:
-      function: compare-against-standard-for-category
-      for: [tag]
-    input:
-      tag: get-transferability-tags
-      knowledge: init-kset
-      analyze-categories: analyze-transferability
+      standard-document-tag: task/standard-document-tag
 
   compare-documents-liability:
     repeat:
       function: compare-against-standard-for-category
       for: [tag]
+      skipIfEmpty: tag
     input:
       tag: get-liability-tags
       knowledge: init-kset
       analyze-categories: analyze-liability
+      standard-document-tag: task/standard-document-tag
 
   # 8) Add Results to Workspace
   add-to-workspace:
@@ -288,13 +280,11 @@ actions:
       paymentAnalysis: analyze-payment
       terminationAnalysis: analyze-termination
       slaAnalysis: analyze-sla
-      transferabilityAnalysis: analyze-transferability
       liabilityAnalysis: analyze-liability
       performanceComparisons: compare-documents-performance
       paymentComparisons: compare-documents-payment
       terminationComparisons: compare-documents-termination
       slaComparisons: compare-documents-sla
-      transferabilityComparisons: compare-documents-transferability
       liabilityComparisons: compare-documents-liability
       knowledge: init-kset
     tool: workspace
@@ -400,6 +390,8 @@ functions:
         type: tag
       knowledge:
         type: knowledge-set
+      standard-document-tag:
+        type: text
     actions:
       get-category-insights:
         input:
@@ -416,75 +408,109 @@ functions:
         input:
           insights: get-category-insights
           tag: function/tag
+          standard-document-tag: function/standard-document-tag
         skipIfEmpty: insights
         tool: llm
         prompt: |
-          Compare how {{tag.name}} is handled in each document against the standard document ({{insights[0].documentTag.name}}), focusing exclusively on quantitative metrics and measurable requirements.
+          {# First find the standard document insight #}
+          {% set standard_doc = [] %}
+          {% set comparison_docs = [] %}
+          {% for insight in insights %}
+          {% if insight.documentTag.name == standard_document_tag %}
+          {% do standard_doc.append(insight) %}
+          {% else %}
+          {% do comparison_docs.append(insight) %}
+          {% endif %}
+          {% endfor %}
           
-          Structure each comparison as follows:
-
-          {% for i in range(1, insights|length) %}
+          Compare how {{tag.name}} is handled across all documents, using {{standard_document_tag}} as the standard reference.
           
-          COMPARISON: Standard ({{insights[0].documentTag.name}}) vs {{insights[i].documentTag.name}}
+          First, provide a comprehensive summary of the standard document:
 
-          QUANTITATIVE ANALYSIS OF {{tag.name}}
+          STANDARD DOCUMENT ({{standard_document_tag}}):
+          
+          1. Key Metrics and Requirements:
+          - List all quantitative metrics and their values
+          - Specify all measurable requirements
+          - Detail any specific thresholds or limits
+          - Document all time-based requirements
+          
+          2. Standard Document Framework:
+          - Core requirements and specifications
+          - Compliance requirements
+          - Implementation requirements
+          - Operational standards
 
-          1. Metric Identification and Values
-          - Define each metric and its purpose
-          - Classify the type (financial, performance, time-based, etc.)
-          - List the specific values from both documents
-          - For metrics missing in either document, explicitly state "No specified value found"
+          Then, for each comparison document, provide a detailed analysis:
 
-          2. Value Comparison
-          - Calculate and explain the range of variation using ONLY found values
-          - Convert units to a common base where applicable
-          - Note any conditions or triggers associated with the values
-          - Explain implications of missing values
+          {% for doc in comparison_docs %}
+          
+          COMPARISON: {{doc.documentTag.name}} vs Standard
 
-          Alignment with Standard:
-          - Where does this document align with the standard?
-          - What are the key deviations from standard practices?
-          - How significant are the variations?
+          1. Metric-by-Metric Comparison:
+          - For each metric in either document:
+            * Standard value: [Value from {{standard_document_tag}}]
+            * Comparison value: [Value from {{doc.documentTag.name}}]
+            * Variation: [Calculate difference/percentage change]
+            * Impact Assessment: [Significance of variation]
 
-          Differences in Requirements:
-          - How do core requirements differ from standard?
-          - Where are technical specifications different?
-          - What measurement/reporting variations exist?
-          - How do compliance approaches vary?
+          2. Compliance Analysis:
+          - Areas of Full Compliance with Standard
+          - Areas of Partial Compliance
+          - Areas of Non-Compliance
+          - Missing Requirements
 
-          Differences in Terms:
-          - What definitional differences exist?
-          - How do scopes and limitations vary?
-          - What timeline variations exist?
-          - Where do processes differ?
+          3. Detailed Variations:
+          - Quantitative Differences:
+            * List each numerical variation
+            * Provide context for variations
+            * Assess impact of differences
+          
+          - Requirement Differences:
+            * More stringent requirements
+            * Less stringent requirements
+            * Additional requirements
+            * Missing requirements
 
-          Risk and Responsibility Variations:
-          - How does risk allocation vary from standard?
-          - What liability differences exist?
-          - How do warranties and disclaimers differ?
-          - What indemnification variations exist?
+          4. Implementation Impact:
+          - Operational Variations
+          - Cost Implications
+          - Timeline Differences
+          - Resource Requirements
 
-          Financial Impact Differences:
-          - What cost variations exist from standard?
-          - How do payment terms differ?
-          - What penalty/credit differences exist?
-          - How do financial safeguards vary?
-
-          Operational Variations:
-          - How do implementation approaches vary from standard?
-          - What service delivery differences exist?
-          - How do quality controls differ?
-          - What monitoring variations exist?
+          5. Risk Assessment:
+          - Compliance Risks
+          - Operational Risks
+          - Financial Risks
+          - Service Delivery Risks
 
           {% endfor %}
 
-          Document insights to compare:
-          Standard Document: {{insights[0].documentTag.name}}
-          {{insights[0].text}}
+          CROSS-DOCUMENT ANALYSIS:
+          
+          1. Pattern Analysis:
+          - Common variations from standard
+          - Unique variations
+          - Trending differences
+          
+          2. Overall Compliance Assessment:
+          - Documents closest to standard
+          - Documents with significant variations
+          - Critical areas of difference
 
-          {% for i in range(1, insights|length) %}
-          Comparison Document: {{insights[i].documentTag.name}}
-          {{insights[i].text}}
+          3. Recommendations:
+          - Priority areas for alignment
+          - Suggested standardization approaches
+          - Risk mitigation strategies
+
+          Document insights used for analysis:
+
+          Standard Document ({{standard_document_tag}}):
+          {{standard_doc[0].text if standard_doc else "Standard document not found"}}
+
+          {% for doc in comparison_docs %}
+          Comparison Document: {{doc.documentTag.name}}
+          {{doc.text}}
           {% endfor %}
 
       create-comparison-insight:
@@ -496,13 +522,14 @@ functions:
         tool: insight
         text: |
           {{summary.text}}
-        name: "Standard Comparison: {{tag.name}}"
+        name: "Standard Comparison Analysis: {{tag.name}}"
         tags: [tag]
         attributes:
           category: tariff-comparison-analysis
           analysisType: standard-comparison
-          standardDocument: "{{insights[0].documentTag.name}}"
+          standardDocument: "{{standard_document_tag}}"
           hasQuantitativeMetrics: "true"
+          documentCount: "{{insights|length}}"
         relations:
           derived-from: [insights]
 
