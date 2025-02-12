@@ -1,0 +1,481 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collections for Different Categories
+  get-document-tags:
+    tool: find-tags
+    name: ["Florida No. 7", "Florida No. 8", "Frontier Florida"]
+
+  get-performance-tags:
+    tool: find-tags
+    name: ["Performance Data"]
+
+  get-payment-tags:
+    tool: find-tags
+    name: ["Billing", "Dispute", "Non-Recurring Charges"]
+
+  get-termination-tags:
+    tool: find-tags
+    name: ["Company Cancellation", "Customer Cancellation"]
+
+  get-sla-tags:
+    tool: find-tags
+    category: "SLA"
+
+  get-liability-tags:
+    tool: find-tags
+    category: "Liabilities"
+
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a telecommunications regulatory expert analyzing tariff documents. Your objectives include:
+
+      1. Providing comprehensive summaries of how each category is handled across all documents
+      2. Identifying key patterns and variations in how categories are treated
+      3. Creating holistic comparisons that highlight important distinctions
+      4. Synthesizing insights across the full document set
+
+      When analyzing documents:
+      - Focus on explicit terms and conditions
+      - Identify regulatory compliance requirements
+      - Note any unusual or non-standard provisions
+      - Flag potential risks or areas requiring attention
+      - Look for patterns and trends across documents
+
+  # 3) Analysis prompt
+  tariffAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is relevant text from the tariff document. Please:
+      - Analyze the specific provisions related to the tagged category
+      - Identify key requirements and obligations
+      - Note any regulatory compliance considerations
+      - Highlight important terms or conditions
+      - Summarize the findings concisely
+
+      Relevant text from the tariff:
+
+  # 4) Section Title
+  analysisTitle:
+    tool: echo
+    message: Multi-Document Tariff Analysis
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      documentTags: get-document-tags
+      performanceTags: get-performance-tags
+      paymentTags: get-payment-tags
+      terminationTags: get-termination-tags
+      slaTags: get-sla-tags
+      liabilityTags: get-liability-tags
+    tool: knowledge-set
+    knowledgeSetName: "Multi-Document Tariff Analysis and Comparison"
+    operations:
+      - op: set-nodes
+        nodes: documents
+      - op: add-dimension
+        key: document
+        name: "Document"
+        nodes: documentTags
+        priority: 1
+        skipIfEmpty: true
+      - op: add-dimension
+        key: performance
+        name: "Performance Obligations"
+        nodes: performanceTags
+        priority: 2
+        skipIfEmpty: true
+      - op: add-dimension
+        key: payment
+        name: "Payment Obligations"
+        nodes: paymentTags
+        priority: 3
+        skipIfEmpty: true
+      - op: add-dimension
+        key: termination
+        name: "Termination"
+        nodes: terminationTags
+        priority: 4
+        skipIfEmpty: true
+      - op: add-dimension
+        key: sla
+        name: "SLA"
+        nodes: slaTags
+        priority: 5
+        skipIfEmpty: true
+      - op: add-dimension
+        key: liability
+        name: "Liabilities"
+        nodes: liabilityTags
+        priority: 6
+        skipIfEmpty: true
+
+  # 6) Analyze content for each category
+  analyze-performance:
+    repeat:
+      function: analyze-category-for-document
+      for: [documentTag, tag]
+    input:
+      documentTag: get-document-tags
+      tag: get-performance-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+    output:
+      type: array
+      items:
+        type: insight
+
+  analyze-payment:
+    repeat:
+      function: analyze-category-for-document
+      for: [documentTag, tag]
+    input:
+      documentTag: get-document-tags
+      tag: get-payment-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+    output:
+      type: array
+      items:
+        type: insight
+
+  analyze-termination:
+    repeat:
+      function: analyze-category-for-document
+      for: [documentTag, tag]
+    input:
+      documentTag: get-document-tags
+      tag: get-termination-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+    output:
+      type: array
+      items:
+        type: insight
+
+  analyze-sla:
+    repeat:
+      function: analyze-category-for-document
+      for: [documentTag, tag]
+    input:
+      documentTag: get-document-tags
+      tag: get-sla-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+    output:
+      type: array
+      items:
+        type: insight
+
+  analyze-liability:
+    repeat:
+      function: analyze-category-for-document
+      for: [documentTag, tag]
+    input:
+      documentTag: get-document-tags
+      tag: get-liability-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+    output:
+      type: array
+      items:
+        type: insight
+
+  # 7) Compare all documents for each category
+  compare-documents-performance:
+    repeat:
+      function: compare-all-documents-for-category
+      for: [tag]
+    input:
+      tag: get-performance-tags
+      knowledge: init-kset
+      analyze-categories: analyze-performance
+
+  compare-documents-payment:
+    repeat:
+      function: compare-all-documents-for-category
+      for: [tag]
+    input:
+      tag: get-payment-tags
+      knowledge: init-kset
+      analyze-categories: analyze-payment
+
+  compare-documents-termination:
+    repeat:
+      function: compare-all-documents-for-category
+      for: [tag]
+    input:
+      tag: get-termination-tags
+      knowledge: init-kset
+      analyze-categories: analyze-termination
+
+  compare-documents-sla:
+    repeat:
+      function: compare-all-documents-for-category
+      for: [tag]
+    input:
+      tag: get-sla-tags
+      knowledge: init-kset
+      analyze-categories: analyze-sla
+
+  compare-documents-liability:
+    repeat:
+      function: compare-all-documents-for-category
+      for: [tag]
+    input:
+      tag: get-liability-tags
+      knowledge: init-kset
+      analyze-categories: analyze-liability
+
+  # 8) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      performanceAnalysis: analyze-performance
+      paymentAnalysis: analyze-payment
+      terminationAnalysis: analyze-termination
+      slaAnalysis: analyze-sla
+      liabilityAnalysis: analyze-liability
+      performanceComparisons: compare-documents-performance
+      paymentComparisons: compare-documents-payment
+      terminationComparisons: compare-documents-termination
+      slaComparisons: compare-documents-sla
+      liabilityComparisons: compare-documents-liability
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
+functions:
+  analyze-category-for-document:
+    input:
+      documentTag:
+        type: tag
+      tag:
+        type: tag
+      documents:
+        type: document
+      knowledge:
+        type: knowledge-set
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      title:
+        type: text
+    actions:
+      get-snippets:
+        input:
+          documents: function/documents
+          documentTag: function/documentTag
+          tag: function/tag
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [documentTag, tag]
+
+      get-instruction-prompt-for-category:
+        input:
+          tag: function/tag
+          documentTag: function/documentTag
+        tool: echo
+        message: |
+          TARIFF DOCUMENT SUMMARY FOR {{tag.category}}:
+
+          Analyze how {{tag.name}} is handled in {{documentTag.name}}. Provide a clear summary in this format:
+
+          **Summary:**
+          [Concise summary of how this category is handled in this document]
+
+          **Key Points:**
+          - List the main requirements or specifications
+          - Note any unique approaches or special conditions
+          - Highlight critical implementation details
+          - Identify regulatory compliance requirements
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-category
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-category-insight:
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          tag: function/tag
+          documentTag: function/documentTag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "Tariff Analysis: {{tag.name}} in {{documentTag.name}}"
+        tags: [documentTag, tag]
+        attributes:
+          category: tariff-category-analysis
+          analysisType: single-document
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-category-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
+
+  compare-all-documents-for-category:
+    input:
+      tag:
+        type: tag
+      knowledge:
+        type: knowledge-set
+    actions:
+      get-category-insights:
+        input:
+          knowledge: function/knowledge
+          tag: function/tag
+        tool: knowledge-set-query
+        nodes:
+          type: insight
+          attributes:
+            category: tariff-category-analysis
+          tags: [tag]
+
+      analyze-differences:
+        input:
+          insights: get-category-insights
+          tag: function/tag
+        skipIfEmpty: insights
+        tool: llm
+        prompt: |
+          Compare how {{tag.name}} is handled across all tariff documents simultaneously, focusing exclusively on quantitative metrics and measurable requirements.
+          
+          Structure the comparison as follows:
+
+          QUANTITATIVE ANALYSIS OF {{tag.name}} ACROSS ALL DOCUMENTS
+
+          Comprehensive Metrics Analysis
+          For each quantitative metric found in ANY document, provide a detailed breakdown using the following structure:
+
+          1. Metric Identification and Values
+          - Define the metric and its purpose
+          - Classify the type (financial, performance, time-based, etc.)
+          - Present values in a comparison table with all documents from the analysis
+          - For documents lacking a metric, explicitly state "No specified value found in document" in the table
+
+          2. Value Comparison
+          - Calculate and explain the range of variation using ONLY found values
+          - Convert units to a common base where applicable (e.g., business days to hours)
+          - Note any conditions or triggers associated with the values
+          - Explain implications of missing values
+
+          For each metric, create a table using this structure:
+          [Metric Name] ([Metric Type]):
+          Purpose: [Description of what the metric measures]
+          | Document | Value | [Additional Context Column] |
+          |----------|-------|---------------------------|
+          {% for insight in insights %}| {{insight.documentTag.name}} | [Value or "No specified value found in document"] | [Relevant context] |
+          {% endfor %}
+          Range of Variation: [range] (based on values from [list documents with values only])
+
+          Example formats (using actual document names from the analysis):
+
+          Response Time Requirements (Time-Based Metric):
+          Purpose: Maximum allowed response time for service disruptions
+          | Document | Value | Condition/Trigger |
+          |----------|-------|------------------|
+          {% for insight in insights %}| {{insight.documentTag.name}} | [Value or "No specified value found in document"] | [Condition if value exists, "N/A" if no value] |
+          {% endfor %}
+          Range of Variation: [X-Y hours] (based on values from [documents with values])
+
+          Late Payment Charges (Financial Metric):
+          Purpose: Interest charged on overdue payments
+          | Document | Value | Condition/Trigger |
+          |----------|-------|------------------|
+          {% for insight in insights %}| {{insight.documentTag.name}} | [Value or "No specified value found in document"] | [Condition if value exists, "N/A" if no value] |
+          {% endfor %}
+          Range of Variation: [X-Y%] (based on values from [documents with values])
+
+          Network Availability (Performance Metric):
+          Purpose: Required system uptime percentage
+          | Document | Value | Measurement Frequency |
+          |----------|-------|---------------------|
+          {% for insight in insights %}| {{insight.documentTag.name}} | [Value or "No specified value found in document"] | [Frequency if value exists, "N/A" if no value] |
+          {% endfor %}
+          Range of Variation: [X-Y%] (based on values from [documents with values])
+
+          Document insights to compare:
+          {% for insight in insights %}
+          Document: {{insight.documentTag.name}}
+          {{insight.text}}
+          {% endfor %}
+
+      create-comparison-insight:
+        input:
+          summary: analyze-differences
+          insights: get-category-insights
+          tag: function/tag
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "Multi-Document Tariff Analysis: {{tag.name}}"
+        tags: [tag]
+        attributes:
+          category: tariff-comparison-analysis
+          analysisType: cross-document
+          comparisonType: multi-document
+          hasQuantitativeMetrics: "true"
+        relations:
+          derived-from: [insights]
+
+      add-comparison:
+        input:
+          knowledge: function/knowledge
+          insight: create-comparison-insight
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight 

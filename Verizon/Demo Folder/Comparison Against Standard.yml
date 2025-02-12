@@ -8,27 +8,23 @@ actions:
   # 1) Tag Collections for Different Categories
   get-document-tags:
     tool: find-tags
-    name: ["Florida No. 7", "Florida No. 8", "Ohio No. 4", "Iowa"]
+    name: ["Florida No. 7", "Florida No. 8", "Frontier Florida"]
 
   get-performance-tags:
     tool: find-tags
-    category: "Performance Obligations"
+    name: ["Performance Data"]
 
   get-payment-tags:
     tool: find-tags
-    category: "Payment Obligations"
+    name: ["Billing", "Dispute", "Non-Recurring Charges"]
 
   get-termination-tags:
     tool: find-tags
-    category: "Termination"
+    name: ["Company Cancellation", "Customer Cancellation"]
 
   get-sla-tags:
     tool: find-tags
     category: "SLA"
-
-  get-transferability-tags:
-    tool: find-tags
-    category: "Transferability"
 
   get-liability-tags:
     tool: find-tags
@@ -41,10 +37,11 @@ actions:
       # Role and Context Setup
       You are a telecommunications regulatory expert analyzing tariff documents. Your objectives include:
 
-      1. Providing comprehensive summaries of how each category is handled across all documents
-      2. Identifying key patterns and variations in how categories are treated
-      3. Creating holistic comparisons that highlight important distinctions
-      4. Synthesizing insights across the full document set
+      1. Comparing each document against the standard document
+      2. Identifying key differences from the standard approach
+      3. Highlighting variations that may require attention or alignment
+      4. Creating actionable comparisons that show compliance or deviation from standards
+      5. Focusing on quantitative metrics and measurable requirements
 
       When analyzing documents:
       - Focus on explicit terms and conditions
@@ -71,7 +68,7 @@ actions:
   # 4) Section Title
   analysisTitle:
     tool: echo
-    message: Multi-Document Tariff Analysis
+    message: Standard Comparison Analysis
 
   # 5) Initialize Knowledge Set
   init-kset:
@@ -82,10 +79,9 @@ actions:
       paymentTags: get-payment-tags
       terminationTags: get-termination-tags
       slaTags: get-sla-tags
-      transferabilityTags: get-transferability-tags
       liabilityTags: get-liability-tags
     tool: knowledge-set
-    knowledgeSetName: "Multi-Document Tariff Analysis and Comparison"
+    knowledgeSetName: "Standards Comparison"
     operations:
       - op: set-nodes
         nodes: documents
@@ -120,16 +116,10 @@ actions:
         priority: 5
         skipIfEmpty: true
       - op: add-dimension
-        key: transferability
-        name: "Transferability"
-        nodes: transferabilityTags
-        priority: 6
-        skipIfEmpty: true
-      - op: add-dimension
         key: liability
         name: "Liabilities"
         nodes: liabilityTags
-        priority: 7
+        priority: 6
         skipIfEmpty: true
 
   # 6) Analyze content for each category
@@ -235,10 +225,10 @@ actions:
       items:
         type: insight
 
-  # 7) Compare all documents for each category
+  # 7) Compare documents against standard for each category
   compare-documents-performance:
     repeat:
-      function: compare-all-documents-for-category
+      function: compare-against-standard-for-category
       for: [tag]
     input:
       tag: get-performance-tags
@@ -247,7 +237,7 @@ actions:
 
   compare-documents-payment:
     repeat:
-      function: compare-all-documents-for-category
+      function: compare-against-standard-for-category
       for: [tag]
     input:
       tag: get-payment-tags
@@ -256,7 +246,7 @@ actions:
 
   compare-documents-termination:
     repeat:
-      function: compare-all-documents-for-category
+      function: compare-against-standard-for-category
       for: [tag]
     input:
       tag: get-termination-tags
@@ -265,7 +255,7 @@ actions:
 
   compare-documents-sla:
     repeat:
-      function: compare-all-documents-for-category
+      function: compare-against-standard-for-category
       for: [tag]
     input:
       tag: get-sla-tags
@@ -274,7 +264,7 @@ actions:
 
   compare-documents-transferability:
     repeat:
-      function: compare-all-documents-for-category
+      function: compare-against-standard-for-category
       for: [tag]
     input:
       tag: get-transferability-tags
@@ -283,7 +273,7 @@ actions:
 
   compare-documents-liability:
     repeat:
-      function: compare-all-documents-for-category
+      function: compare-against-standard-for-category
       for: [tag]
     input:
       tag: get-liability-tags
@@ -384,7 +374,7 @@ functions:
         tool: insight
         text: |
           {{summary.text}}
-        name: "Tariff Analysis: {{tag.name}} in {{documentTag.name}}"
+        name: "Standard Analysis: {{tag.name}} in {{documentTag.name}}"
         tags: [documentTag, tag]
         attributes:
           category: tariff-category-analysis
@@ -404,7 +394,7 @@ functions:
           - op: set-nodes
             nodes: snippets
 
-  compare-all-documents-for-category:
+  compare-against-standard-for-category:
     input:
       tag:
         type: tag
@@ -429,71 +419,72 @@ functions:
         skipIfEmpty: insights
         tool: llm
         prompt: |
-          Compare how {{tag.name}} is handled across all tariff documents simultaneously. Extract and compare specific metrics and requirements.
+          Compare how {{tag.name}} is handled in each document against the standard document ({{insights[0].documentTag.name}}), focusing exclusively on quantitative metrics and measurable requirements.
           
-          Structure the comparison as follows:
+          Structure each comparison as follows:
 
-          COMPREHENSIVE ANALYSIS OF {{tag.name}} ACROSS ALL DOCUMENTS
-
-          1. Quantitative Metrics:
-          Create a table comparing key numerical values across documents. For each value, include a brief parenthetical explanation of what the metric represents or applies to:
-          | Metric | Florida No. 7 | Florida No. 8 | Ohio No. 4 | Iowa |
-          |--------|---------------|---------------|------------|------|
-          [Extract all numerical values, time periods, percentages, dollar amounts with explanations]
-          Example: Response Time | 4 hrs (network outage) | 2 hrs (critical failure) | 6 hrs (service disruption) | 3 hrs (system down)
-
-          2. Technical Requirements Matrix:
-          Create a feature comparison matrix with explanatory notes:
-          | Requirement | Florida No. 7 | Florida No. 8 | Ohio No. 4 | Iowa |
-          |------------|---------------|---------------|------------|------|
-          [List each technical requirement with contextual notes about implementation]
-
-          3. Process Comparison:
-          For each key process (e.g., notification, reporting, compliance):
-          - Timeline requirements (with explanation of triggering events)
-          - Required documentation (with purpose)
-          - Approval processes (with scope)
-          - Specific steps/stages (with context)
+          {% for i in range(1, insights|length) %}
           
-          4. Jurisdiction-Specific Elements:
-          Document-specific requirements with contextual explanations:
-          - Florida No. 7: [unique requirements with rationale]
-          - Florida No. 8: [unique requirements with rationale]
-          - Ohio No. 4: [unique requirements with rationale]
-          - Iowa: [unique requirements with rationale]
+          COMPARISON: Standard ({{insights[0].documentTag.name}}) vs {{insights[i].documentTag.name}}
 
-          5. Compliance Requirements:
-          For each document (include context for requirements):
-          - Reporting frequency: [daily/weekly/monthly/quarterly/annually] (explain what triggers each report)
-          - Required metrics: [list specific measurements with purpose]
-          - Audit requirements: [frequency and scope with explanation]
-          - Record retention periods: [specific timeframes with context]
+          QUANTITATIVE ANALYSIS OF {{tag.name}}
 
-          6. Risk Analysis:
-          Compare across documents with explanatory context:
-          - Financial penalties: [specific amounts/calculations] (explain what triggers each penalty)
-          - Service level guarantees: [specific metrics] (explain measurement criteria)
-          - Liability caps: [specific amounts] (explain what the cap covers)
-          - Insurance requirements: [coverage amounts] (explain coverage purpose)
+          1. Metric Identification and Values
+          - Define each metric and its purpose
+          - Classify the type (financial, performance, time-based, etc.)
+          - List the specific values from both documents
+          - For metrics missing in either document, explicitly state "No specified value found"
 
-          7. Implementation Requirements:
-          Technical specifications with contextual notes:
-          - Equipment requirements: [specific models/types] (explain purpose)
-          - Protocol requirements: [specific standards] (explain applicability)
-          - Testing requirements: [specific procedures] (explain validation criteria)
-          - Documentation requirements: [specific deliverables] (explain intended use)
+          2. Value Comparison
+          - Calculate and explain the range of variation using ONLY found values
+          - Convert units to a common base where applicable
+          - Note any conditions or triggers associated with the values
+          - Explain implications of missing values
 
-          8. Qualitative Assessment:
-          For each document with supporting context:
-          - Strengths: [specific advantages with explanation]
-          - Weaknesses: [specific limitations with impact]
-          - Unique features: [distinctive elements with purpose]
-          - Risk factors: [specific concerns with potential impact]
+          Alignment with Standard:
+          - Where does this document align with the standard?
+          - What are the key deviations from standard practices?
+          - How significant are the variations?
+
+          Differences in Requirements:
+          - How do core requirements differ from standard?
+          - Where are technical specifications different?
+          - What measurement/reporting variations exist?
+          - How do compliance approaches vary?
+
+          Differences in Terms:
+          - What definitional differences exist?
+          - How do scopes and limitations vary?
+          - What timeline variations exist?
+          - Where do processes differ?
+
+          Risk and Responsibility Variations:
+          - How does risk allocation vary from standard?
+          - What liability differences exist?
+          - How do warranties and disclaimers differ?
+          - What indemnification variations exist?
+
+          Financial Impact Differences:
+          - What cost variations exist from standard?
+          - How do payment terms differ?
+          - What penalty/credit differences exist?
+          - How do financial safeguards vary?
+
+          Operational Variations:
+          - How do implementation approaches vary from standard?
+          - What service delivery differences exist?
+          - How do quality controls differ?
+          - What monitoring variations exist?
+
+          {% endfor %}
 
           Document insights to compare:
-          {% for insight in insights %}
-          Document: {{insight.documentTag.name}}
-          {{insight.text}}
+          Standard Document: {{insights[0].documentTag.name}}
+          {{insights[0].text}}
+
+          {% for i in range(1, insights|length) %}
+          Comparison Document: {{insights[i].documentTag.name}}
+          {{insights[i].text}}
           {% endfor %}
 
       create-comparison-insight:
@@ -505,20 +496,13 @@ functions:
         tool: insight
         text: |
           {{summary.text}}
-        name: "Multi-Document Tariff Analysis: {{tag.name}}"
+        name: "Standard Comparison: {{tag.name}}"
         tags: [tag]
         attributes:
           category: tariff-comparison-analysis
-          analysisType: cross-document
-          comparisonType: multi-document
+          analysisType: standard-comparison
+          standardDocument: "{{insights[0].documentTag.name}}"
           hasQuantitativeMetrics: "true"
-          hasTechnicalMatrix: "true"
-          hasProcessComparison: "true"
-          hasJurisdictionalElements: "true"
-          hasComplianceRequirements: "true"
-          hasRiskAnalysis: "true"
-          hasImplementationRequirements: "true"
-          hasQualitativeAssessment: "true"
         relations:
           derived-from: [insights]
 
