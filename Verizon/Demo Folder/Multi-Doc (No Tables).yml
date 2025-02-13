@@ -413,6 +413,8 @@ functions:
 
           QUANTITATIVE ANALYSIS OF {{tag.name}} ACROSS ALL DOCUMENTS
 
+          CRITICAL REQUIREMENT: When exactly comparable statistics are found in multiple documents (same metric, same units, same context), you MUST include them in the comparison. No comparable statistics may be omitted.
+
           Comprehensive Metrics Analysis
           For each quantitative metric found in ANY document, provide a detailed breakdown using the following structure:
 
@@ -421,38 +423,41 @@ functions:
           - Classify the type (financial, performance, time-based, etc.)
           - List the specific values from each document
           - For documents lacking this metric, explicitly state "No specified value found in document"
+          - REQUIRED: If the exact same metric appears in multiple documents (e.g., same type of late fee, same type of response time), ALL instances must be included
 
           2. Value Comparison
           - Calculate and explain the range of variation using ONLY found values
           - Convert units to a common base where applicable (e.g., business days to hours)
           - Note any conditions or triggers associated with the values
-          - Explain implications of missing values
+          - REQUIRED: For metrics that are exactly comparable across documents, provide a complete comparison showing all instances
 
-          Example formats:
+          Example formats (NOTE: The following examples use FICTIONAL DATA for illustration purposes ONLY. DO NOT use these values as actual reference data):
 
-          "Response Time Requirements (Time-Based Metric):
+          "EXAMPLE FORMAT 1 - FICTIONAL DATA FOR ILLUSTRATION:
+           Response Time Requirements (Time-Based Metric):
            Values:
-           - Florida No. 7: 4 hours for network outages
-           - Florida No. 8: 2 hours for critical failures
+           - Florida No. 7: 4 hours for network outages [FICTIONAL EXAMPLE]
+           - Florida No. 8: 2 hours for critical failures [FICTIONAL EXAMPLE]
+           - Virginia: 4 hours for network outages [FICTIONAL EXAMPLE]
            - Frontier Florida: No specified value found in document
-           Range of Variation: 2-4 hours (based on values from Florida No. 7 and Florida No. 8 only)
-           Conditions: Florida No. 7 applies to all outages, Florida No. 8 specifies critical failures only"
+           Range of Variation: 2-4 hours
+           Directly Comparable Sets:
+           - Network outages response time: Florida No. 7 and Virginia both specify 4 hours
+           Conditions: Florida No. 7 and Virginia apply to all outages, Florida No. 8 specifies critical failures only"
 
-          "Late Payment Charges (Financial Metric):
+          "EXAMPLE FORMAT 2 - FICTIONAL DATA FOR ILLUSTRATION:
+           Late Payment Charges (Financial Metric):
            Values:
-           - Florida No. 7: 1.5% monthly interest
-           - Florida No. 8: 1.8% monthly interest
+           - Florida No. 7: 1.5% monthly interest [FICTIONAL EXAMPLE]
+           - Florida No. 8: 1.8% monthly interest [FICTIONAL EXAMPLE]
+           - Maryland: 1.5% monthly interest [FICTIONAL EXAMPLE]
            - Frontier Florida: No specified value found in document
-           Range of Variation: 1.5-1.8% monthly (based on values from Florida No. 7 and Florida No. 8 only)
-           Conditions: Both apply after 30-day grace period"
+           Range of Variation: 1.5-1.8% monthly
+           Directly Comparable Sets:
+           - 1.5% monthly interest: Florida No. 7 and Maryland
+           Conditions: All apply after 30-day grace period"
 
-          "Network Availability (Performance Metric):
-           Values:
-           - Florida No. 7: 99.99% uptime requirement (measured monthly)
-           - Florida No. 8: 99.999% uptime requirement (measured daily)
-           - Frontier Florida: No specified value found in document
-           Range of Variation: 99.99-99.999% (based on values from Florida No. 7 and Florida No. 8 only)
-           Measurement Frequency: Varies by document as noted in values"
+          IMPORTANT: The examples above use fictional data solely to demonstrate the required format. Your analysis must use ONLY actual values found in the source documents.
 
           Document insights to compare:
           {% for insight in insights %}
