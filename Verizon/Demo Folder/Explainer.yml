@@ -1,0 +1,181 @@
+# Verizon Tariff Analysis Automation Workflows
+# This file explains the different automation approaches used for analyzing tariff documents
+
+# ===================================
+# 1. Granular Comparison (Granular Comparison.yml)
+# ===================================
+# Purpose: Performs detailed pairwise comparisons between specific tariff documents
+# focusing on key categories like performance, payment, termination, etc.
+
+granular_comparison:
+  workflow_steps:
+    # Step 1: Tag Collection
+    # - Gathers document-specific tags (Florida No. 7, Florida No. 8, etc.)
+    # - Collects category-specific tags (Performance, Payment, etc.)
+    tag_collection:
+      document_tags: ["Florida No. 7", "Florida No. 8", "Ohio No. 4", "Iowa"]
+      category_tags:
+        - Performance Obligations
+        - Payment Obligations
+        - Termination
+        - SLA
+        - Transferability
+        - Liabilities
+
+    # Step 2: Analysis Process
+    # - Analyzes each document-category combination
+    # - Creates detailed insights for each analysis
+    # - Stores results in knowledge set for comparison
+    analysis:
+      per_category:
+        - analyze_performance
+        - analyze_payment
+        - analyze_termination
+        - analyze_sla
+        - analyze_transferability
+        - analyze_liability
+
+    # Step 3: Comparison Process
+    # - Compares documents pairwise for each category
+    # - Generates detailed comparison matrices
+    # - Focuses on specific differences between pairs of documents
+    comparison:
+      method: pairwise
+      output: detailed_comparison_matrix
+
+# ===================================
+# 2. High-Level Comparison (High-Level Comparison.yml)
+# ===================================
+# Purpose: Creates broader, category-based comparisons across all documents
+# with less granular detail but wider document coverage
+
+high_level_comparison:
+  workflow_steps:
+    # Step 1: Document Collection
+    # - Gathers a wider range of documents
+    # - Includes multiple state tariffs and providers
+    document_scope:
+      providers: ["Frontier", "Verizon"]
+      states: ["Florida", "Ohio", "Colorado", "Delaware", "Hawaii", "Iowa", "etc"]
+
+    # Step 2: Category Analysis
+    # - Analyzes documents by category
+    # - Creates high-level summaries
+    # - Focuses on key patterns and trends
+    analysis:
+      approach: category_based
+      output: summary_insights
+
+    # Step 3: Cross-Document Synthesis
+    # - Synthesizes findings across all documents
+    # - Identifies common patterns and variations
+    # - Creates holistic view of category treatment
+    synthesis:
+      method: multi_document
+      focus: patterns_and_trends
+
+# ===================================
+# 3. Overviews (Overviews.yml)
+# ===================================
+# Purpose: Generates comprehensive overviews of individual documents
+# with detailed category-specific analysis
+
+overviews:
+  workflow_steps:
+    # Step 1: Category Definition
+    # - Defines key categories for analysis
+    # - Sets up analysis requirements per category
+    categories:
+      performance:
+        analysis_requirements:
+          - service_quality
+          - technical_standards
+          - measurement_methods
+      payment:
+        analysis_requirements:
+          - billing_cycles
+          - payment_terms
+          - dispute_processes
+      # ... other categories
+
+    # Step 2: Document Analysis
+    # - Analyzes each document thoroughly
+    # - Creates detailed category-specific insights
+    # - Generates comprehensive document summaries
+    analysis:
+      per_document:
+        method: deep_dive
+        output: detailed_insights
+
+    # Step 3: Knowledge Organization
+    # - Organizes insights by category and document
+    # - Creates structured knowledge representation
+    # - Enables easy access to specific analyses
+    organization:
+      structure: hierarchical
+      dimensions: ["document", "category"]
+
+# ===================================
+# 4. Multi-Doc (No Tables) (Multi-Doc (No Tables).yml)
+# ===================================
+# Purpose: Performs multi-document analysis with focus on narrative comparisons
+# rather than tabular data
+
+multi_doc_analysis:
+  workflow_steps:
+    # Step 1: Document and Tag Setup
+    # - Sets up comprehensive document collection
+    # - Defines analysis categories
+    # - Establishes tag relationships
+    setup:
+      document_tags: extensive_provider_state_list
+      category_tags: key_analysis_areas
+
+    # Step 2: Analysis Framework
+    # - Creates analysis structure
+    # - Defines comparison methodology
+    # - Sets up insight generation process
+    framework:
+      analysis_type: narrative
+      comparison_focus: qualitative
+      insight_generation: structured_narrative
+
+    # Step 3: Cross-Document Analysis
+    # - Performs comprehensive document analysis
+    # - Generates detailed comparisons
+    # - Creates narrative insights
+    analysis:
+      method: comprehensive
+      output: narrative_insights
+      focus: qualitative_comparison
+
+# ===================================
+# Common Elements Across All Workflows
+# ===================================
+common_elements:
+  # Knowledge Set Structure
+  # - All workflows use knowledge sets to store and organize information
+  # - Enables consistent data organization and access
+  knowledge_set:
+    dimensions:
+      - document
+      - category
+    priorities: defined_per_dimension
+    operations: ["set-nodes", "add-dimension"]
+
+  # Analysis Patterns
+  # - All workflows follow similar analysis patterns
+  # - Differ in granularity and focus
+  analysis_patterns:
+    - document_specific_analysis
+    - category_based_analysis
+    - cross_document_comparison
+
+  # Output Generation
+  # - All workflows generate structured insights
+  # - Insights are organized by document and category
+  # - Results are stored in workspace for further use
+  output_handling:
+    format: structured_insights
+    storage: workspace
+    organization: multi_dimensional 
