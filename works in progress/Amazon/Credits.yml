@@ -1,0 +1,223 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Existing Tag Collection for Agreement Information
+  get-agreementInformation-tags:
+    tool: find-tags
+    name: ["Credit"]
+  
+  # 2) NEW Tag Collection for "Counterparty Name"
+  get-counterpartyName-tags:
+    tool: find-tags
+    category: "Counterparty Name"
+
+  # 3) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are in-house counsel at a major entertainment studio, responsible for assessing credit obligations across all talent agreements. Your analysis covers on-screen and promotional credits for:
+      
+      - Performers (actors, voice talent, stunts)
+      - Writers (screenwriters, story writers)
+      - Directors
+      - Producers (executive, line, physical producers)
+      - Other creative roles (cinematographers, editors, composers)
+      
+      Your objectives include:
+
+      1. Identifying all credit display obligations, including position, size, placement, and special requirements
+      2. Ensuring compliance with applicable guild credit requirements
+      3. Analyzing credit parity provisions and most favored nations clauses
+      4. Flagging potential conflicts between different talent credit requirements
+      5. Identifying timing requirements for credit submission and approval
+
+      When analyzing credit provisions:
+      - Focus ONLY on credit display requirements and obligations
+      - DO NOT include any compensation, payment, or financial terms
+      - Consider hierarchy and positioning of multiple credits
+      - Note any conditional credit requirements
+      - Flag potential conflicts with other talent agreements
+      - Identify any studio discretion clauses
+      - Highlight approval rights and deadlines
+
+  # 4) Contract Analysis prompt
+  contractAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is key text from the talent agreement. As in-house counsel, you should:
+      - Thoroughly review the credit-related clauses to ensure compliance with the studio's existing policies and any union/guild rules.
+      - Identify potential loopholes, ambiguous language, or conflicting provisions that may lead to disputes or noncompliance.
+      - Recommend steps (if any) to clarify, renegotiate, or reinforce obligations in line with best practices and studio interests.
+      - Provide your analysis succinctly, focusing on the specific clauses below.
+
+      Relevant language from the agreement:
+
+  # 5) Section Titles
+  contractAnalysisTitle:
+    tool: echo
+    message: Credit Obligations Output Test
+
+  # 6) Initialize Knowledge Set for Agreement Information
+  init-kset:
+    input:
+      documents: task/documents
+      agreementInformationTags: get-agreementInformation-tags
+      counterpartyNameTags: get-counterpartyName-tags
+    tool: knowledge-set
+    knowledgeSetName: "Credit Obligations Memo (Multi-Doc)"
+    operations:
+      - op: add-dimension
+        key: theme
+        name: Tags
+        nodes: agreementInformationTags
+        priority: 1
+      - op: add-dimension
+        key: document
+        name: Document
+        nodes: counterpartyNameTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # 7) NEW - Analyze each "Agreement Tag" for each "Counterparty Name"
+  analyze-each-counterpartyName-tag:
+    repeat:
+      function: analyze-for-tag
+      for: [tag, agreementTag]
+    input:
+      tag: get-counterpartyName-tags
+      agreementTag: get-agreementInformation-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: contractAnalysisPrompt
+      title: contractAnalysisTitle
+
+  # 8) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      counterpartyNameAnalysis: analyze-each-counterpartyName-tag
+      knowledgeForDocuments: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeForDocuments
+
+functions:
+  analyze-for-tag:
+    input:
+      tag:
+        type: tag
+      agreementTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      get-instruction-prompt-for-tag:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          tag: function/tag
+          agreementTag: function/agreementTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [tag, agreementTag]
+      
+      get-instruction-prompt-for-tag:
+        input:
+          agreementTag: function/agreementTag
+        tool: echo
+        message: |
+          CREDIT ANALYSIS REQUIREMENTS:
+
+          Analyze ONLY the credit display provisions and provide a single, well-organized paragraph that includes all relevant information. Bold all key terms and requirements. DO NOT include any compensation or payment terms.
+
+          Your response should follow this structure:
+          Begin with identifying the talent type, then describe any specific credit display terms, followed by guild requirements, approval rights, and special conditions - all flowing naturally in a single paragraph.
+
+          Elements to cover (only if explicitly mentioned):
+          - Talent category and role
+          - Credit position/placement specifications
+          - Card type and format
+          - Special credit designations
+          - Size and format requirements
+          - Credit parity provisions
+          - Guild credit requirements
+          - Credit approval rights
+          - Special conditions affecting credit display
+          - Paid advertising credit requirements
+
+          Example format:
+          The agreement concerns a **[talent category]** who shall receive credit **[position/placement details]** with **[size/format requirements]**. [Any guild credit requirements]. [Any credit approval rights]. [Any special credit display conditions].
+
+          Rules:
+          1. Maintain a natural, flowing narrative
+          2. Bold ALL key credit terms and specifications
+          3. Include ONLY explicitly stated credit requirements
+          4. EXCLUDE all compensation and payment terms
+          5. No bullet points or separate sections
+          6. No additional commentary or analysis
+
+      run-prompt:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-tag
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-snippets
+          tag: function/tag
+          agreementTag: function/agreementTag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} for {{tag.name}}"
+        tags: [tag, agreementTag]
+        attributes:
+          category: contract-analysis-insight
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
