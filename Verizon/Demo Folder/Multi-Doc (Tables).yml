@@ -397,21 +397,28 @@ functions:
           QUANTITATIVE ANALYSIS OF {{tag.name}} ACROSS ALL DOCUMENTS
 
           Comprehensive Metrics Analysis
-          For each quantitative metric found in ANY document, provide a detailed breakdown using the following structure:
+          For each quantitative metric found in ANY document:
 
-          1. Metric Identification and Values
-          - Define the metric and its purpose
-          - Classify the type (financial, performance, time-based, etc.)
-          - Present values in a comparison table with all documents from the analysis
-          - For documents lacking a metric, explicitly state "No specified value found in document" in the table
+          1. Metric Organization:
+          - Group related metrics into logical categories
+          - Create separate tables for distinct metric types or related groups of metrics
+          - Split complex metrics into component parts if they measure multiple aspects
+          - Create subtables for metrics with multiple dimensions or conditions
 
-          2. Value Comparison
-          - Calculate and explain the range of variation using ONLY found values
-          - Convert units to a common base where applicable (e.g., business days to hours)
-          - Note any conditions or triggers associated with the values
-          - Explain implications of missing values
+          2. Table Creation Guidelines:
+          - Create a primary table for the main metric values
+          - Create additional tables for:
+            * Different measurement conditions
+            * Different time periods
+            * Different service levels
+            * Different geographic regions
+            * Different customer categories
+            * Different service types
+          - Include relevant context columns based on the metric type
+          - Split large tables if they contain more than 5-7 metrics for better readability
 
-          For each metric, create a table using this structure:
+          3. For each table or subtable:
+          [Table Category/Type]:
           [Metric Name] ([Metric Type]):
           Purpose: [Description of what the metric measures]
           | Document | Value | [Additional Context Column] |
@@ -420,31 +427,69 @@ functions:
           {% endfor %}
           Range of Variation: [range] (based on values from [list documents with values only])
 
+          4. Value Comparison:
+          - Calculate and explain the range of variation using ONLY found values
+          - Convert units to a common base where applicable (e.g., business days to hours)
+          - Note any conditions or triggers associated with the values
+          - Explain implications of missing values
+
           Example formats (using actual document names from the analysis):
 
-          Response Time Requirements (Time-Based Metric):
-          Purpose: Maximum allowed response time for service disruptions
-          | Document | Value | Condition/Trigger |
-          |----------|-------|------------------|
-          {% for insight in insights %}| {{insight.documentTag.name}} | [Value or "No specified value found in document"] | [Condition if value exists, "N/A" if no value] |
+          Primary Response Time Table:
+          Response Time - Critical Outages (Time-Based Metric):
+          Purpose: Maximum allowed response time for critical network outages
+          | Document | Value | Severity Level |
+          |----------|-------|----------------|
+          {% for insight in insights %}| {{insight.documentTag.name}} | [Value or "No specified value found in document"] | [Critical/High/Medium/Low] |
           {% endfor %}
-          Range of Variation: [X-Y hours] (based on values from [documents with values])
+          Range of Variation: [X-Y hours] (based on values from [list documents with values only])
 
-          Late Payment Charges (Financial Metric):
-          Purpose: Interest charged on overdue payments
-          | Document | Value | Condition/Trigger |
-          |----------|-------|------------------|
-          {% for insight in insights %}| {{insight.documentTag.name}} | [Value or "No specified value found in document"] | [Condition if value exists, "N/A" if no value] |
+          Response Time by Service Type:
+          Response Time - Voice Services (Time-Based Metric):
+          Purpose: Maximum response time for voice service disruptions
+          | Document | Value | Service Type |
+          |----------|-------|--------------|
+          {% for insight in insights %}| {{insight.documentTag.name}} | [Value or "No specified value found in document"] | [Voice specific details] |
           {% endfor %}
-          Range of Variation: [X-Y%] (based on values from [documents with values])
 
+          Response Time - Data Services (Time-Based Metric):
+          Purpose: Maximum response time for data service disruptions
+          | Document | Value | Service Type |
+          |----------|-------|--------------|
+          {% for insight in insights %}| {{insight.documentTag.name}} | [Value or "No specified value found in document"] | [Data specific details] |
+          {% endfor %}
+
+          Payment Terms - Base Charges:
+          Late Payment Interest (Financial Metric):
+          Purpose: Interest charged on overdue base service payments
+          | Document | Value | Grace Period |
+          |----------|-------|-------------|
+          {% for insight in insights %}| {{insight.documentTag.name}} | [Value or "No specified value found in document"] | [Grace period details] |
+          {% endfor %}
+
+          Payment Terms - Additional Charges:
+          Late Payment Interest - Special Services (Financial Metric):
+          Purpose: Interest charged on overdue special service payments
+          | Document | Value | Service Type |
+          |----------|-------|-------------|
+          {% for insight in insights %}| {{insight.documentTag.name}} | [Value or "No specified value found in document"] | [Special service details] |
+          {% endfor %}
+
+          Network Performance - Core Metrics:
           Network Availability (Performance Metric):
           Purpose: Required system uptime percentage
-          | Document | Value | Measurement Frequency |
-          |----------|-------|---------------------|
-          {% for insight in insights %}| {{insight.documentTag.name}} | [Value or "No specified value found in document"] | [Frequency if value exists, "N/A" if no value] |
+          | Document | Value | Measurement Period |
+          |----------|-------|-------------------|
+          {% for insight in insights %}| {{insight.documentTag.name}} | [Value or "No specified value found in document"] | [Measurement details] |
           {% endfor %}
-          Range of Variation: [X-Y%] (based on values from [documents with values])
+
+          Network Performance - Service Specific:
+          Voice Quality Metrics (Performance Metric):
+          Purpose: Voice service quality requirements
+          | Document | Value | Quality Parameter |
+          |----------|-------|------------------|
+          {% for insight in insights %}| {{insight.documentTag.name}} | [Value or "No specified value found in document"] | [Voice quality parameter] |
+          {% endfor %}
 
           Document insights to compare:
           {% for insight in insights %}

@@ -8,7 +8,24 @@ actions:
   # 1) Tag Collections for Different Categories
   get-document-tags:
     tool: find-tags
-    name: ["Florida No. 7", "Florida No. 8", "Frontier Florida"]
+    name: [
+      "Frontier Florida",
+      "Frontier Ohio",
+      "Verizon Colorado",
+      "Verizon Delaware", 
+      "Verizon Florida No. 7",
+      "Verizon Florida No. 8",
+      "Verizon Hawaii",
+      "Verizon Iowa",
+      "Verizon Maryland",
+      "Verizon Massachusetts",
+      "Verizon New York",
+      "Verizon North Carolina",
+      "Verizon Ohio No. 4",
+      "Verizon Pennsylvania",
+      "Verizon South Dakota",
+      "Verizon Virginia"
+    ]
 
   get-performance-tags:
     tool: find-tags

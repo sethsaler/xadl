@@ -5,13 +5,17 @@ input:
     type: workspace
   standard-document-tag:
     type: text
-    label: "Name of the document tag to use as the standard for comparison"
+    description: "Name of the document tag to use as the standard for comparison"
 
 actions:
   # 1) Tag Collections for Different Categories
   get-document-tags:
     tool: find-tags
     category: "Document"
+
+  get-standard-tags:
+    tool: find-tags
+    category: "Standard"
 
   get-performance-tags:
     tool: find-tags
@@ -78,6 +82,7 @@ actions:
     input:
       documents: task/documents
       documentTags: get-document-tags
+      standardTags: get-standard-tags
       performanceTags: get-performance-tags
       paymentTags: get-payment-tags
       terminationTags: get-termination-tags
@@ -95,34 +100,40 @@ actions:
         priority: 1
         skipIfEmpty: true
       - op: add-dimension
+        key: standard
+        name: "Standard"
+        nodes: standardTags
+        priority: 2
+        skipIfEmpty: true
+      - op: add-dimension
         key: performance
         name: "Performance Obligations"
         nodes: performanceTags
-        priority: 2
+        priority: 3
         skipIfEmpty: true
       - op: add-dimension
         key: payment
         name: "Payment Obligations"
         nodes: paymentTags
-        priority: 3
+        priority: 4
         skipIfEmpty: true
       - op: add-dimension
         key: termination
         name: "Termination"
         nodes: terminationTags
-        priority: 4
+        priority: 5
         skipIfEmpty: true
       - op: add-dimension
         key: sla
         name: "SLA"
         nodes: slaTags
-        priority: 5
+        priority: 6
         skipIfEmpty: true
       - op: add-dimension
         key: liability
         name: "Liabilities"
         nodes: liabilityTags
-        priority: 6
+        priority: 7
         skipIfEmpty: true
 
   # 6) Analyze content for each category
@@ -140,9 +151,7 @@ actions:
       prompt: tariffAnalysisPrompt
       title: analysisTitle
     output:
-      type: array
-      items:
-        type: insight
+      type: insight
 
   analyze-payment:
     repeat:
@@ -158,9 +167,7 @@ actions:
       prompt: tariffAnalysisPrompt
       title: analysisTitle
     output:
-      type: array
-      items:
-        type: insight
+      type: insight
 
   analyze-termination:
     repeat:
@@ -176,9 +183,7 @@ actions:
       prompt: tariffAnalysisPrompt
       title: analysisTitle
     output:
-      type: array
-      items:
-        type: insight
+      type: insight
 
   analyze-sla:
     repeat:
@@ -194,9 +199,7 @@ actions:
       prompt: tariffAnalysisPrompt
       title: analysisTitle
     output:
-      type: array
-      items:
-        type: insight
+      type: insight
 
   analyze-liability:
     repeat:
@@ -212,9 +215,7 @@ actions:
       prompt: tariffAnalysisPrompt
       title: analysisTitle
     output:
-      type: array
-      items:
-        type: insight
+      type: insight
 
   # 7) Compare documents against standard for each category
   compare-documents-performance:
@@ -227,6 +228,7 @@ actions:
       knowledge: init-kset
       analyze-categories: analyze-performance
       standard-document-tag: task/standard-document-tag
+      document-tags: get-document-tags
 
   compare-documents-payment:
     repeat:
@@ -238,6 +240,7 @@ actions:
       knowledge: init-kset
       analyze-categories: analyze-payment
       standard-document-tag: task/standard-document-tag
+      document-tags: get-document-tags
 
   compare-documents-termination:
     repeat:
@@ -249,6 +252,7 @@ actions:
       knowledge: init-kset
       analyze-categories: analyze-termination
       standard-document-tag: task/standard-document-tag
+      document-tags: get-document-tags
 
   compare-documents-sla:
     repeat:
@@ -260,6 +264,7 @@ actions:
       knowledge: init-kset
       analyze-categories: analyze-sla
       standard-document-tag: task/standard-document-tag
+      document-tags: get-document-tags
 
   compare-documents-liability:
     repeat:
@@ -271,6 +276,7 @@ actions:
       knowledge: init-kset
       analyze-categories: analyze-liability
       standard-document-tag: task/standard-document-tag
+      document-tags: get-document-tags
 
   # 8) Add Results to Workspace
   add-to-workspace:
@@ -392,17 +398,24 @@ functions:
         type: knowledge-set
       standard-document-tag:
         type: text
+      document-tags:
+        type: tag
     actions:
       get-category-insights:
         input:
           knowledge: function/knowledge
           tag: function/tag
+          document-tags: function/document-tags
         tool: knowledge-set-query
         nodes:
           type: insight
           attributes:
             category: tariff-category-analysis
           tags: [tag]
+          filter:
+            operator: "in"
+            field: "documentTag"
+            values: "{{document-tags}}"
 
       analyze-differences:
         input:
@@ -518,6 +531,7 @@ functions:
           summary: analyze-differences
           insights: get-category-insights
           tag: function/tag
+          standard-document-tag: function/standard-document-tag
         skipIfEmpty: summary
         tool: insight
         text: |
@@ -540,4 +554,4 @@ functions:
         tool: knowledge-set
         operations:
           - op: set-nodes
-            nodes: insight 
+            nodes: insight
