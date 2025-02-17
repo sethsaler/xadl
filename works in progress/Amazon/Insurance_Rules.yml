@@ -73,10 +73,38 @@ actions:
 
       Relevant text from the document:
 
-  # 4) Section Title
-  analysisTitle:
+  # 4) Section Titles
+  generalLiabilityTitle:
     tool: echo
-    message: Insurance Requirements Analysis
+    message: General Liability Insurance Analysis
+
+  excessLiabilityTitle:
+    tool: echo
+    message: Excess Liability Insurance Analysis
+
+  workersCompTitle:
+    tool: echo
+    message: Workers Compensation Insurance Analysis
+
+  autoLiabilityTitle:
+    tool: echo
+    message: Auto Liability Insurance Analysis
+
+  lossUseTitle:
+    tool: echo
+    message: Loss of Use Insurance Analysis
+
+  endorsementsTitle:
+    tool: echo
+    message: Policy Endorsements Analysis
+
+  cancellationTitle:
+    tool: echo
+    message: Cancellation Provisions Analysis
+
+  indemnityTitle:
+    tool: echo
+    message: Indemnity Clauses Analysis
 
   # 5) Initialize Knowledge Set
   init-kset:
@@ -155,7 +183,7 @@ actions:
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: analysisTitle
+      title: generalLiabilityTitle
 
   analyze-excess-liability:
     repeat:
@@ -167,7 +195,7 @@ actions:
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: analysisTitle
+      title: excessLiabilityTitle
 
   analyze-workers-comp:
     repeat:
@@ -179,7 +207,7 @@ actions:
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: analysisTitle
+      title: workersCompTitle
 
   analyze-auto-liability:
     repeat:
@@ -191,7 +219,7 @@ actions:
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: analysisTitle
+      title: autoLiabilityTitle
 
   analyze-loss-use:
     repeat:
@@ -203,7 +231,7 @@ actions:
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: analysisTitle
+      title: lossUseTitle
 
   analyze-endorsements:
     repeat:
@@ -215,7 +243,7 @@ actions:
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: analysisTitle
+      title: endorsementsTitle
 
   analyze-cancellation:
     repeat:
@@ -227,7 +255,7 @@ actions:
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: analysisTitle
+      title: cancellationTitle
 
   analyze-indemnity:
     repeat:
@@ -239,7 +267,7 @@ actions:
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: analysisTitle
+      title: indemnityTitle
 
   # 7) Document-level analyses
   analyze-documents-general:
@@ -252,7 +280,7 @@ actions:
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: analysisTitle
+      title: generalLiabilityTitle
 
   analyze-documents-excess-liability:
     repeat:
@@ -264,7 +292,7 @@ actions:
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: analysisTitle
+      title: excessLiabilityTitle
 
   analyze-documents-workers-comp:
     repeat:
@@ -276,7 +304,7 @@ actions:
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: analysisTitle
+      title: workersCompTitle
 
   analyze-documents-auto-liability:
     repeat:
@@ -288,7 +316,7 @@ actions:
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: analysisTitle
+      title: autoLiabilityTitle
 
   analyze-documents-loss-use:
     repeat:
@@ -300,7 +328,7 @@ actions:
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: analysisTitle
+      title: lossUseTitle
 
   analyze-documents-endorsements:
     repeat:
@@ -312,7 +340,7 @@ actions:
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: analysisTitle
+      title: endorsementsTitle
 
   analyze-documents-cancellation:
     repeat:
@@ -324,7 +352,7 @@ actions:
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: analysisTitle
+      title: cancellationTitle
 
   analyze-documents-indemnity:
     repeat:
@@ -336,7 +364,7 @@ actions:
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: analysisTitle
+      title: indemnityTitle
 
   # 8) Add Results to Workspace
   add-to-workspace:
@@ -448,16 +476,131 @@ functions:
         skipIfEmpty: snippets
         prompt: |
           INSURANCE REQUIREMENTS ANALYSIS:
-          
-          Analyze all insurance requirements for this document. Include:
-          
-          1. Coverage types and limits
-          2. Policy endorsement requirements
-          3. Compliance verification methods
-          4. Notification requirements
-          5. Cancellation provisions
-          6. Indemnification obligations
-          7. Special conditions or exclusions
+
+          {% if tag.category == "General Liability" %}
+          GENERAL LIABILITY ANALYSIS REQUIREMENTS:
+
+          You must output in this exact format with all sections:
+
+          **Coverage Overview:**
+          [Single paragraph summarizing liability coverage framework and terminology requirements. Include key compliance points.]
+
+          **Key Requirements:**
+          - Replace "Comprehensive General Liability" or "Public Liability" with "Commercial General Liability"
+          - Verify coverage limits and umbrella policy references
+          - Default to "blanket endorsement" unless specific broker requirement exists
+          - Ensure renewal certificate timing and cancellation notice provisions
+
+          **Compliance Checklist:**
+          - List all terminology that needs updating
+          - Detail coverage limits and verification methods
+          - Document endorsement requirements
+          - Note certificate and notice provisions
+          {% endif %}
+
+          {% if tag.category == "Excess Liability" %}
+          EXCESS LIABILITY ANALYSIS REQUIREMENTS:
+
+          You must output in this exact format with all sections:
+
+          **Coverage Overview:**
+          [Single paragraph summarizing excess liability framework and coverage structure. Include key limits and umbrella requirements.]
+
+          **Key Requirements:**
+          - Verify coverage limits ($1M per occurrence, $2M aggregate)
+          - Check umbrella policy references
+          - Review combined primary and excess coverage structure
+
+          **Compliance Checklist:**
+          - List all coverage limits and thresholds
+          - Detail umbrella policy specifications
+          - Document coverage combination requirements
+          {% endif %}
+
+          {% if tag.category == "Workers Compensation" %}
+          WORKERS COMPENSATION ANALYSIS REQUIREMENTS:
+
+          You must output in this exact format with all sections:
+
+          **Coverage Overview:**
+          [Single paragraph summarizing workers compensation requirements and employer's liability limits. Include key compliance points.]
+
+          **Key Requirements:**
+          - Confirm statutory limits from payroll service
+          - Verify Employer's Liability maximum of $1M
+          - Flag unauthorized third-party insured additions
+          - Review subrogation clauses against payroll service standards
+
+          **Compliance Checklist:**
+          - List statutory requirements and limits
+          - Detail employer's liability specifications
+          - Document third-party and subrogation restrictions
+          {% endif %}
+
+          {% if tag.category == "Auto Liability" %}
+          AUTO LIABILITY ANALYSIS REQUIREMENTS:
+
+          You must output in this exact format with all sections:
+
+          **Coverage Overview:**
+          [Single paragraph summarizing auto liability requirements and coverage specifications. Include key compliance points.]
+
+          **Key Requirements:**
+          - Remove "owned" or "any auto" references unless specifically endorsed
+          - Specify pollution coverage as "if caused by Accident"
+          - Review and correct hired/non-owned vehicle coverage terms
+
+          **Compliance Checklist:**
+          - List vehicle coverage specifications
+          - Detail pollution coverage requirements
+          - Document endorsement conditions
+          {% endif %}
+
+          {% if tag.category == "Loss of Use" %}
+          LOSS OF USE ANALYSIS REQUIREMENTS:
+
+          You must output in this exact format with all sections:
+
+          **Coverage Overview:**
+          [Single paragraph summarizing loss of use requirements and payment terms. Include key compliance points.]
+
+          **Key Requirements:**
+          - Include "actual and verifiable" language
+          - Remove payment until replacement provisions
+          - Validate repair coverage and payout terms
+
+          **Compliance Checklist:**
+          - List required terminology
+          - Detail payment restrictions
+          - Document coverage specifications
+          {% endif %}
+
+          {% if tag.category == "Indemnity" %}
+          INDEMNITY ANALYSIS REQUIREMENTS:
+
+          You must output in this exact format with all sections:
+
+          **Coverage Overview:**
+          [Single paragraph summarizing indemnity requirements and documentation standards. Include key compliance points.]
+
+          **Key Requirements:**
+          - Add "reasonable outside" before attorney's fees
+          - Include wear and tear exceptions
+          - Remove loss of profits references
+          - Strike policy copy requirements
+          - Confirm certificate provision instead of policy copies
+
+          **Compliance Checklist:**
+          - List terminology requirements
+          - Detail documentation standards
+          - Document prohibited terms
+          {% endif %}
+
+          Analyze the provided content according to these requirements. Focus on:
+          1. Identifying non-compliant language
+          2. Flagging missing required elements
+          3. Suggesting specific corrections
+          4. Noting any unusual provisions
           
           {{prompt.text}}
           {% for s in snippets %}
@@ -474,7 +617,7 @@ functions:
         tool: insight
         text: |
           {{summary.text}}
-        name: "{{title.text}} Insurance Analysis for {{document.name}}"
+        name: "{{title.text}} for {{document.name}}"
         tags: [insuranceTags]
         attributes:
           category: insurance-document-analysis
