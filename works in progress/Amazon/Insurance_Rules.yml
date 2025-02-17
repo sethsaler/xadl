@@ -38,17 +38,7 @@ actions:
     tool: find-tags
     category: "Indemnity"
 
-  # 2) Add documents to workspace
-  add-to-workspace:
-    input:
-      workspace: task/workspace
-      documents: task/documents
-    tool: workspace
-    operations:
-      - op: set-nodes
-        nodes: documents
-
-  # 3) Base configuration for shared prompt elements
+  # 2) Base configuration for shared prompt elements
   basePrompt:
     tool: echo
     message: |
@@ -68,7 +58,7 @@ actions:
       - Flag non-standard provisions
       - Note required modifications
 
-  # 4) Analysis prompt
+  # 3) Analysis prompt
   insuranceAnalysisPrompt:
     tool: echo
     message: |
@@ -83,12 +73,12 @@ actions:
 
       Relevant text from the document:
 
-  # 5) Section Title
+  # 4) Section Title
   analysisTitle:
     tool: echo
     message: Insurance Requirements Analysis
 
-  # 6) Initialize Knowledge Set
+  # 5) Initialize Knowledge Set
   init-kset:
     input:
       documents: task/documents
@@ -153,7 +143,8 @@ actions:
         nodes: indemnityTags
         priority: 8
         skipIfEmpty: true
-  # 7) Category-specific analyses
+
+  # 6) Category-specific analyses
   analyze-general-liability:
     repeat:
       function: analyze-for-tag
@@ -250,8 +241,8 @@ actions:
       prompt: insuranceAnalysisPrompt
       title: analysisTitle
 
-  # 6) Document-level analyses
-  analyze-documents-general-liability:
+  # 7) Document-level analyses
+  analyze-documents-general:
     repeat:
       function: analyze-document-insurance
       for: [document]
@@ -347,6 +338,16 @@ actions:
       prompt: insuranceAnalysisPrompt
       title: analysisTitle
 
+  # 8) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
 functions:
   analyze-for-tag:
     input:
@@ -372,181 +373,20 @@ functions:
           operator: "and"
           tags: [tag]
 
-      get-instruction-prompt-for-tag:
-        input:
-          tag: function/tag
-        tool: echo
-        message: |
-          {% if tag.category == "General Liability" %}
-          GENERAL LIABILITY ANALYSIS REQUIREMENTS:
-
-          You must output in this exact format with all sections:
-
-          **Coverage Overview:**
-          [Single paragraph analyzing the general liability coverage, focusing on terminology usage and compliance with standard requirements.]
-
-          **Key Requirements:**
-          - Verify use of "Commercial General Liability" terminology
-          - List any instances of incorrect terminology found
-          - Detail coverage limits and their adequacy
-          - Document any non-standard provisions
-          - Note required terminology corrections
-
-          **Compliance Status:**
-          - Highlight any terminology breaches
-          - Assess impact of identified issues
-          - Provide specific correction recommendations
-          - Note any regulatory compliance concerns
-          {% endif %}
-
-          {% if tag.category == "Excess Liability" %}
-          EXCESS LIABILITY ANALYSIS REQUIREMENTS:
-
-          You must output in this exact format with all sections:
-
-          **Coverage Structure:**
-          [Single paragraph analyzing excess liability coverage, focusing on limits and umbrella policy integration.]
-
-          **Coverage Verification:**
-          - Confirm $1M per occurrence minimum
-          - Verify $2M aggregate minimum
-          - Analyze umbrella policy references
-          - Document coverage combination approach
-          - Note any coverage gaps
-
-          **Compliance Assessment:**
-          - Detail any limit deficiencies
-          - Evaluate umbrella policy adequacy
-          - Recommend coverage adjustments
-          - Assess overall risk exposure
-          {% endif %}
-
-          {% if tag.category == "Workers Compensation" %}
-          WORKERS COMPENSATION ANALYSIS REQUIREMENTS:
-
-          You must output in this exact format with all sections:
-
-          **Coverage Framework:**
-          [Single paragraph analyzing workers' compensation coverage, focusing on statutory compliance and employer's liability limits.]
-
-          **Requirement Verification:**
-          - Confirm statutory limits compliance
-          - Verify $1M employer's liability maximum
-          - Check for unauthorized third-party additions
-          - Review subrogation clauses
-          - Document any non-standard provisions
-
-          **Compliance Status:**
-          - Identify any limit violations
-          - Flag unauthorized endorsements
-          - Recommend required modifications
-          - Note regulatory compliance issues
-          {% endif %}
-
-          {% if tag.category == "Auto Liability" %}
-          AUTO LIABILITY ANALYSIS REQUIREMENTS:
-
-          You must output in this exact format with all sections:
-
-          **Coverage Details:**
-          [Single paragraph analyzing auto liability coverage, focusing on scope and pollution coverage specifications.]
-
-          **Term Verification:**
-          - Check for "owned auto" language
-          - Verify "any auto" references
-          - Review pollution coverage terms
-          - Document specific endorsements
-          - Note coverage limitations
-
-          **Compliance Review:**
-          - List unauthorized terms
-          - Detail required modifications
-          - Assess endorsement adequacy
-          - Recommend specific changes
-          {% endif %}
-
-          {% if tag.category == "Loss of Use" %}
-          LOSS OF USE ANALYSIS REQUIREMENTS:
-
-          You must output in this exact format with all sections:
-
-          **Coverage Structure:**
-          [Single paragraph analyzing loss of use provisions, focusing on verifiability and payment terms.]
-
-          **Term Verification:**
-          - Confirm "actual and verifiable" language
-          - Check payment timing provisions
-          - Review coverage limitations
-          - Document verification requirements
-          - Note any payment restrictions
-
-          **Compliance Status:**
-          - Identify missing required terms
-          - Flag unauthorized provisions
-          - Recommend specific changes
-          - Assess verification procedures
-          {% endif %}
-
-          {% if tag.category == "Policy Endorsements" %}
-          ENDORSEMENT ANALYSIS REQUIREMENTS:
-
-          You must output in this exact format with all sections:
-
-          **Endorsement Framework:**
-          [Single paragraph analyzing policy endorsements, focusing on blanket vs specific requirements.]
-
-          **Requirement Verification:**
-          - Confirm blanket endorsement usage
-          - Review specific endorsement cases
-          - Document broker requirements
-          - Verify endorsement adequacy
-          - Note any exceptions
-
-          **Compliance Review:**
-          - Identify non-compliant endorsements
-          - Assess broker justifications
-          - Recommend required changes
-          - Note any risk exposure
-          {% endif %}
-
-          {% if tag.category == "Cancellation" %}
-          CANCELLATION ANALYSIS REQUIREMENTS:
-
-          You must output in this exact format with all sections:
-
-          **Notice Framework:**
-          [Single paragraph analyzing cancellation provisions, focusing on notice requirements and material changes.]
-
-          **Requirement Verification:**
-          - Review notice period specifications
-          - Check material change references
-          - Document notification procedures
-          - Verify compliance with standards
-          - Note any deviations
-
-          **Compliance Status:**
-          - Identify unauthorized terms
-          - Assess notice adequacy
-          - Recommend specific changes
-          - Evaluate notification process
-          {% endif %}
-
       analyze-content:
         input:
           snippets: get-snippets
           basePrompt: function/basePrompt
-          instructionPrompt: get-instruction-prompt-for-tag
           prompt: function/prompt
         tool: llm
         skipIfEmpty: snippets
         prompt: |
-          {{instructionPrompt.text}}
           {{prompt.text}}
           {% for s in snippets %}
           {{s.text}}
           {% endfor %}
 
-      create-insight-by-tag:
+      create-insight:
         input:
           summary: analyze-content
           snippets: get-snippets
@@ -563,10 +403,10 @@ functions:
         relations:
           derived-from: [snippets]
 
-      add-insight-by-tag:
+      add-insight:
         input:
           knowledge: function/knowledge
-          insight: create-insight-by-tag
+          insight: create-insight
           snippets: get-snippets
         tool: knowledge-set
         operations:
@@ -607,20 +447,18 @@ functions:
         tool: llm
         skipIfEmpty: snippets
         prompt: |
-          DOCUMENT INSURANCE REQUIREMENTS SUMMARY:
+          INSURANCE REQUIREMENTS ANALYSIS:
           
-          Analyze all insurance requirements for this specific document. Include:
+          Analyze all insurance requirements for this document. Include:
           
-          1. General Liability provisions and terminology
-          2. Excess Liability coverage limits and structure
-          3. Workers' Compensation compliance and limits
-          4. Auto Liability specifications
-          5. Loss of Use and cancellation terms
-          6. Policy endorsements and modifications
-          7. Indemnification requirements
-          8. Prohibited terms and conditions
+          1. Coverage types and limits
+          2. Policy endorsement requirements
+          3. Compliance verification methods
+          4. Notification requirements
+          5. Cancellation provisions
+          6. Indemnification obligations
+          7. Special conditions or exclusions
           
-          {{basePrompt.text}}
           {{prompt.text}}
           {% for s in snippets %}
           {{s.text}}
@@ -630,16 +468,16 @@ functions:
         input:
           summary: analyze-content
           snippets: get-snippets
-          tag: function/insuranceTags
+          document: function/document
           title: function/title
         skipIfEmpty: summary
         tool: insight
         text: |
           {{summary.text}}
-        name: "{{title.text}} Insurance Requirements"
-        tags: [tag]
+        name: "{{title.text}} Insurance Analysis for {{document.name}}"
+        tags: [insuranceTags]
         attributes:
-          category: insurance-analysis-insight
+          category: insurance-document-analysis
         relations:
           derived-from: [snippets]
 
@@ -654,41 +492,3 @@ functions:
             nodes: insight
           - op: set-nodes
             nodes: snippets
-
-      analyze-tags:
-        repeat:
-          function: analyze-for-tag
-          for: insuranceTags
-        input:
-          document: function/document
-          tag: repeat/item
-          knowledge: function/knowledge
-          basePrompt: function/basePrompt
-          prompt: function/prompt
-          title: function/title
-
-  # 3) Add Results to Workspace
-  add-to-workspace:
-    input:
-      workspace: task/workspace
-      generalLiabilityAnalysis: analyze-general-liability
-      excessLiabilityAnalysis: analyze-excess-liability
-      workersCompAnalysis: analyze-workers-comp
-      autoLiabilityAnalysis: analyze-auto-liability
-      lossUseAnalysis: analyze-loss-use
-      endorsementAnalysis: analyze-endorsements
-      cancellationAnalysis: analyze-cancellation
-      indemnityAnalysis: analyze-indemnity
-      documentGeneralLiabilityAnalysis: analyze-documents-general-liability
-      documentExcessLiabilityAnalysis: analyze-documents-excess-liability
-      documentWorkersCompAnalysis: analyze-documents-workers-comp
-      documentAutoLiabilityAnalysis: analyze-documents-auto-liability
-      documentLossUseAnalysis: analyze-documents-loss-use
-      documentEndorsementAnalysis: analyze-documents-endorsements
-      documentCancellationAnalysis: analyze-documents-cancellation
-      documentIndemnityAnalysis: analyze-documents-indemnity
-      knowledge: init-kset
-    tool: workspace
-    operations:
-      - op: add-items
-        items: knowledge
