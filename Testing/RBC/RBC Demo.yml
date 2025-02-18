@@ -1,0 +1,167 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # Get Company tags
+  get-company-tags:
+    tool: find-tags
+    category: "Company"
+  
+  # Get Theme tags
+  get-theme-tags:
+    tool: find-tags
+    category: "Theme"
+
+  # Base analysis prompt
+  basePrompt:
+    tool: echo
+    message: |
+      You are an expert analyst tasked with summarizing content related to specific companies and themes.
+      Your objective is to provide clear, concise summaries that capture the key points while maintaining
+      accuracy and relevance.
+
+  # Analysis prompt for processing snippets
+  analysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Please provide a summary of the following content in 100 words or less, focusing specifically
+      on how it relates to the given company and theme. The summary should:
+      - Be clear and concise
+      - Focus on key points and main ideas
+      - Maintain factual accuracy
+      - Be relevant to the specific company and theme context
+
+      Content to analyze:
+
+  # Title format for insights
+  analysisTitle:
+    tool: echo
+    message: "Theme Analysis by Company"
+
+  # Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      companyTags: get-company-tags
+      themeTags: get-theme-tags
+    tool: knowledge-set
+    knowledgeSetName: "Company Theme Analysis"
+    operations:
+      - op: add-dimension
+        key: company
+        name: Company
+        nodes: companyTags
+        priority: 1
+      - op: add-dimension
+        key: theme
+        name: Theme
+        nodes: themeTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # Analyze each Theme tag for each Company tag
+  analyze-each-company-theme:
+    repeat:
+      function: analyze-for-tags
+      for: [companyTag, themeTag]
+    input:
+      companyTag: get-company-tags
+      themeTag: get-theme-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: analysisPrompt
+      title: analysisTitle
+
+  # Add results to workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      companyThemeAnalysis: analyze-each-company-theme
+      knowledgeForDocuments: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeForDocuments
+
+functions:
+  analyze-for-tags:
+    input:
+      companyTag:
+        type: tag
+      themeTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      # Get text snippets that match both company and theme tags
+      get-snippets:
+        input:
+          companyTag: function/companyTag
+          themeTag: function/themeTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [companyTag, themeTag]
+      
+      # Process snippets through LLM
+      run-analysis:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      # Create insight from analysis
+      create-insight:
+        input:
+          summary: run-analysis
+          snippets: get-snippets
+          companyTag: function/companyTag
+          themeTag: function/themeTag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} - {{companyTag.name}} - {{themeTag.name}}"
+        tags: [companyTag, themeTag]
+        attributes:
+          category: company-theme-analysis
+        relations:
+          derived-from: [snippets]
+
+      # Add insight to knowledge set
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
