@@ -1,0 +1,462 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collection
+  get-contract-tags:
+    tool: find-tags
+    category: "Contract"
+
+  get-company-tags:
+    tool: find-tags
+    category: "Company"
+
+  get-instruction-prompt-for-tag:
+    input:
+      tag: function/tag
+    tool: echo
+    message: |
+      {% if tag.category == "Basic Contract Information" %}
+      BASIC CONTRACT INFORMATION ANALYSIS REQUIREMENTS:
+
+      You must output in this exact format with all sections:
+
+      **Contract Overview:**
+      [Single paragraph summarizing the agreement type, parties involved, and key dates. Include strategic importance and business context.]
+
+      **Key Elements:**
+      - List contract title and all participating parties with roles
+      - Detail effective date and term information
+      - Specify dependencies affecting contract activation
+      - Document agreement structure and organization
+      - Note any unusual formatting or organization
+
+      **Strategic Considerations:**
+      - Analyze relationship dynamics between parties
+      - Evaluate agreement scope and coverage
+      - Identify potential gaps or ambiguities
+      - Note any non-standard party arrangements
+      - Assess compliance with documentation standards
+      {% endif %}
+
+      {% if tag.category == "Financial Terms" %}
+      FINANCIAL TERMS ANALYSIS REQUIREMENTS:
+
+      You must output in this exact format with all sections:
+
+      **Financial Overview:**
+      [Single paragraph summarizing total contract value, payment structure, and financial implications. Include key financial obligations and their business impact.]
+
+      **Value Components:**
+      - List total contract value (initial and current)
+      - Detail payment schedules and structures
+      - Specify pricing tiers and volume considerations
+      - Document currency and tax treatments
+      - Note payment incentives and penalties
+      - Include financial reporting requirements
+
+      **Strategic Implications:**
+      - Analyze impact on revenue and cash flow
+      - Evaluate pricing competitiveness
+      - Identify financial risks and controls
+      - Note opportunities for optimization
+      - Assess compliance with accounting standards
+      {% endif %}
+
+      {% if tag.category == "Amendments" %}
+      AMENDMENT ANALYSIS REQUIREMENTS:
+
+      You must output in this exact format with all sections:
+
+      **Amendment Overview:**
+      [Single paragraph summarizing amendment history, key changes, and their business impact. Include strategic rationale for modifications.]
+
+      **Change Analysis:**
+      - List all amendments with identifiers and dates
+      - Detail scope and service modifications
+      - Specify price and term adjustments
+      - Document business justifications
+      - Note impact on original agreement
+      - Include approval and documentation requirements
+
+      **Strategic Considerations:**
+      - Analyze amendment patterns and trends
+      - Evaluate impact on contract value
+      - Identify risks from changes
+      - Note process improvement opportunities
+      - Assess compliance with change management standards
+      {% endif %}
+
+      {% if tag.category == "Purchase Details" %}
+      PURCHASE DETAILS ANALYSIS REQUIREMENTS:
+
+      You must output in this exact format with all sections:
+
+      **Order Overview:**
+      [Single paragraph summarizing purchase patterns, order types, and their business impact. Include key ordering processes and requirements.]
+
+      **Order Components:**
+      - List order numbers and dates
+      - Detail items and services purchased
+      - Specify quantities and unit pricing
+      - Document delivery requirements
+      - Note usage entitlements
+      - Include order-specific terms
+
+      **Strategic Implications:**
+      - Analyze purchase patterns and trends
+      - Evaluate order process efficiency
+      - Identify fulfillment risks
+      - Note optimization opportunities
+      - Assess compliance with procurement standards
+      {% endif %}
+
+      {% if tag.category == "Technical Specifications" %}
+      TECHNICAL SPECIFICATIONS ANALYSIS REQUIREMENTS:
+
+      You must output in this exact format with all sections:
+
+      **Technical Overview:**
+      [Single paragraph summarizing technical requirements, standards, and their operational impact. Include key technical dependencies.]
+
+      **Specification Details:**
+      - List software/hardware requirements
+      - Detail version and compatibility information
+      - Specify integration capabilities
+      - Document security standards
+      - Note compliance requirements
+      - Include testing and certification needs
+
+      **Strategic Considerations:**
+      - Analyze technical feasibility and risks
+      - Evaluate against industry standards
+      - Identify integration challenges
+      - Note technology refresh requirements
+      - Assess compliance with security standards
+      {% endif %}
+
+      {% if tag.category == "Risk and Liability" %}
+      RISK AND LIABILITY ANALYSIS REQUIREMENTS:
+
+      You must output in this exact format with all sections:
+
+      **Risk Overview:**
+      [Single paragraph summarizing risk allocation, liability framework, and insurance requirements. Include strategic rationale for risk structure.]
+
+      **Key Components:**
+      - List insurance requirements and coverage limits
+      - Detail liability caps and exclusions
+      - Specify indemnification obligations
+      - Document risk transfer mechanisms
+      - Note compliance requirements
+      - Include risk mitigation procedures
+
+      **Strategic Implications:**
+      - Analyze potential exposure scenarios
+      - Evaluate against industry standards
+      - Identify risk management opportunities
+      - Note insurance coverage gaps
+      - Assess regulatory compliance
+      {% endif %}
+
+      {% if tag.category == "Trend Analysis" %}
+      TREND ANALYSIS REQUIREMENTS:
+
+      You must output in this exact format with all sections:
+
+      **Trend Overview:**
+      [Single paragraph summarizing key trends, patterns, and their business impact. Include strategic implications of observed changes.]
+
+      **Analysis Components:**
+      - List price change patterns and adjustments
+      - Detail scope modifications over time
+      - Specify usage and consumption trends
+      - Document geographic changes
+      - Note feature/service evolution
+      - Include true-up history
+
+      **Strategic Considerations:**
+      - Analyze growth and change patterns
+      - Evaluate market alignment
+      - Identify optimization opportunities
+      - Note competitive positioning
+      - Assess future scaling needs
+      {% endif %}
+
+  # 2) Base Configuration
+  basePrompt:
+    tool: echo
+    message: |
+      # Role
+      - Title: Contract Analysis Expert
+      - Expertise: Contract Document Analysis
+      - Objective: Extract and analyze key contract information
+
+      # Analysis Framework
+      ## Basic Contract Information
+      - Contract title and parties
+      - Effective dates and terms
+      - Agreement structure
+
+      ## Financial Analysis
+      - Total Contract Value (TCV)
+      - Payment structures
+      - Pricing models
+
+      ## Amendment Tracking
+      - Amendment history
+      - Scope changes
+      - Term modifications
+
+      ## Purchase Details
+      - Order specifics
+      - Delivery terms
+      - Usage entitlements
+
+      ## Technical Requirements
+      - System specifications
+      - Security standards
+      - Integration requirements
+
+      ## Risk Assessment
+      - Insurance requirements
+      - Liability provisions
+      - Compliance obligations
+
+  # 3) Contract Analysis Configuration
+  analysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      # Analysis Instructions
+
+      ## Information Extraction
+      - Basic contract details
+      - Financial terms analysis
+      - Amendment tracking
+      - Purchase order details
+      - Technical specifications
+      - Risk and liability terms
+
+      ## Data Organization
+      - Create clear sections
+      - Include source references
+      - Note missing information
+      - Flag inconsistencies
+
+      ## Quality Control
+      - Cross-reference data
+      - Verify calculations
+      - Check dependencies
+      - Document assumptions
+
+      # Instruction
+      Analyze the following contract:
+
+  # 4) Section Title
+  analysisTitle:
+    tool: echo
+    message: "Contract Analysis"
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      contractTags: get-contract-tags
+      companyTags: get-company-tags
+    tool: knowledge-set
+    knowledgeSetName: "Contract Document Analysis"
+    operations:
+      - op: set-nodes
+        nodes: documents
+      - op: add-dimension
+        key: contract
+        name: "Contract Analysis"
+        nodes: contractTags
+        priority: 1
+      - op: add-dimension
+        key: company
+        name: "Company"
+        nodes: companyTags
+        priority: 2
+
+  # 6) Analysis Components
+  analyze-contract:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-contract-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: analysisPrompt
+      title: analysisTitle
+
+  analyze-company:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-company-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: analysisPrompt
+      title: analysisTitle
+
+  # 7) Generate Summary Insights
+  summarize-by-company:
+    repeat:
+      function: summarize-for-company
+      for: [companyTag]
+    input:
+      companyTag: get-company-tags
+      documents: task/documents
+      knowledge: init-kset
+      companyAnalysis: analyze-company
+
+  create-contract-summary-insight:
+    input:
+      contractAnalysis: analyze-contract
+      contractTag: get-contract-tags
+      knowledge: init-kset
+    tool: insight
+    text: "{{contractAnalysis.text}}"
+    tags: [contractTag]
+    name: "Contract Analysis Summary"
+    attributes:
+      category: contract-summary-insight
+    relations:
+      derived-from: [contractAnalysis]
+
+  create-company-summary-insight:
+    input:
+      summary: summarize-by-company
+      companyAnalysis: analyze-company
+      companyTag: get-company-tags
+      knowledge: init-kset
+    tool: insight
+    text: "{{summary.text}}"
+    tags: [companyTag]
+    name: "Company Contract Analysis Summary"
+    attributes:
+      category: company-summary-insight
+    relations:
+      derived-from: [companyAnalysis]
+
+  # 8) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      contractAnalysis: analyze-contract
+      companyAnalysis: analyze-company
+      contractSummary: create-contract-summary-insight
+      companySummary: create-company-summary-insight
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+      - op: add-items
+        items: contractAnalysis
+      - op: add-items
+        items: companyAnalysis
+      - op: add-items
+        items: contractSummary
+      - op: add-items
+        items: companySummary
+
+functions:
+  analyze-for-tag:
+    input:
+      tag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          documents: function/documents
+          tag: function/tag
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [tag]
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+          tag: function/tag
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          snippets: get-snippets
+          summary: analyze-content
+          tag: function/tag
+          title: function/title
+        tool: insight
+        text: "{{summary.text}}"
+        tags: [tag]
+        name: "{{title}} - {{tag.name}}"
+        attributes:
+          category: section-analysis-insight
+        relations:
+          derived-from: [snippets]
+
+  summarize-for-company:
+    input:
+      companyTag:
+        type: tag
+      documents:
+        type: document
+      knowledge:
+        type: knowledge-set
+      companyAnalysis:
+        type: analysis
+
+    actions:
+      get-company-content:
+        input:
+          documents: function/documents
+          companyTag: function/companyTag
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [companyTag]
+
+      create-company-insight:
+        input:
+          content: get-company-content
+          analysis: function/companyAnalysis
+          companyTag: function/companyTag
+        tool: insight
+        text: "{{analysis.text}}"
+        tags: [companyTag]
+        name: "Company Analysis - {{companyTag.name}}"
+        attributes:
+          category: company-analysis-insight
+        relations:
+          derived-from: [content]

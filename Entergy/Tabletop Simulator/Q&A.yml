@@ -1,0 +1,246 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collection
+  get-analyst-tags:
+    tool: find-tags
+    category: "Analyst"
+
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      <role>
+        <title>Corporate Strategy Expert</title>
+        <expertise>Analyst Questions and Themes Analysis</expertise>
+        <objective>Provide thorough and structured analysis</objective>
+      </role>
+
+      <analysis_framework>
+        <section name="Question Classification">
+          <item>Core business inquiries</item>
+          <item>Strategic direction questions</item>
+          <item>Operational performance concerns</item>
+          <item>Market positioning queries</item>
+          <item>Financial outlook questions</item>
+        </section>
+
+        <section name="Theme Analysis">
+          <item>Identify recurring topics and patterns</item>
+          <item>Group related concerns</item>
+          <item>Map interconnections between themes</item>
+          <item>Assess theme significance and urgency</item>
+        </section>
+
+        <section name="Strategic Implications">
+          <item>Business model impact</item>
+          <item>Competitive positioning effects</item>
+          <item>Market perception considerations</item>
+          <item>Operational challenges</item>
+          <item>Financial implications</item>
+        </section>
+
+        <section name="Response Framework">
+          <item>Key messaging points</item>
+          <item>Supporting data requirements</item>
+          <item>Risk mitigation strategies</item>
+          <item>Communication approach</item>
+        </section>
+
+        <section name="Preparation Requirements">
+          <item>Required data and metrics</item>
+          <item>Subject matter expert input needs</item>
+          <item>Supporting documentation</item>
+          <item>Potential scenario planning</item>
+        </section>
+      </analysis_framework>
+
+      <guidelines>
+        <item>Prioritize questions by strategic importance</item>
+        <item>Identify implicit concerns behind explicit questions</item>
+        <item>Map relationships between different analyst interests</item>
+        <item>Flag areas requiring immediate attention</item>
+        <item>Note gaps in current preparation materials</item>
+      </guidelines>
+
+  # 3) Analysis prompt
+  analysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      <analysis_structure>
+        <section name="Theme Categorization">
+          <item>Group and categorize main topics</item>
+          <item>Identify primary and secondary themes</item>
+          <item>Note theme frequency and emphasis</item>
+        </section>
+
+        <section name="Strategic Assessment">
+          <item>Core business implications</item>
+          <item>Market positioning impact</item>
+          <item>Competitive landscape considerations</item>
+          <item>Operational challenges</item>
+          <item>Financial performance concerns</item>
+        </section>
+
+        <section name="Question Pattern Analysis">
+          <item>Common threads across questions</item>
+          <item>Underlying concerns and motivations</item>
+          <item>Areas of heightened analyst interest</item>
+          <item>Gaps in current messaging</item>
+        </section>
+
+        <section name="Follow-up Anticipation">
+          <item>Likely deeper dive questions</item>
+          <item>Required supporting data</item>
+          <item>Potential challenging scenarios</item>
+          <item>Areas needing clarification</item>
+        </section>
+
+        <section name="Preparation Requirements">
+          <item>Executive briefing needs</item>
+          <item>Data and metrics to gather</item>
+          <item>Subject matter expert involvement</item>
+          <item>Documentation requirements</item>
+          <item>Risk mitigation strategies</item>
+        </section>
+      </analysis_structure>
+
+      <instruction>Analyze the following content:</instruction>
+
+  # 4) Section Title
+  analysisTitle:
+    tool: echo
+    message: "Question Analysis"
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      analystTags: get-analyst-tags
+    tool: knowledge-set
+    knowledgeSetName: "Analyst Question Analysis"
+    operations:
+      - op: set-nodes
+        nodes: documents
+      - op: add-dimension
+        key: analyst
+        name: "Analyst Questions"
+        nodes: analystTags
+        priority: 1
+
+  # 6) Analyze content
+  analyze-questions:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+      collect: analysis_results
+    input:
+      tag: get-analyst-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: analysisPrompt
+      title: analysisTitle
+    returns: analysis_results
+
+  # 7) Generate Summary Insights
+  create-summary-insight:
+    input:
+      analysisResults: analyze-questions/analysis_results
+      analystTag: get-analyst-tags
+      knowledge: init-kset
+    tool: insight
+    text: "{{analysisResults}}"
+    tags: [analystTag]
+    name: "Analyst Question Analysis Summary"
+    attributes:
+      category: question-analysis-insight
+    relations:
+      derived-from: [analysisResults]
+
+  # 8) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      questionAnalysis: analyze-questions
+      summary: create-summary-insight
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
+functions:
+  analyze-for-tag:
+    input:
+      tag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+    returns: create-insight
+
+    actions:
+      get-questions:
+        input:
+          documents: function/documents
+          tag: function/tag
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [tag]
+
+      analyze-content:
+        input:
+          questions: get-questions
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+          tag: function/tag
+        tool: llm
+        skipIfEmpty: questions
+        prompt: |
+          {{prompt.text}}
+          {% for q in questions %}
+          {{q.text}}
+          {% endfor %}
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          analysisInsight: create-insight
+          questions: get-questions
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: analysisInsight
+          - op: set-nodes
+            nodes: questions
+
+      create-insight:
+        input:
+          questions: get-questions
+          analysis: analyze-content
+          tag: function/tag
+          title: function/title
+        skipIfEmpty: analysis
+        tool: insight
+        text: "{{analysis.text}}"
+        tags: [tag]
+        name: "{{title.text}} for {{tag.name}}"
+        attributes:
+          category: question-analysis-insight
+        relations:
+          derived-from: [questions]
