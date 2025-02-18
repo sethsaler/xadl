@@ -5,7 +5,7 @@ input:
     type: workspace
 
 actions:
-  # 1) Tag Collections for Insurance Categories
+  # 1) Tag Collections for Risk Management
   get-general-liability-tags:
     tool: find-tags
     category: "General Liability"

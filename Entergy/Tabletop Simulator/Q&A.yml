@@ -1,0 +1,234 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collection
+  get-analyst-tags:
+    tool: find-tags
+    category: "Analyst"
+
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role
+      - Title: Corporate Strategy Expert
+      - Expertise: Analyst Questions and Themes Analysis
+      - Objective: Provide thorough and structured analysis
+
+      # Analysis Framework
+
+      ## Question Classification
+      - Core business inquiries
+      - Strategic direction questions
+      - Operational performance concerns
+      - Market positioning queries
+      - Financial outlook questions
+
+      ## Theme Analysis
+      - Identify recurring topics and patterns
+      - Group related concerns
+      - Map interconnections between themes
+      - Assess theme significance and urgency
+
+      ## Strategic Implications
+      - Business model impact
+      - Competitive positioning effects
+      - Market perception considerations
+      - Operational challenges
+      - Financial implications
+
+      ## Response Framework
+      - Key messaging points
+      - Supporting data requirements
+      - Risk mitigation strategies
+      - Communication approach
+
+      ## Preparation Requirements
+      - Required data and metrics
+      - Subject matter expert input needs
+      - Supporting documentation
+      - Potential scenario planning
+
+      # Guidelines
+      - Prioritize questions by strategic importance
+      - Identify implicit concerns behind explicit questions
+      - Map relationships between different analyst interests
+      - Flag areas requiring immediate attention
+      - Note gaps in current preparation materials
+
+  # 3) Analysis prompt
+  analysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      # Analysis Structure
+
+      ## Theme Categorization
+      - Group and categorize main topics
+      - Identify primary and secondary themes
+      - Note theme frequency and emphasis
+
+      ## Strategic Assessment
+      - Core business implications
+      - Market positioning impact
+      - Competitive landscape considerations
+      - Operational challenges
+      - Financial performance concerns
+
+      ## Question Pattern Analysis
+      - Common threads across questions
+      - Underlying concerns and motivations
+      - Areas of heightened analyst interest
+      - Gaps in current messaging
+
+      ## Follow-up Anticipation
+      - Likely deeper dive questions
+      - Required supporting data
+      - Potential challenging scenarios
+      - Areas needing clarification
+
+      ## Preparation Requirements
+      - Executive briefing needs
+      - Data and metrics to gather
+      - Subject matter expert involvement
+      - Documentation requirements
+      - Risk mitigation strategies
+
+      # Instruction
+      Analyze the following content:
+
+  # 4) Section Title
+  analysisTitle:
+    tool: echo
+    message: "Question Analysis"
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      analystTags: get-analyst-tags
+    tool: knowledge-set
+    knowledgeSetName: "Analyst Question Analysis"
+    operations:
+      - op: set-nodes
+        nodes: documents
+      - op: add-dimension
+        key: analyst
+        name: "Analyst Questions"
+        nodes: analystTags
+        priority: 1
+
+  # 6) Analyze content
+  analyze-questions:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-analyst-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: analysisPrompt
+      title: analysisTitle
+
+  # 7) Generate Summary Insights
+  create-summary-insight:
+    input:
+      analysisResults: analyze-questions
+      analystTag: get-analyst-tags
+      knowledge: init-kset
+    tool: insight
+    text: "{{analysisResults}}"
+    tags: [analystTag]
+    name: "Analyst Question Analysis Summary"
+    attributes:
+      category: question-analysis-insight
+    relations:
+      derived-from: [analysisResults]
+
+  # 8) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      questionAnalysis: analyze-questions
+      summary: create-summary-insight
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+      - op: add-items
+        items: summary
+
+functions:
+  analyze-for-tag:
+    input:
+      tag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          documents: function/documents
+          tag: function/tag
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [tag]
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+          tag: function/tag
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          snippets: get-snippets
+          summary: analyze-content
+          tag: function/tag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: "{{summary.text}}"
+        tags: [tag]
+        name: "{{title.message}} for {{tag.name}}"
+        attributes:
+          category: question-analysis-insight
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          analysisInsight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: analysisInsight
+          - op: set-nodes
+            nodes: snippets
