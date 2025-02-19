@@ -8,20 +8,153 @@ actions:
   # 1) Tag Collections for Risk Management Categories
   get-risk-management-tags:
     tool: find-tags
-    name:
-      - "General Liability"
-      - "Excess Liability"
-      - "Workers Compensation"
-      - "Auto Liability"
-      - "Loss of Use"
-      - "Policy Endorsements"
-      - "Cancellation"
-      - "Indemnity"
-
+    name: ["General Liability", "Excess Liability", "Workers Compensation", "Auto Liability", "Loss of Use", "Policy Endorsements", "Cancellation", "Indemnity"]
   # 2) Base configuration for shared prompt elements
+  insuranceRequirements:
+    tool: echo
+    message: |
+      INSURANCE REQUIREMENTS ANALYSIS:
+
+      {% if tag.category == "General Liability" %}
+      GENERAL LIABILITY ANALYSIS REQUIREMENTS:
+      - Verify coverage limits meet minimum requirements
+      - Check additional insured provisions
+      - Confirm primary and non-contributory language
+      - Review aggregate limits
+      - Validate occurrence vs claims-made coverage
+      - Check exclusions and restrictions
+
+      **Compliance Checklist:**
+      - Coverage limits (typically $1M per occurrence, $2M aggregate)
+      - Additional insured status for all parties
+      - Primary and non-contributory wording
+      - Per project aggregate
+      - No unusual exclusions
+      {% endif %}
+
+      {% if tag.category == "Excess Liability" %}
+      EXCESS LIABILITY ANALYSIS REQUIREMENTS:
+      - Verify umbrella/excess coverage limits
+      - Check follow-form provisions
+      - Review underlying coverage requirements
+      - Validate coverage consistency
+      - Check drop-down provisions
+
+      **Compliance Checklist:**
+      - Coverage limits (typically $5M+)
+      - Follow-form coverage
+      - Proper underlying insurance
+      - No gaps in coverage
+      - Consistent terms with primary
+      {% endif %}
+
+      {% if tag.category == "Workers Compensation" %}
+      WORKERS COMPENSATION ANALYSIS REQUIREMENTS:
+      - Verify statutory coverage
+      - Check employer's liability limits
+      - Review waiver of subrogation
+      - Validate coverage territory
+      - Check stop-gap coverage if needed
+
+      **Compliance Checklist:**
+      - Statutory limits for all jurisdictions
+      - Employer's liability ($1M typical)
+      - Waiver of subrogation
+      - All states coverage
+      - USL&H if applicable
+      {% endif %}
+
+      {% if tag.category == "Auto Liability" %}
+      AUTO LIABILITY ANALYSIS REQUIREMENTS:
+      - Verify coverage for all vehicles
+      - Check liability limits
+      - Review hired/non-owned coverage
+      - Validate territory restrictions
+      - Check loading/unloading coverage
+
+      **Compliance Checklist:**
+      - Coverage limits ($1M typical)
+      - All owned autos
+      - Hired/non-owned coverage
+      - No territorial restrictions
+      - Loading/unloading included
+      {% endif %}
+
+      {% if tag.category == "Loss of Use" %}
+      LOSS OF USE ANALYSIS REQUIREMENTS:
+      - Review loss of use provisions
+      - Check valuation methods
+      - Verify coverage triggers
+      - Validate exclusions
+      - Review time limitations
+
+      **Compliance Checklist:**
+      - Clear valuation method
+      - Reasonable time limits
+      - No excessive exclusions
+      - Fair compensation structure
+      - Clear coverage triggers
+      {% endif %}
+
+      {% if tag.category == "Policy Endorsements" %}
+      POLICY ENDORSEMENT ANALYSIS REQUIREMENTS:
+      - Review all endorsements
+      - Check for restrictive conditions
+      - Verify required endorsements
+      - Validate modification impact
+      - Check endorsement consistency
+
+      **Compliance Checklist:**
+      - All required endorsements present
+      - No restrictive endorsements
+      - Proper additional insured forms
+      - Waiver endorsements if needed
+      - Primary/non-contributory endorsement
+      {% endif %}
+
+      {% if tag.category == "Cancellation" %}
+      CANCELLATION PROVISION ANALYSIS REQUIREMENTS:
+      - Check notice requirements
+      - Review cancellation grounds
+      - Verify notice recipients
+      - Validate notice method
+      - Check reinstatement provisions
+
+      **Compliance Checklist:**
+      - 30-day notice minimum
+      - Notice to all parties
+      - Clear notification method
+      - Reasonable grounds only
+      - Written notice required
+      {% endif %}
+
+      {% if tag.category == "Indemnity" %}
+      INDEMNIFICATION ANALYSIS REQUIREMENTS:
+      - Review scope of indemnity
+      - Check trigger events
+      - Verify parties covered
+      - Validate defense obligations
+      - Review limitations/exclusions
+
+      **Compliance Checklist:**
+      - Clear scope definition
+      - Reasonable trigger events
+      - Proper party identification
+      - Defense obligation clarity
+      - No unreasonable exclusions
+      {% endif %}
+
+      Analyze the provided content according to these requirements. Focus on:
+      1. Identifying non-compliant language
+      2. Flagging missing required elements
+      3. Suggesting specific corrections
+      4. Noting any unusual provisions
+
   basePrompt:
     tool: echo
     message: |
+      {{insuranceRequirements}}
+      
       # Role and Context Setup
       You are an insurance compliance expert analyzing contract documents. Your objectives include:
 
@@ -66,14 +199,14 @@ actions:
     tool: knowledge-set
     knowledgeSetName: "Insurance Requirements Analysis"
     operations:
-      - op: set-nodes
-        nodes: documents
       - op: add-dimension
         key: risk_management
         name: "Risk Management"
         nodes: riskManagementTags
         skipIfEmpty: true
         priority: 1
+      - op: set-nodes
+        nodes: documents
 
   # 6) Analyze each insurance category
   analyze-insurance-categories:
@@ -96,8 +229,10 @@ actions:
       knowledgeForDocuments: init-kset
     tool: workspace
     operations:
+      - op: set-nodes
+        nodes: knowledgeForDocuments
       - op: add-items
-        items: "insuranceAnalysis,knowledgeForDocuments"
+        items: insuranceAnalysis
 
 functions:
   analyze-for-tag:
@@ -114,7 +249,6 @@ functions:
         type: text
       title:
         type: text
-
     actions:
       get-snippets:
         input:
@@ -133,133 +267,7 @@ functions:
         tool: llm
         skipIfEmpty: snippets
         prompt: |
-          INSURANCE REQUIREMENTS ANALYSIS:
-
-          {% if tag.category == "General Liability" %}
-          GENERAL LIABILITY ANALYSIS REQUIREMENTS:
-
-          You must output in this exact format with all sections:
-
-          **Coverage Overview:**
-          [Single paragraph summarizing liability coverage framework and terminology requirements. Include key compliance points.]
-
-          **Key Requirements:**
-          - Replace "Comprehensive General Liability" or "Public Liability" with "Commercial General Liability"
-          - Verify coverage limits and umbrella policy references
-          - Default to "blanket endorsement" unless specific broker requirement exists
-          - Ensure renewal certificate timing and cancellation notice provisions
-
-          **Compliance Checklist:**
-          - List all terminology that needs updating
-          - Detail coverage limits and verification methods
-          - Document endorsement requirements
-          - Note certificate and notice provisions
-          {% endif %}
-
-          {% if tag.category == "Excess Liability" %}
-          EXCESS LIABILITY ANALYSIS REQUIREMENTS:
-
-          You must output in this exact format with all sections:
-
-          **Coverage Overview:**
-          [Single paragraph summarizing excess liability framework and coverage structure. Include key limits and umbrella requirements.]
-
-          **Key Requirements:**
-          - Verify coverage limits ($1M per occurrence, $2M aggregate)
-          - Check umbrella policy references
-          - Review combined primary and excess coverage structure
-
-          **Compliance Checklist:**
-          - List all coverage limits and thresholds
-          - Detail umbrella policy specifications
-          - Document coverage combination requirements
-          {% endif %}
-
-          {% if tag.category == "Workers Compensation" %}
-          WORKERS COMPENSATION ANALYSIS REQUIREMENTS:
-
-          You must output in this exact format with all sections:
-
-          **Coverage Overview:**
-          [Single paragraph summarizing workers compensation requirements and employer's liability limits. Include key compliance points.]
-
-          **Key Requirements:**
-          - Confirm statutory limits from payroll service
-          - Verify Employer's Liability maximum of $1M
-          - Flag unauthorized third-party insured additions
-          - Review subrogation clauses against payroll service standards
-
-          **Compliance Checklist:**
-          - List statutory requirements and limits
-          - Detail employer's liability specifications
-          - Document third-party and subrogation restrictions
-          {% endif %}
-
-          {% if tag.category == "Auto Liability" %}
-          AUTO LIABILITY ANALYSIS REQUIREMENTS:
-
-          You must output in this exact format with all sections:
-
-          **Coverage Overview:**
-          [Single paragraph summarizing auto liability requirements and coverage specifications. Include key compliance points.]
-
-          **Key Requirements:**
-          - Remove "owned" or "any auto" references unless specifically endorsed
-          - Specify pollution coverage as "if caused by Accident"
-          - Review and correct hired/non-owned vehicle coverage terms
-
-          **Compliance Checklist:**
-          - List vehicle coverage specifications
-          - Detail pollution coverage requirements
-          - Document endorsement conditions
-          {% endif %}
-
-          {% if tag.category == "Loss of Use" %}
-          LOSS OF USE ANALYSIS REQUIREMENTS:
-
-          You must output in this exact format with all sections:
-
-          **Coverage Overview:**
-          [Single paragraph summarizing loss of use requirements and payment terms. Include key compliance points.]
-
-          **Key Requirements:**
-          - Include "actual and verifiable" language
-          - Remove payment until replacement provisions
-          - Validate repair coverage and payout terms
-
-          **Compliance Checklist:**
-          - List required terminology
-          - Detail payment restrictions
-          - Document coverage specifications
-          {% endif %}
-
-          {% if tag.category == "Indemnity" %}
-          INDEMNITY ANALYSIS REQUIREMENTS:
-
-          You must output in this exact format with all sections:
-
-          **Coverage Overview:**
-          [Single paragraph summarizing indemnity requirements and documentation standards. Include key compliance points.]
-
-          **Key Requirements:**
-          - Add "reasonable outside" before attorney's fees
-          - Include wear and tear exceptions
-          - Remove loss of profits references
-          - Strike policy copy requirements
-          - Confirm certificate provision instead of policy copies
-
-          **Compliance Checklist:**
-          - List terminology requirements
-          - Detail documentation standards
-          - Document prohibited terms
-          {% endif %}
-
-          Analyze the provided content according to these requirements. Focus on:
-          1. Identifying non-compliant language
-          2. Flagging missing required elements
-          3. Suggesting specific corrections
-          4. Noting any unusual provisions
-          
+          {{basePrompt.text}}
           {{prompt.text}}
           {% for s in snippets %}
           {{s.text}}
