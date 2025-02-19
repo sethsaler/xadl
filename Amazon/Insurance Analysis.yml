@@ -1,0 +1,303 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collections for Risk Management Categories
+  get-risk-management-tags:
+    tool: find-tags
+    name: ["General Liability", "Excess Liability", "Workers Compensation", "Auto Liability", "Loss of Use", "Policy Endorsements", "Cancellation", "Indemnity"]
+  # 2) Base configuration for shared prompt elements
+  insuranceRequirements:
+    tool: echo
+    message: |
+      INSURANCE REQUIREMENTS ANALYSIS:
+
+      {% if tag.category == "General Liability" %}
+      GENERAL LIABILITY ANALYSIS REQUIREMENTS:
+      - Verify coverage limits meet minimum requirements
+      - Check additional insured provisions
+      - Confirm primary and non-contributory language
+      - Review aggregate limits
+      - Validate occurrence vs claims-made coverage
+      - Check exclusions and restrictions
+
+      **Compliance Checklist:**
+      - Coverage limits (typically $1M per occurrence, $2M aggregate)
+      - Additional insured status for all parties
+      - Primary and non-contributory wording
+      - Per project aggregate
+      - No unusual exclusions
+      {% endif %}
+
+      {% if tag.category == "Excess Liability" %}
+      EXCESS LIABILITY ANALYSIS REQUIREMENTS:
+      - Verify umbrella/excess coverage limits
+      - Check follow-form provisions
+      - Review underlying coverage requirements
+      - Validate coverage consistency
+      - Check drop-down provisions
+
+      **Compliance Checklist:**
+      - Coverage limits (typically $5M+)
+      - Follow-form coverage
+      - Proper underlying insurance
+      - No gaps in coverage
+      - Consistent terms with primary
+      {% endif %}
+
+      {% if tag.category == "Workers Compensation" %}
+      WORKERS COMPENSATION ANALYSIS REQUIREMENTS:
+      - Verify statutory coverage
+      - Check employer's liability limits
+      - Review waiver of subrogation
+      - Validate coverage territory
+      - Check stop-gap coverage if needed
+
+      **Compliance Checklist:**
+      - Statutory limits for all jurisdictions
+      - Employer's liability ($1M typical)
+      - Waiver of subrogation
+      - All states coverage
+      - USL&H if applicable
+      {% endif %}
+
+      {% if tag.category == "Auto Liability" %}
+      AUTO LIABILITY ANALYSIS REQUIREMENTS:
+      - Verify coverage for all vehicles
+      - Check liability limits
+      - Review hired/non-owned coverage
+      - Validate territory restrictions
+      - Check loading/unloading coverage
+
+      **Compliance Checklist:**
+      - Coverage limits ($1M typical)
+      - All owned autos
+      - Hired/non-owned coverage
+      - No territorial restrictions
+      - Loading/unloading included
+      {% endif %}
+
+      {% if tag.category == "Loss of Use" %}
+      LOSS OF USE ANALYSIS REQUIREMENTS:
+      - Review loss of use provisions
+      - Check valuation methods
+      - Verify coverage triggers
+      - Validate exclusions
+      - Review time limitations
+
+      **Compliance Checklist:**
+      - Clear valuation method
+      - Reasonable time limits
+      - No excessive exclusions
+      - Fair compensation structure
+      - Clear coverage triggers
+      {% endif %}
+
+      {% if tag.category == "Policy Endorsements" %}
+      POLICY ENDORSEMENT ANALYSIS REQUIREMENTS:
+      - Review all endorsements
+      - Check for restrictive conditions
+      - Verify required endorsements
+      - Validate modification impact
+      - Check endorsement consistency
+
+      **Compliance Checklist:**
+      - All required endorsements present
+      - No restrictive endorsements
+      - Proper additional insured forms
+      - Waiver endorsements if needed
+      - Primary/non-contributory endorsement
+      {% endif %}
+
+      {% if tag.category == "Cancellation" %}
+      CANCELLATION PROVISION ANALYSIS REQUIREMENTS:
+      - Check notice requirements
+      - Review cancellation grounds
+      - Verify notice recipients
+      - Validate notice method
+      - Check reinstatement provisions
+
+      **Compliance Checklist:**
+      - 30-day notice minimum
+      - Notice to all parties
+      - Clear notification method
+      - Reasonable grounds only
+      - Written notice required
+      {% endif %}
+
+      {% if tag.category == "Indemnity" %}
+      INDEMNIFICATION ANALYSIS REQUIREMENTS:
+      - Review scope of indemnity
+      - Check trigger events
+      - Verify parties covered
+      - Validate defense obligations
+      - Review limitations/exclusions
+
+      **Compliance Checklist:**
+      - Clear scope definition
+      - Reasonable trigger events
+      - Proper party identification
+      - Defense obligation clarity
+      - No unreasonable exclusions
+      {% endif %}
+
+      Analyze the provided content according to these requirements. Focus on:
+      1. Identifying non-compliant language
+      2. Flagging missing required elements
+      3. Suggesting specific corrections
+      4. Noting any unusual provisions
+
+  basePrompt:
+    tool: echo
+    message: |
+      {{insuranceRequirements}}
+      
+      # Role and Context Setup
+      You are an insurance compliance expert analyzing contract documents. Your objectives include:
+
+      1. Verifying correct insurance terminology and coverage requirements
+      2. Validating coverage limits and policy structures
+      3. Ensuring compliance with statutory requirements
+      4. Reviewing endorsements and exclusions
+      5. Analyzing indemnification provisions
+
+      When analyzing the content:
+      - Focus on specific insurance requirements
+      - Identify terminology breaches
+      - Verify coverage limits
+      - Flag non-standard provisions
+      - Note required modifications
+
+  # 3) Analysis prompt
+  insuranceAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is relevant text from the insurance document. Please:
+      - Analyze the specific provisions related to the tagged category
+      - Identify key requirements and coverage limits
+      - Note any compliance violations
+      - Highlight important terms or conditions
+      - Summarize the findings concisely
+
+      Relevant text from the document:
+
+  # 4) Section Title
+  insuranceAnalysisTitle:
+    tool: echo
+    message: Insurance Requirements Analysis
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      riskManagementTags: get-risk-management-tags
+    tool: knowledge-set
+    knowledgeSetName: "Insurance Requirements Analysis"
+    operations:
+      - op: add-dimension
+        key: risk_management
+        name: "Risk Management"
+        nodes: riskManagementTags
+        skipIfEmpty: true
+        priority: 1
+      - op: set-nodes
+        nodes: documents
+
+  # 6) Analyze each insurance category
+  analyze-insurance-categories:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-risk-management-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: insuranceAnalysisPrompt
+      title: insuranceAnalysisTitle
+
+  # 7) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      insuranceAnalysis: analyze-insurance-categories
+      knowledgeForDocuments: init-kset
+    tool: workspace
+    operations:
+      - op: set-nodes
+        nodes: knowledgeForDocuments
+      - op: add-items
+        items: insuranceAnalysis
+
+functions:
+  analyze-for-tag:
+    input:
+      tag:
+        type: tag
+      documents:
+        type: document
+      knowledge:
+        type: knowledge-set
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      title:
+        type: text
+    actions:
+      get-snippets:
+        input:
+          tag: function/tag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          tags: [tag]
+        skipIfEmpty: documents
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{basePrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          tag: function/tag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} for {{tag.name}}"
+        tags: [tag]
+        attributes:
+          category: insurance-analysis-insight
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: "insight"
+          - op: set-nodes
+            nodes: "snippets"
