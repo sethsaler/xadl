@@ -5,38 +5,18 @@ input:
     type: workspace
 
 actions:
-  # 1) Tag Collections for Risk Management
-  get-general-liability-tags:
+  # 1) Tag Collections for Risk Management Categories
+  get-risk-management-tags:
     tool: find-tags
-    category: "General Liability"
-
-  get-excess-liability-tags:
-    tool: find-tags
-    category: "Excess Liability"
-
-  get-workers-comp-tags:
-    tool: find-tags
-    category: "Workers Compensation"
-
-  get-auto-liability-tags:
-    tool: find-tags
-    category: "Auto Liability"
-
-  get-loss-use-tags:
-    tool: find-tags
-    category: "Loss of Use"
-
-  get-endorsement-tags:
-    tool: find-tags
-    category: "Policy Endorsements"
-
-  get-cancellation-tags:
-    tool: find-tags
-    category: "Cancellation"
-
-  get-indemnity-tags:
-    tool: find-tags
-    category: "Indemnity"
+    name:
+      - "General Liability"
+      - "Excess Liability"
+      - "Workers Compensation"
+      - "Auto Liability"
+      - "Loss of Use"
+      - "Policy Endorsements"
+      - "Cancellation"
+      - "Indemnity"
 
   # 2) Base configuration for shared prompt elements
   basePrompt:
@@ -73,308 +53,51 @@ actions:
 
       Relevant text from the document:
 
-  # 4) Section Titles
-  generalLiabilityTitle:
+  # 4) Section Title
+  insuranceAnalysisTitle:
     tool: echo
-    message: General Liability Insurance Analysis
-
-  excessLiabilityTitle:
-    tool: echo
-    message: Excess Liability Insurance Analysis
-
-  workersCompTitle:
-    tool: echo
-    message: Workers Compensation Insurance Analysis
-
-  autoLiabilityTitle:
-    tool: echo
-    message: Auto Liability Insurance Analysis
-
-  lossUseTitle:
-    tool: echo
-    message: Loss of Use Insurance Analysis
-
-  endorsementsTitle:
-    tool: echo
-    message: Policy Endorsements Analysis
-
-  cancellationTitle:
-    tool: echo
-    message: Cancellation Provisions Analysis
-
-  indemnityTitle:
-    tool: echo
-    message: Indemnity Clauses Analysis
+    message: Insurance Requirements Analysis
 
   # 5) Initialize Knowledge Set
   init-kset:
     input:
       documents: task/documents
-      generalLiabilityTags: get-general-liability-tags
-      excessLiabilityTags: get-excess-liability-tags
-      workersCompTags: get-workers-comp-tags
-      autoLiabilityTags: get-auto-liability-tags
-      lossUseTags: get-loss-use-tags
-      endorsementTags: get-endorsement-tags
-      cancellationTags: get-cancellation-tags
-      indemnityTags: get-indemnity-tags
+      riskManagementTags: get-risk-management-tags
     tool: knowledge-set
     knowledgeSetName: "Insurance Requirements Analysis"
     operations:
       - op: set-nodes
         nodes: documents
       - op: add-dimension
-        key: general_liability
-        name: "General Liability"
-        nodes: generalLiabilityTags
+        key: risk_management
+        name: "Risk Management"
+        nodes: riskManagementTags
+        skipIfEmpty: true
         priority: 1
-        skipIfEmpty: true
-      - op: add-dimension
-        key: excess_liability
-        name: "Excess Liability"
-        nodes: excessLiabilityTags
-        priority: 2
-        skipIfEmpty: true
-      - op: add-dimension
-        key: workers_comp
-        name: "Workers Compensation"
-        nodes: workersCompTags
-        priority: 3
-        skipIfEmpty: true
-      - op: add-dimension
-        key: auto_liability
-        name: "Auto Liability"
-        nodes: autoLiabilityTags
-        priority: 4
-        skipIfEmpty: true
-      - op: add-dimension
-        key: loss_use
-        name: "Loss of Use"
-        nodes: lossUseTags
-        priority: 5
-        skipIfEmpty: true
-      - op: add-dimension
-        key: endorsements
-        name: "Policy Endorsements"
-        nodes: endorsementTags
-        priority: 6
-        skipIfEmpty: true
-      - op: add-dimension
-        key: cancellation
-        name: "Cancellation"
-        nodes: cancellationTags
-        priority: 7
-        skipIfEmpty: true
-      - op: add-dimension
-        key: indemnity
-        name: "Indemnity"
-        nodes: indemnityTags
-        priority: 8
-        skipIfEmpty: true
 
-  # 6) Category-specific analyses
-  analyze-general-liability:
+  # 6) Analyze each insurance category
+  analyze-insurance-categories:
     repeat:
       function: analyze-for-tag
       for: [tag]
     input:
-      tag: get-general-liability-tags
+      tag: get-risk-management-tags
       documents: task/documents
       knowledge: init-kset
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
-      title: generalLiabilityTitle
+      title: insuranceAnalysisTitle
 
-  analyze-excess-liability:
-    repeat:
-      function: analyze-for-tag
-      for: [tag]
-    input:
-      tag: get-excess-liability-tags
-      documents: task/documents
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: insuranceAnalysisPrompt
-      title: excessLiabilityTitle
-
-  analyze-workers-comp:
-    repeat:
-      function: analyze-for-tag
-      for: [tag]
-    input:
-      tag: get-workers-comp-tags
-      documents: task/documents
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: insuranceAnalysisPrompt
-      title: workersCompTitle
-
-  analyze-auto-liability:
-    repeat:
-      function: analyze-for-tag
-      for: [tag]
-    input:
-      tag: get-auto-liability-tags
-      documents: task/documents
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: insuranceAnalysisPrompt
-      title: autoLiabilityTitle
-
-  analyze-loss-use:
-    repeat:
-      function: analyze-for-tag
-      for: [tag]
-    input:
-      tag: get-loss-use-tags
-      documents: task/documents
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: insuranceAnalysisPrompt
-      title: lossUseTitle
-
-  analyze-endorsements:
-    repeat:
-      function: analyze-for-tag
-      for: [tag]
-    input:
-      tag: get-endorsement-tags
-      documents: task/documents
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: insuranceAnalysisPrompt
-      title: endorsementsTitle
-
-  analyze-cancellation:
-    repeat:
-      function: analyze-for-tag
-      for: [tag]
-    input:
-      tag: get-cancellation-tags
-      documents: task/documents
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: insuranceAnalysisPrompt
-      title: cancellationTitle
-
-  analyze-indemnity:
-    repeat:
-      function: analyze-for-tag
-      for: [tag]
-    input:
-      tag: get-indemnity-tags
-      documents: task/documents
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: insuranceAnalysisPrompt
-      title: indemnityTitle
-
-  # 7) Document-level analyses
-  analyze-documents-general:
-    repeat:
-      function: analyze-document-insurance
-      for: [document]
-    input:
-      document: task/documents
-      insuranceTags: get-general-liability-tags
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: insuranceAnalysisPrompt
-      title: generalLiabilityTitle
-
-  analyze-documents-excess-liability:
-    repeat:
-      function: analyze-document-insurance
-      for: [document]
-    input:
-      document: task/documents
-      insuranceTags: get-excess-liability-tags
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: insuranceAnalysisPrompt
-      title: excessLiabilityTitle
-
-  analyze-documents-workers-comp:
-    repeat:
-      function: analyze-document-insurance
-      for: [document]
-    input:
-      document: task/documents
-      insuranceTags: get-workers-comp-tags
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: insuranceAnalysisPrompt
-      title: workersCompTitle
-
-  analyze-documents-auto-liability:
-    repeat:
-      function: analyze-document-insurance
-      for: [document]
-    input:
-      document: task/documents
-      insuranceTags: get-auto-liability-tags
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: insuranceAnalysisPrompt
-      title: autoLiabilityTitle
-
-  analyze-documents-loss-use:
-    repeat:
-      function: analyze-document-insurance
-      for: [document]
-    input:
-      document: task/documents
-      insuranceTags: get-loss-use-tags
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: insuranceAnalysisPrompt
-      title: lossUseTitle
-
-  analyze-documents-endorsements:
-    repeat:
-      function: analyze-document-insurance
-      for: [document]
-    input:
-      document: task/documents
-      insuranceTags: get-endorsement-tags
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: insuranceAnalysisPrompt
-      title: endorsementsTitle
-
-  analyze-documents-cancellation:
-    repeat:
-      function: analyze-document-insurance
-      for: [document]
-    input:
-      document: task/documents
-      insuranceTags: get-cancellation-tags
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: insuranceAnalysisPrompt
-      title: cancellationTitle
-
-  analyze-documents-indemnity:
-    repeat:
-      function: analyze-document-insurance
-      for: [document]
-    input:
-      document: task/documents
-      insuranceTags: get-indemnity-tags
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: insuranceAnalysisPrompt
-      title: indemnityTitle
-
-  # 8) Add Results to Workspace
+  # 7) Add Results to Workspace
   add-to-workspace:
     input:
       workspace: task/workspace
-      knowledge: init-kset
+      insuranceAnalysis: analyze-insurance-categories
+      knowledgeForDocuments: init-kset
     tool: workspace
     operations:
       - op: add-items
-        items: knowledge
+        items: "insuranceAnalysis,knowledgeForDocuments"
 
 functions:
   analyze-for-tag:
@@ -391,81 +114,16 @@ functions:
         type: text
       title:
         type: text
+
     actions:
       get-snippets:
         input:
+          tag: function/tag
           documents: function/documents
-          tag: function/tag
         tool: document-text
         textFilter:
-          operator: "and"
           tags: [tag]
-
-      analyze-content:
-        input:
-          snippets: get-snippets
-          basePrompt: function/basePrompt
-          prompt: function/prompt
-        tool: llm
-        skipIfEmpty: snippets
-        prompt: |
-          {{prompt.text}}
-          {% for s in snippets %}
-          {{s.text}}
-          {% endfor %}
-
-      create-insight:
-        input:
-          summary: analyze-content
-          snippets: get-snippets
-          tag: function/tag
-          title: function/title
-        skipIfEmpty: summary
-        tool: insight
-        text: |
-          {{summary.text}}
-        name: "{{title.text}} for {{tag.name}}"
-        tags: [tag]
-        attributes:
-          category: insurance-analysis-insight
-        relations:
-          derived-from: [snippets]
-
-      add-insight:
-        input:
-          knowledge: function/knowledge
-          insight: create-insight
-          snippets: get-snippets
-        tool: knowledge-set
-        operations:
-          - op: set-nodes
-            nodes: insight
-          - op: set-nodes
-            nodes: snippets
-
-  analyze-document-insurance:
-    input:
-      document:
-        type: document
-      insuranceTags:
-        type: tag[]
-      knowledge:
-        type: knowledge-set
-      basePrompt:
-        type: text
-      prompt:
-        type: text
-      title:
-        type: text
-    actions:
-      get-snippets:
-        input:
-          documents: function/document
-          insuranceTags: function/insuranceTags
-        tool: document-text
-        textFilter:
-          operator: "and"
-          tags: [insuranceTags]
+        skipIfEmpty: documents
 
       analyze-content:
         input:
@@ -611,16 +269,16 @@ functions:
         input:
           summary: analyze-content
           snippets: get-snippets
-          document: function/document
+          tag: function/tag
           title: function/title
         skipIfEmpty: summary
         tool: insight
         text: |
           {{summary.text}}
-        name: "{{title.text}} for {{document.name}}"
-        tags: [insuranceTags]
+        name: "{{title.text}} for {{tag.name}}"
+        tags: [tag]
         attributes:
-          category: insurance-document-analysis
+          category: insurance-analysis-insight
         relations:
           derived-from: [snippets]
 
@@ -632,6 +290,6 @@ functions:
         tool: knowledge-set
         operations:
           - op: set-nodes
-            nodes: insight
+            nodes: "insight"
           - op: set-nodes
-            nodes: snippets
+            nodes: "snippets"

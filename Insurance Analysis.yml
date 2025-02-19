@@ -1,0 +1,346 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collections for Risk Management Categories
+  get-general-liability-tags:
+    tool: find-tags
+    category: "General Liability"
+  
+  get-excess-liability-tags:
+    tool: find-tags
+    category: "Excess Liability"
+
+  get-workers-comp-tags:
+    tool: find-tags
+    category: "Workers Compensation"
+
+  get-auto-liability-tags:
+    tool: find-tags
+    category: "Auto Liability"
+
+  get-loss-use-tags:
+    tool: find-tags
+    category: "Loss of Use"
+
+  get-endorsement-tags:
+    tool: find-tags
+    category: "Policy Endorsements"
+
+  get-cancellation-tags:
+    tool: find-tags
+    category: "Cancellation"
+
+  get-indemnity-tags:
+    tool: find-tags
+    category: "Indemnity"
+
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are an insurance compliance expert analyzing contract documents. Your objectives include:
+
+      1. Verifying correct insurance terminology and coverage requirements
+      2. Validating coverage limits and policy structures
+      3. Ensuring compliance with statutory requirements
+      4. Reviewing endorsements and exclusions
+      5. Analyzing indemnification provisions
+
+      When analyzing the content:
+      - Focus on specific insurance requirements
+      - Identify terminology breaches
+      - Verify coverage limits
+      - Flag non-standard provisions
+      - Note required modifications
+
+  # 3) Analysis prompt
+  insuranceAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is relevant text from the insurance document. Please:
+      - Analyze the specific provisions related to the tagged category
+      - Identify key requirements and coverage limits
+      - Note any compliance violations
+      - Highlight important terms or conditions
+      - Summarize the findings concisely
+
+      Relevant text from the document:
+
+  # 4) Section Title
+  insuranceAnalysisTitle:
+    tool: echo
+    message: Insurance Requirements Analysis
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      generalLiabilityTags: get-general-liability-tags
+      excessLiabilityTags: get-excess-liability-tags
+      workersCompTags: get-workers-comp-tags
+      autoLiabilityTags: get-auto-liability-tags
+      lossUseTags: get-loss-use-tags
+      endorsementTags: get-endorsement-tags
+      cancellationTags: get-cancellation-tags
+      indemnityTags: get-indemnity-tags
+    tool: knowledge-set
+    knowledgeSetName: "Insurance Requirements Analysis"
+    operations:
+      - op: add-dimension
+        key: theme
+        name: Tags
+        nodes: generalLiabilityTags
+        priority: 1
+        skipIfEmpty: true
+      - op: set-nodes
+        nodes: excessLiabilityTags
+      - op: set-nodes
+        nodes: workersCompTags
+      - op: set-nodes
+        nodes: autoLiabilityTags
+      - op: set-nodes
+        nodes: lossUseTags
+      - op: set-nodes
+        nodes: endorsementTags
+      - op: set-nodes
+        nodes: cancellationTags
+      - op: set-nodes
+        nodes: indemnityTags
+      - op: add-dimension
+        key: document
+        name: Documents
+        nodes: documents
+        priority: 2
+        skipIfEmpty: true
+      - op: set-nodes
+        nodes: documents
+
+  # 6) Analyze each insurance category
+  analyze-insurance-categories:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-general-liability-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: insuranceAnalysisPrompt
+      title: insuranceAnalysisTitle
+
+  analyze-excess-liability:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-excess-liability-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: insuranceAnalysisPrompt
+      title: insuranceAnalysisTitle
+
+  analyze-workers-comp:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-workers-comp-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: insuranceAnalysisPrompt
+      title: insuranceAnalysisTitle
+
+  analyze-auto-liability:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-auto-liability-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: insuranceAnalysisPrompt
+      title: insuranceAnalysisTitle
+
+  analyze-loss-use:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-loss-use-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: insuranceAnalysisPrompt
+      title: insuranceAnalysisTitle
+
+  analyze-endorsements:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-endorsement-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: insuranceAnalysisPrompt
+      title: insuranceAnalysisTitle
+
+  analyze-cancellation:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-cancellation-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: insuranceAnalysisPrompt
+      title: insuranceAnalysisTitle
+
+  analyze-indemnity:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-indemnity-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: insuranceAnalysisPrompt
+      title: insuranceAnalysisTitle
+
+  # 7) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      generalLiabilityAnalysis: analyze-insurance-categories
+      excessLiabilityAnalysis: analyze-excess-liability
+      workersCompAnalysis: analyze-workers-comp
+      autoLiabilityAnalysis: analyze-auto-liability
+      lossUseAnalysis: analyze-loss-use
+      endorsementsAnalysis: analyze-endorsements
+      cancellationAnalysis: analyze-cancellation
+      indemnityAnalysis: analyze-indemnity
+      knowledgeForDocuments: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeForDocuments
+
+functions:
+  analyze-for-tag:
+    input:
+      tag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      get-instruction-prompt-for-tag:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          tag: function/tag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [tag]
+      
+      get-instruction-prompt-for-tag:
+        input:
+          tag: function/tag
+        tool: echo
+        message: |
+          INSURANCE ANALYSIS REQUIREMENTS:
+
+          <overview>
+          Create a single, concise paragraph that includes ONLY explicitly stated insurance requirements. Bold all key terms that appear in the text. Start directly with the found information - no lead-in phrases. Use quotes for specific coverage requirements or limits.
+          </overview>
+
+          <required_elements>
+          Elements to include (ONLY if explicitly stated in the text):
+          - Insurance type and category
+          - Coverage limits and sublimits
+          - Required endorsements
+          - Additional insured requirements
+          - Notice provisions
+          - Cancellation requirements
+          - Special conditions or exclusions
+          - Policy form requirements
+          - Waiver provisions
+          </required_elements>
+
+          <rules>
+          Rules:
+          1. Start directly with the information - no introductory phrases
+          2. Include ONLY information explicitly stated in the provided text snippets
+          3. Bold ONLY terms that appear in the actual source text snippets
+          4. Use quotes for exact coverage requirements/limits ONLY from source text
+          5. Maintain a natural, flowing narrative
+          6. No bullet points or separate sections
+          7. No commentary about missing information
+          8. Focus solely on insurance requirements and coverage details
+          </rules>
+
+      run-prompt:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-tag
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-snippets
+          tag: function/tag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} for {{tag.name}}"
+        tags: [tag]
+        attributes:
+          category: insurance-analysis-insight
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
