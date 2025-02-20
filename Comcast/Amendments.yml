@@ -1,0 +1,504 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+  standard-document-tag:
+    type: tag
+    label: "Name of the document tag to use as the standard for comparison"
+
+actions:
+  # 1) Tag Collections for Different Categories
+  get-document-tags:
+    tool: find-tags
+    category: "Amendment"
+
+  get-standard-tags:
+    tool: find-tags
+    category: "Master"
+
+  get-performance-tags:
+    tool: find-tags
+    name: ["Security"]
+
+  get-payment-tags:
+    tool: find-tags
+    name: ["Payment Terms", "Price Increase"]
+
+  get-termination-tags:
+    tool: find-tags
+    name: ["Term", "Insurance Term", "Subscription Term", "Renewal"]
+
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a telecommunications regulatory expert analyzing tariff documents. Your objectives include:
+
+      1. Comparing each document against the standard document
+      2. Identifying key differences from the standard approach
+      3. Highlighting variations that may require attention or alignment
+      4. Creating actionable comparisons that show compliance or deviation from standards
+      5. Focusing on quantitative metrics and measurable requirements
+
+      When analyzing documents:
+      - Focus on explicit terms and conditions
+      - Identify regulatory compliance requirements
+      - Note any unusual or non-standard provisions
+      - Flag potential risks or areas requiring attention
+      - Look for patterns and trends across documents
+
+  # 3) Analysis prompt
+  tariffAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is relevant text from the tariff document. Please:
+      - Analyze the specific provisions related to the tagged category
+      - Identify key requirements and obligations
+      - Note any regulatory compliance considerations
+      - Highlight important terms or conditions
+      - Summarize the findings concisely
+
+      Relevant text from the tariff:
+
+  # 4) Section Title
+  analysisTitle:
+    tool: echo
+    message: Standard Comparison Analysis
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      documentTags: get-document-tags
+      standardTags: get-standard-tags
+      performanceTags: get-performance-tags
+      paymentTags: get-payment-tags
+      terminationTags: get-termination-tags
+    tool: knowledge-set
+    knowledgeSetName: "Standards Comparison"
+    operations:
+      - op: set-nodes
+        nodes: documents
+      - op: add-dimension
+        key: document
+        name: "Document"
+        nodes: documentTags
+        priority: 1
+        skipIfEmpty: true
+      - op: add-dimension
+        key: standard
+        name: "Standard"
+        nodes: standardTags
+        priority: 2
+        skipIfEmpty: true
+      - op: add-dimension
+        key: performance
+        name: "Performance Obligations"
+        nodes: performanceTags
+        priority: 3
+        skipIfEmpty: true
+      - op: add-dimension
+        key: payment
+        name: "Payment Obligations"
+        nodes: paymentTags
+        priority: 4
+        skipIfEmpty: true
+      - op: add-dimension
+        key: termination
+        name: "Termination"
+        nodes: terminationTags
+        priority: 5
+        skipIfEmpty: true
+
+  # 6) Analyze content for each category
+  analyze-performance:
+    repeat:
+      function: analyze-category-for-document
+      for: [documentTag, tag]
+      skipIfEmpty: [documentTag, tag]
+    input:
+      documentTag: get-document-tags
+      tag: get-performance-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+    output:
+      type: insight
+
+  analyze-payment:
+    repeat:
+      function: analyze-category-for-document
+      for: [documentTag, tag]
+      skipIfEmpty: [documentTag, tag]
+    input:
+      documentTag: get-document-tags
+      tag: get-payment-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+    output:
+      type: insight
+
+  analyze-termination:
+    repeat:
+      function: analyze-category-for-document
+      for: [documentTag, tag]
+      skipIfEmpty: [documentTag, tag]
+    input:
+      documentTag: get-document-tags
+      tag: get-termination-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: tariffAnalysisPrompt
+      title: analysisTitle
+    output:
+      type: insight
+      type: insight
+
+  # 7) Compare documents against standard for each category
+  compare-documents-performance:
+    repeat:
+      function: compare-against-standard-for-category
+      for: [tag]
+      skipIfEmpty: tag
+    input:
+      tag: get-performance-tags
+      knowledge: init-kset
+      analyze-categories: analyze-performance
+      standard-document-tag: task/standard-document-tag
+      document-tags: get-document-tags
+
+  compare-documents-payment:
+    repeat:
+      function: compare-against-standard-for-category
+      for: [tag]
+      skipIfEmpty: tag
+    input:
+      tag: get-payment-tags
+      knowledge: init-kset
+      analyze-categories: analyze-payment
+      standard-document-tag: task/standard-document-tag
+      document-tags: get-document-tags
+
+  compare-documents-termination:
+    repeat:
+      function: compare-against-standard-for-category
+      for: [tag]
+      skipIfEmpty: tag
+    input:
+      tag: get-termination-tags
+      knowledge: init-kset
+      analyze-categories: analyze-termination
+      standard-document-tag: task/standard-document-tag
+      document-tags: get-document-tags
+
+  compare-documents-sla:
+    repeat:
+      function: compare-against-standard-for-category
+      for: [tag]
+      skipIfEmpty: tag
+    input:
+      tag: get-sla-tags
+      knowledge: init-kset
+      analyze-categories: analyze-sla
+      standard-document-tag: task/standard-document-tag
+      document-tags: get-document-tags
+
+  compare-documents-liability:
+    repeat:
+      function: compare-against-standard-for-category
+      for: [tag]
+      skipIfEmpty: tag
+    input:
+      tag: get-liability-tags
+      knowledge: init-kset
+      analyze-categories: analyze-liability
+      standard-document-tag: task/standard-document-tag
+      document-tags: get-document-tags
+
+  # 8) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      performanceAnalysis: analyze-performance
+      paymentAnalysis: analyze-payment
+      terminationAnalysis: analyze-termination
+      slaAnalysis: analyze-sla
+      liabilityAnalysis: analyze-liability
+      performanceComparisons: compare-documents-performance
+      paymentComparisons: compare-documents-payment
+      terminationComparisons: compare-documents-termination
+      slaComparisons: compare-documents-sla
+      liabilityComparisons: compare-documents-liability
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
+functions:
+  analyze-category-for-document:
+    input:
+      documentTag:
+        type: tag
+      tag:
+        type: tag
+      documents:
+        type: document
+      knowledge:
+        type: knowledge-set
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      title:
+        type: text
+    actions:
+      get-snippets:
+        input:
+          documents: function/documents
+          documentTag: function/documentTag
+          tag: function/tag
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [documentTag, tag]
+
+      get-instruction-prompt-for-category:
+        input:
+          tag: function/tag
+          documentTag: function/documentTag
+        tool: echo
+        message: |
+          TARIFF DOCUMENT SUMMARY FOR {{tag.category}}:
+
+          Analyze how {{tag.name}} is handled in {{documentTag.name}}. Provide a clear summary in this format:
+
+          **Summary:**
+          [Concise summary of how this category is handled in this document]
+
+          **Key Points:**
+          - List the main requirements or specifications
+          - Note any unique approaches or special conditions
+          - Highlight critical implementation details
+          - Identify regulatory compliance requirements
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-category
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-category-insight:
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          tag: function/tag
+          documentTag: function/documentTag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "Standard Analysis: {{tag.name}} in {{documentTag.name}}"
+        tags: [documentTag, tag]
+        attributes:
+          category: tariff-category-analysis
+          analysisType: single-document
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-category-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
+
+  compare-against-standard-for-category:
+    input:
+      tag:
+        type: tag
+      knowledge:
+        type: knowledge-set
+      standard-document-tag:
+        type: text
+      document-tags:
+        type: tag
+    actions:
+      get-category-insights:
+        input:
+          knowledge: function/knowledge
+          tag: function/tag
+          document-tags: function/document-tags
+        tool: knowledge-set-query
+        nodes:
+          type: insight
+          attributes:
+            category: tariff-category-analysis
+          tags: [tag]
+          filter:
+            operator: "in"
+            field: "documentTag"
+            values: "{{document-tags}}"
+
+      analyze-differences:
+        input:
+          insights: get-category-insights
+          tag: function/tag
+          standard-document-tag: function/standard-document-tag
+        skipIfEmpty: insights
+        tool: llm
+        prompt: |
+          {# First find the standard document insight #}
+          {% set standard_doc = [] %}
+          {% set comparison_docs = [] %}
+          {% for insight in insights %}
+          {% if insight.documentTag.name == standard_document_tag %}
+          {% do standard_doc.append(insight) %}
+          {% else %}
+          {% do comparison_docs.append(insight) %}
+          {% endif %}
+          {% endfor %}
+          
+          Compare how {{tag.name}} is handled across all documents, using {{standard_document_tag}} as the standard reference.
+          
+          First, provide a comprehensive summary of the standard document:
+
+          STANDARD DOCUMENT ({{standard_document_tag}}):
+          
+          1. Key Metrics and Requirements:
+          - List all quantitative metrics and their values
+          - Specify all measurable requirements
+          - Detail any specific thresholds or limits
+          - Document all time-based requirements
+          
+          2. Standard Document Framework:
+          - Core requirements and specifications
+          - Compliance requirements
+          - Implementation requirements
+          - Operational standards
+
+          Then, for each comparison document, provide a detailed analysis:
+
+          {% for doc in comparison_docs %}
+          
+          COMPARISON: {{doc.documentTag.name}} vs Standard
+
+          1. Metric-by-Metric Comparison:
+          - For each metric in either document:
+            * Standard value: [Value from {{standard_document_tag}}]
+            * Comparison value: [Value from {{doc.documentTag.name}}]
+            * Variation: [Calculate difference/percentage change]
+            * Impact Assessment: [Significance of variation]
+
+          2. Compliance Analysis:
+          - Areas of Full Compliance with Standard
+          - Areas of Partial Compliance
+          - Areas of Non-Compliance
+          - Missing Requirements
+
+          3. Detailed Variations:
+          - Quantitative Differences:
+            * List each numerical variation
+            * Provide context for variations
+            * Assess impact of differences
+          
+          - Requirement Differences:
+            * More stringent requirements
+            * Less stringent requirements
+            * Additional requirements
+            * Missing requirements
+
+          4. Implementation Impact:
+          - Operational Variations
+          - Cost Implications
+          - Timeline Differences
+          - Resource Requirements
+
+          5. Risk Assessment:
+          - Compliance Risks
+          - Operational Risks
+          - Financial Risks
+          - Service Delivery Risks
+
+          {% endfor %}
+
+          CROSS-DOCUMENT ANALYSIS:
+          
+          1. Pattern Analysis:
+          - Common variations from standard
+          - Unique variations
+          - Trending differences
+          
+          2. Overall Compliance Assessment:
+          - Documents closest to standard
+          - Documents with significant variations
+          - Critical areas of difference
+
+          3. Recommendations:
+          - Priority areas for alignment
+          - Suggested standardization approaches
+          - Risk mitigation strategies
+
+          Document insights used for analysis:
+
+          Standard Document ({{standard_document_tag}}):
+          {{standard_doc[0].text if standard_doc else "Standard document not found"}}
+
+          {% for doc in comparison_docs %}
+          Comparison Document: {{doc.documentTag.name}}
+          {{doc.text}}
+          {% endfor %}
+
+      create-comparison-insight:
+        input:
+          summary: analyze-differences
+          insights: get-category-insights
+          tag: function/tag
+          standard-document-tag: function/standard-document-tag
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "Standard Comparison Analysis: {{tag.name}}"
+        tags: [tag]
+        attributes:
+          category: tariff-comparison-analysis
+          analysisType: standard-comparison
+          standardDocument: "{{standard_document_tag}}"
+          hasQuantitativeMetrics: "true"
+          documentCount: "{{insights|length}}"
+        relations:
+          derived-from: [insights]
+
+      add-comparison:
+        input:
+          knowledge: function/knowledge
+          insight: create-comparison-insight
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
