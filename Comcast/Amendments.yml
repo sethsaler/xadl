@@ -3,222 +3,240 @@ input:
     type: document
   workspace:
     type: workspace
+  standard-document-tag:
+    type: text
+    value: "Master"
 
 actions:
-  # Get document type tags
-  get-master-tag:
+  # 1) Tag Collections for Different Categories
+  get-document-tags:
     tool: find-tags
-    name: "Master"
-    createIfNotFound: true
+    category: ["Master", "Amendment"]
 
-  get-amendment-tag:
+  get-standard-tags:
     tool: find-tags
-    name: "Amendment"
-    createIfNotFound: true
+    category: "Master"
 
-  # Get analysis category tags
-  get-category-tags:
+  get-amendment-tags:
     tool: find-tags
-    name: ["Security", "Payment Terms", "Price Increase", "Term", "Insurance Term", "Subscription Term", "Renewal"]
-    createIfNotFound: true
+    category: "Amendment"
 
-  # Base prompt for comparison
+  get-security-tags:
+    tool: find-tags
+    name: ["Security"]
+
+  get-payment-tags:
+    tool: find-tags
+    name: ["Payment Terms", "Price Increase"]
+
+  get-term-tags:
+    tool: find-tags
+    name: ["Term", "Insurance Term", "Subscription Term", "Renewal"]
+
+  # 2) Base configuration for shared prompt elements
   basePrompt:
     tool: echo
     message: |
-      # Contract Analysis Expert
-      You are analyzing changes between a master agreement and its amendments. Focus on:
-      1. Identifying specific modifications
-      2. Highlighting material changes
-      3. Noting implications of changes
-      4. Tracking cumulative impact
+      # Role and Context Setup
+      You are a contract analysis expert focused on comparing amendments against a master agreement. Your objectives include:
 
-  # Analysis prompt
-  comparisonPrompt:
+      1. Comparing each amendment against the master agreement
+      2. Identifying key differences between amendments
+      3. Highlighting variations that may require attention or alignment
+      4. Creating actionable comparisons that show changes in requirements
+      5. Focusing on material changes and modifications
+
+      When analyzing documents:
+      - Focus on explicit terms and modifications
+      - Identify changes to requirements
+      - Note any unusual or non-standard provisions
+      - Flag potential conflicts between amendments
+      - Look for patterns across amendments
+
+  # 3) Analysis prompt
+  amendmentAnalysisPrompt:
     tool: echo
     message: |
       {{basePrompt}}
-      Compare the master agreement against this amendment for {{category.name}}:
-      1. Original Terms (Master Agreement):
-      {{masterText}}
-      2. Amendment Changes:
-      {{amendmentText}}
-      Please analyze:
-      - What specific changes were made?
-      - How do these changes impact the agreement?
-      - Are there any material modifications to rights or obligations?
-      - How does this affect the overall relationship?
 
-  # Initialize Knowledge Set
+      Below is relevant text from the document. Please:
+      - Analyze the specific provisions and modifications
+      - Identify key changes and requirements
+      - Note any regulatory compliance considerations
+      - Highlight important terms or conditions
+      - Summarize the findings concisely
+
+      Relevant text:
+
+  # 4) Section Title
+  analysisTitle:
+    tool: echo
+    message: Amendment Comparison Analysis
+
+  # 5) Initialize Knowledge Set
   init-kset:
     input:
       documents: task/documents
-      masterTag: get-master-tag
-      amendmentTag: get-amendment-tag
-      categoryTags: get-category-tags
+      documentTags: get-document-tags
+      standardTags: get-standard-tags
+      amendmentTags: get-amendment-tags
+      securityTags: get-security-tags
+      paymentTags: get-payment-tags
+      termTags: get-term-tags
     tool: knowledge-set
-    knowledgeSetName: "Amendment Analysis"
+    knowledgeSetName: "Amendment Comparison Analysis"
     operations:
       - op: set-nodes
         nodes: documents
       - op: add-dimension
-        key: document-type
-        name: "Document Type"
-        nodes: masterTag
-        priority: 0
-      - op: add-dimension
-        key: amendment-type
-        name: "Amendment Type"
-        nodes: amendmentTag
+        key: security
+        name: "Security Requirements"
+        nodes: securityTags
         priority: 1
+        skipIfEmpty: true
       - op: add-dimension
-        key: categories
-        name: "Analysis Categories"
-        nodes: categoryTags
+        key: payment
+        name: "Payment Terms"
+        nodes: paymentTags
         priority: 2
+        skipIfEmpty: true
+      - op: add-dimension
+        key: term
+        name: "Term Requirements"
+        nodes: termTags
+        priority: 3
+        skipIfEmpty: true
 
-  # Compare master against amendments
-  analyze-amendments:
-    input:
-      documents: task/documents
-      masterTag: get-master-tag
-      amendmentTag: get-amendment-tag
-      categoryTags: get-category-tags
-      knowledge: init-kset
-      basePrompt: basePrompt
-      prompt: comparisonPrompt
+  # 6) Tag documents based on type
+  tag-documents:
+    tool: find-tags
+    category: ["Master", "Amendment"]
+    createIfNotFound: true
+
+  # 7) Analyze content for each category
+  analyze-security:
     repeat:
-      function: analyze-amendment
-      for: documents
-      filter:
-        tags: [get-amendment-tag]
-      as: current_amendment
-      input:
-        masterTag: masterTag
-        amendmentTag: amendmentTag
-        categoryTags: categoryTags
-        knowledge: knowledge
-        basePrompt: basePrompt
-        prompt: prompt
+      function: analyze-category-for-document
+      for: [tag]
+      skipIfEmpty: tag
+    input:
+      tag: get-security-tags
+      documents: task/documents
+      basePrompt: basePrompt
+      prompt: amendmentAnalysisPrompt
+      title: analysisTitle
+      knowledge: init-kset
 
-  # Add results to workspace
+  analyze-payment:
+    repeat:
+      function: analyze-category-for-document
+      for: [tag]
+      skipIfEmpty: tag
+    input:
+      tag: get-payment-tags
+      documents: task/documents
+      basePrompt: basePrompt
+      prompt: amendmentAnalysisPrompt
+      title: analysisTitle
+      knowledge: init-kset
+
+  analyze-term:
+    repeat:
+      function: analyze-category-for-document
+      for: [tag]
+      skipIfEmpty: tag
+    input:
+      tag: get-term-tags
+      documents: task/documents
+      basePrompt: basePrompt
+      prompt: amendmentAnalysisPrompt
+      title: analysisTitle
+      knowledge: init-kset
+
+  # 8) Add Results to Workspace
   add-to-workspace:
     input:
       workspace: task/workspace
-      knowledge: analyze-amendments
+      securityAnalysis: analyze-security
+      paymentAnalysis: analyze-payment
+      termAnalysis: analyze-term
+      knowledgeForDocuments: init-kset
     tool: workspace
     operations:
       - op: add-items
-        items: knowledge
+        items: knowledgeForDocuments
+      - op: add-items
+        items: securityAnalysis
+      - op: add-items
+        items: paymentAnalysis
+      - op: add-items
+        items: termAnalysis
 
 functions:
-  analyze-amendment:
+  analyze-category-for-document:
     input:
+      tag:
+        type: tag
       documents:
         type: document
-      current_amendment:
-        type: document
-      masterTag:
-        type: tag
-      amendmentTag:
-        type: tag
-      categoryTags:
-        type: tag
-      knowledge:
-        type: knowledge-set
       basePrompt:
         type: text
       prompt:
         type: text
+      title:
+        type: text
+      knowledge:
+        type: knowledge-set
     actions:
-      log-amendment-input:
-        tool: echo
-        message: "Current amendment input received: {{function/current_amendment}}"
-
-      get-master-text:
+      get-snippets:
         input:
           documents: function/documents
-          masterTag: function/masterTag
+          tag: function/tag
         tool: document-text
         textFilter:
           operator: "and"
-          tags: [masterTag]
+          tags: [tag]
 
-      get-amendment-text:
+      run-prompt:
         input:
-          document: function/current_amendment
-        tool: document-text
-
-      analyze-categories:
-        input:
-          masterText: get-master-text
-          amendmentText: get-amendment-text
-          categoryTags: function/categoryTags
-          knowledge: function/knowledge
-          basePrompt: function/basePrompt
-          prompt: function/prompt
-        repeat:
-          function: analyze-single-category
-          for: function/categoryTags
-          as: category
-          input:
-            masterText: masterText
-            amendmentText: amendmentText
-            category: category
-            knowledge: knowledge
-            basePrompt: basePrompt
-            prompt: prompt
-
-  analyze-single-category:
-    input:
-      masterText:
-        type: text
-      amendmentText:
-        type: text
-      category:
-        type: tag
-      knowledge:
-        type: knowledge-set
-      basePrompt:
-        type: text
-      prompt:
-        type: text
-    actions:
-      analyze-changes:
-        input:
-          masterText: function/masterText
-          amendmentText: function/amendmentText
-          category: function/category
+          snippets: get-snippets
           basePrompt: function/basePrompt
           prompt: function/prompt
         tool: llm
-        skipIfEmpty: [masterText, amendmentText]
+        skipIfEmpty: snippets
         prompt: |
-          {{prompt}}
+          {{basePrompt}}
+          
+          Analyze the following content:
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
 
       create-insight:
         input:
-          analysis: analyze-changes
-          masterText: function/masterText
-          amendmentText: function/amendmentText
-          category: function/category
-        skipIfEmpty: analysis
+          summary: run-prompt
+          snippets: get-snippets
+          tag: function/tag
+          title: function/title
+        skipIfEmpty: summary
         tool: insight
         text: |
-          {{analysis.text}}
-        name: "Changes to {{category.name}}"
-        tags: [category]
+          {{summary.text}}
+        name: "{{title.text}} for {{tag.name}}"
+        tags: [tag]
         attributes:
-          category: amendment-comparison
-          analysisType: category.name
+          category: amendment-analysis-insight
         relations:
-          derived-from: [masterText, amendmentText]
+          derived-from: [snippets]
 
       add-insight:
         input:
           knowledge: function/knowledge
           insight: create-insight
+          snippets: get-snippets
         tool: knowledge-set
         operations:
           - op: set-nodes
             nodes: insight
+          - op: set-nodes
+            nodes: snippets
