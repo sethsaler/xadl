@@ -5,17 +5,17 @@ input:
     type: workspace
   standard-document-tag:
     type: text
-    value: "Master"
+    value: "MSA"
 
 actions:
   # 1) Tag Collections for Different Categories
   get-document-tags:
     tool: find-tags
-    category: ["Master", "Amendment"]
+    category: ["Amendment 2", "Amendment 3", "Amendment 4", "Amendment 5"]
 
   get-standard-tags:
     tool: find-tags
-    category: "Master"
+    category: "MSA"
 
   get-amendment-tags:
     tool: find-tags
@@ -73,18 +73,62 @@ actions:
     tool: echo
     message: Amendment Comparison Analysis
 
-  # 5) Initialize Knowledge Set
-  init-kset:
+  # 5) Tag documents based on type
+  tag-documents:
+    tool: find-tags
+    category: ["Master", "Amendment"]
+    createIfNotFound: true
+
+  # 7) Create insights and knowledge set
+  analyze-security:
+    tool: insight
+    input:
+      documents: task/documents
+      tag: get-security-tags
+    text: |
+      {{basePrompt}}
+      Security Analysis for MSA vs Amendments
+    name: "Security Requirements Analysis"
+    attributes:
+      category: amendment-analysis
+      dimension: security
+
+  analyze-payment:
+    tool: insight
+    input:
+      documents: task/documents
+      tag: get-payment-tags
+    text: |
+      {{basePrompt}}
+      Payment Terms Analysis for MSA vs Amendments
+    name: "Payment Terms Analysis"
+    attributes:
+      category: amendment-analysis
+      dimension: payment
+
+  analyze-term:
+    tool: insight
+    input:
+      documents: task/documents
+      tag: get-term-tags
+    text: |
+      {{basePrompt}}
+      Term Requirements Analysis for MSA vs Amendments
+    name: "Term Requirements Analysis"
+    attributes:
+      category: amendment-analysis
+      dimension: term
+
+  create-kset:
     input:
       documents: task/documents
       documentTags: get-document-tags
       standardTags: get-standard-tags
-      amendmentTags: get-amendment-tags
       securityTags: get-security-tags
       paymentTags: get-payment-tags
       termTags: get-term-tags
     tool: knowledge-set
-    knowledgeSetName: "Amendment Comparison Analysis"
+    knowledgeSetName: "MSA Amendment Analysis"
     operations:
       - op: set-nodes
         nodes: documents
@@ -107,70 +151,24 @@ actions:
         priority: 3
         skipIfEmpty: true
 
-  # 6) Tag documents based on type
-  tag-documents:
-    tool: find-tags
-    category: ["Master", "Amendment"]
-    createIfNotFound: true
-
-  # 7) Analyze content for each category
-  analyze-security:
-    repeat:
-      function: analyze-category-for-document
-      for: [tag]
-      skipIfEmpty: tag
-    input:
-      tag: get-security-tags
-      documents: task/documents
-      basePrompt: basePrompt
-      prompt: amendmentAnalysisPrompt
-      title: analysisTitle
-      knowledge: init-kset
-
-  analyze-payment:
-    repeat:
-      function: analyze-category-for-document
-      for: [tag]
-      skipIfEmpty: tag
-    input:
-      tag: get-payment-tags
-      documents: task/documents
-      basePrompt: basePrompt
-      prompt: amendmentAnalysisPrompt
-      title: analysisTitle
-      knowledge: init-kset
-
-  analyze-term:
-    repeat:
-      function: analyze-category-for-document
-      for: [tag]
-      skipIfEmpty: tag
-    input:
-      tag: get-term-tags
-      documents: task/documents
-      basePrompt: basePrompt
-      prompt: amendmentAnalysisPrompt
-      title: analysisTitle
-      knowledge: init-kset
-
   # 8) Add Results to Workspace
   add-to-workspace:
     input:
       workspace: task/workspace
-      securityAnalysis: analyze-security
-      paymentAnalysis: analyze-payment
-      termAnalysis: analyze-term
-      knowledgeForDocuments: init-kset
+      knowledgeSet: create-kset
+      securityInsight: analyze-security
+      paymentInsight: analyze-payment
+      termInsight: analyze-term
     tool: workspace
     operations:
       - op: add-items
-        items: knowledgeForDocuments
+        items: knowledgeSet
       - op: add-items
-        items: securityAnalysis
+        items: securityInsight
       - op: add-items
-        items: paymentAnalysis
+        items: paymentInsight
       - op: add-items
-        items: termAnalysis
+        items: termInsight
 
 functions:
   analyze-category-for-document:
