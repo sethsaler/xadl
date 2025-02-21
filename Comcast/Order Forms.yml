@@ -1,0 +1,211 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Get tags for Order Form and Year 
+  get-orderform-tag:
+    tool: find-tags
+    name: "Order Form"
+
+  get-year-tags:
+    tool: find-tags
+    category: "Year"
+
+  # 2) Get Subscription Details tags
+  get-subscription-tags:
+    tool: find-tags
+    category: "Subscription Details"
+
+  # 3) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a contract analysis expert focused on summarizing order form terms and subscription details. Your objectives include:
+
+      1. Identifying and extracting key subscription terms from order forms
+      2. Comparing terms across different years
+      3. Highlighting significant changes or variations in subscription details
+      4. Creating clear summaries of subscription terms and conditions
+
+      When analyzing order forms:
+      - Focus on explicit terms and conditions
+      - Note any special provisions or exceptions
+      - Identify key dates, prices, and service levels
+      - Highlight any unique or non-standard terms
+
+  # 4) Analysis prompt for subscription details
+  subscriptionAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is the relevant text from the order form. Please:
+      - Analyze all subscription-related terms
+      - Extract key dates, prices, and service levels
+      - Note any special conditions or requirements
+      - Summarize the findings clearly and concisely
+
+      Relevant text from the order form:
+
+  # 5) Section Title
+  analysisTitle:
+    tool: echo
+    message: Order Form Subscription Analysis
+
+  # 6) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      orderFormTag: get-orderform-tag
+      yearTags: get-year-tags
+      subscriptionTags: get-subscription-tags
+    tool: knowledge-set
+    knowledgeSetName: "Order Form Subscription Analysis"
+    operations:
+      - op: set-nodes
+        nodes: documents
+      - op: add-dimension
+        key: orderform
+        name: "Order Form"
+        nodes: orderFormTag
+        priority: 1
+      - op: add-dimension
+        key: year
+        name: "Year"
+        nodes: yearTags
+        priority: 2
+      - op: add-dimension
+        key: subscription
+        name: "Subscription Details"
+        nodes: subscriptionTags
+        priority: 3
+
+  # 7) Analyze each subscription detail for each order form + year combination
+  analyze-subscription-details:
+    repeat:
+      function: analyze-for-tag
+      for: [yearTag, subscriptionTag]
+    input:
+      orderFormTag: get-orderform-tag
+      yearTag: get-year-tags
+      subscriptionTag: get-subscription-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: subscriptionAnalysisPrompt
+      title: analysisTitle
+
+  # 8) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      subscriptionAnalysis: analyze-subscription-details
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
+functions:
+  analyze-for-tag:
+    input:
+      orderFormTag:
+        type: tag
+      yearTag:
+        type: tag
+      subscriptionTag:
+        type: tag
+      documents:
+        type: document
+      knowledge:
+        type: knowledge-set
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          documents: function/documents
+          orderFormTag: function/orderFormTag
+          yearTag: function/yearTag
+          subscriptionTag: function/subscriptionTag
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [orderFormTag, yearTag, subscriptionTag]
+
+      get-instruction-prompt-for-subscription:
+        input:
+          orderFormTag: function/orderFormTag
+          yearTag: function/yearTag
+          subscriptionTag: function/subscriptionTag
+        tool: echo
+        message: |
+          ORDER FORM SUBSCRIPTION ANALYSIS:
+
+          Analyze the subscription details for {{subscriptionTag.name}} in Order Form for {{yearTag.name}}. 
+          Provide a clear summary in this format:
+
+          **Summary:**
+          [Concise summary of subscription terms]
+
+          **Key Terms:**
+          - List main subscription parameters
+          - Note pricing and duration
+          - Include service levels and limits
+          - Highlight any special conditions
+
+      analyze-content:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-subscription
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-subscription-insight:
+        input:
+          summary: analyze-content
+          snippets: get-snippets
+          orderFormTag: function/orderFormTag
+          yearTag: function/yearTag
+          subscriptionTag: function/subscriptionTag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}}: {{subscriptionTag.name}} for {{yearTag.name}}"
+        tags: [orderFormTag, yearTag, subscriptionTag]
+        attributes:
+          category: subscription-analysis
+          analysisType: order-form
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-subscription-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets

@@ -146,22 +146,22 @@ functions:
         message: |
           TERM ANALYSIS FOR DOCUMENT:
 
-          Analyze how {{categoryTag.name}} is handled in {{documentTag.name}}. Provide analysis in this format:
+          Analyze {{categoryTag.name}} in {{documentTag.name}}. Provide ONLY the following:
 
-          **Term Summary:**
-          [Concise summary of the term's requirements in this document]
+          IF MSA:
+          **Original Terms:**
+          [State the original terms exactly as written, with no interpretation]
 
-          **Key Components:**
-          - Core obligations and requirements
-          - Conditions and limitations
-          - Specific timeframes or deadlines
-          - Associated processes or procedures
+          IF AMENDMENT:
+          **Modified/New Terms:**
+          [State ONLY the specific modifications or additions made by this amendment]
 
-          **Changes from MSA (if amendment):**
-          - New requirements added
-          - Modified terms
-          - Removed provisions
-          - Scope changes
+          **Effect:**
+          [State if this amendment:
+          - Completely replaces the original term
+          - Modifies specific parts
+          - Adds new provisions
+          - Removes provisions]
 
       analyze-content:
         input:
@@ -238,31 +238,21 @@ functions:
         skipIfEmpty: insights
         tool: llm
         prompt: |
-          Compare how {{categoryTag.name}} has evolved from the MSA through amendments.
+          Create a final analysis of {{categoryTag.name}} across all documents.
           
-          Structure the comparison as follows:
+          Structure your response EXACTLY as follows:
 
-          TERM EVOLUTION: {{categoryTag.name}}
+          **CURRENT EFFECTIVE TERMS:**
+          [State the complete, current terms as they stand after all amendments. This should be a clear, definitive statement of the current contractual requirements that could be used as a reference]
 
-          MSA Baseline:
-          [Extract and summarize the original MSA terms]
+          **CHANGE HISTORY:**
+          [Chronological list of ONLY the material changes:
+          1. What specifically changed
+          2. Which amendment made the change
+          3. Whether it was a complete replacement, modification, or addition]
 
-          Amendment Changes:
-          {% for insight in insights %}
-          {% if insight.documentTag.name != "MSA" %}
-          {{insight.documentTag.name}}:
-          - What specific changes were made?
-          - How do these affect the MSA terms?
-          - Are terms superseded or complemented?
-          - What new requirements are added?
-          {% endif %}
-          {% endfor %}
-
-          Current State:
-          - What is the final, effective version of these terms?
-          - Which document contains the controlling language?
-          - Are there any conflicts or ambiguities?
-          - What is the practical impact of the changes?
+          **KEY MODIFICATIONS:**
+          [List the most significant differences between original and current terms]
 
           Document insights to compare:
           {% for insight in insights %}
