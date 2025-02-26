@@ -1,0 +1,198 @@
+input:
+  topicCategory:
+    type: tag
+    label: Topic Category  
+  earningsCallDocuments:
+    type: document
+    label: Earnings call transcripts
+  workspace:
+    type: workspace
+
+actions:
+  # Print document names to check what we're receiving
+  document-check:
+    tool: echo
+    input:
+      documents: task/earningsCallDocuments
+    message: |
+      {% if documents %}
+      Received {{documents.size}} document(s):
+      {% for doc in documents %}
+      - Document {{loop.index}}: {% if doc.name %}{{doc.name}}{% else %}Unnamed document{% endif %}
+      {% endfor %}
+      {% else %}
+      No documents were provided in the input.
+      {% endif %}
+
+  # Find relevant topic tags first
+  find-topic-tags:
+    tool: find-tags
+    name: "{{topicCategory.name}}"
+
+  # Step 1: Directly process the provided documents
+  analyze-documents:
+    tool: llm
+    input:
+      documents: task/earningsCallDocuments
+      topicCategory: task/topicCategory
+      docCheck: document-check
+    prompt: |
+      You are an elite pharmaceutical industry analyst with expertise in earnings call analysis, specifically focusing on {{topicCategory.name}}. 
+      
+      Document Check Info: {{docCheck.text}}
+      
+      # TASK
+      Perform a deep, insightful analysis of Pfizer's earnings call transcripts focusing EXCLUSIVELY on {{topicCategory.name}}. Your goal is to produce an executive-level strategic analysis that highlights meaningful trends, financial impacts, and strategic shifts across quarters.
+      
+      {% if documents and documents.size > 0 %}
+      # ANALYSIS APPROACH
+      
+      ## STEP 1: EXTRACT RAW DATA FROM EACH TRANSCRIPT
+      For each earnings call transcript:
+      - Extract the EXACT quarter/year from document metadata (Q1 2024, Q2 2024, etc.)
+      - Identify ALL mentions of {{topicCategory.name}} including synonyms and related product names
+      - Capture VERBATIM quotes from executives discussing {{topicCategory.name}}
+      - Extract PRECISE financial figures: revenue, growth rates, market share, sales projections
+      - Note ANY strategic decisions, pipeline updates, regulatory events, or market conditions related to {{topicCategory.name}}
+      
+      ## STEP 2: SYNTHESIZE QUARTERLY INSIGHTS
+      For each quarter, create a comprehensive analysis covering:
+      
+      ### FINANCIAL PERFORMANCE
+      - Revenue attributed to {{topicCategory.name}} products with exact figures and YoY/QoQ growth rates
+      - Segment contribution and geographical breakdowns if mentioned
+      - Impact on overall company financial health
+      - Profitability metrics specific to {{topicCategory.name}} offerings
+      
+      ### STRATEGIC POSITIONING
+      - How Pfizer positions its {{topicCategory.name}} products against competitors
+      - Changes in strategic direction or emphasis
+      - Resource allocation and investment decisions
+      - Partnership or M&A activity related to {{topicCategory.name}}
+      
+      ### PIPELINE & REGULATORY DEVELOPMENTS
+      - Clinical trial updates for {{topicCategory.name}}-related products
+      - Regulatory submissions, approvals or rejections
+      - Timeline adjustments for product launches
+      - Manufacturing capacity changes
+      
+      ### MARKET DYNAMICS
+      - Changes in market demand for {{topicCategory.name}}
+      - Competitive landscape shifts
+      - Pricing pressure or strategy changes
+      - Regional market variations
+      
+      ### FORWARD GUIDANCE
+      - Official guidance related to {{topicCategory.name}}
+      - Changes from previous quarters' projections
+      - Executive confidence level (analyze language and tone)
+      - Risk factors or contingencies mentioned
+      
+      ## STEP 3: DEVELOP LONGITUDINAL INSIGHTS
+      Analyze how Pfizer's approach to {{topicCategory.name}} evolves over time:
+      
+      - TREND IDENTIFICATION: Identify clear patterns in financial performance, strategic focus, or market positioning
+      - PIVOT POINTS: Highlight moments where strategy or messaging notably changed
+      - CONSISTENCY ANALYSIS: Evaluate whether Pfizer delivered on previous quarters' promises
+      - EXTERNAL FACTOR CORRELATION: Connect changes in approach to market events, competitor actions, or regulatory developments
+      - PREDICTIVE INSIGHTS: Based on the trend analysis, suggest what might happen next for Pfizer's {{topicCategory.name}} business
+      
+      # OUTPUT FORMAT
+      Your analysis must be structured as follows:
+      
+      ## PART 1: EXECUTIVE SUMMARY
+      A concise 3-5 bullet point summary of the most important insights about Pfizer's {{topicCategory.name}} business evolution.
+      
+      ## PART 2: QUARTERLY BREAKDOWN
+      For each quarter, provide a structured breakdown with these exact subheadings:
+      - Financial Performance
+      - Strategic Positioning
+      - Pipeline & Regulatory Updates
+      - Market Dynamics
+      - Forward Guidance
+      
+      Under each subheading, include:
+      - Key data points with specific numbers
+      - Direct quotes from executives (properly attributed)
+      - Your analytical insights
+      
+      ## PART 3: LONGITUDINAL ANALYSIS
+      Analyze trends across all quarters, including:
+      - Financial trajectory
+      - Strategic evolution
+      - Execution against stated objectives
+      - Market position changes
+      
+      ## PART 4: STRATEGIC IMPLICATIONS
+      Conclude with 3-5 high-value insights about what this analysis reveals about Pfizer's {{topicCategory.name}} business.
+      
+      # CRITICAL REQUIREMENTS
+      1. Be PRECISE with numbers, dates, and quotes
+      2. Avoid generic statements - every insight must be backed by specific evidence
+      3. Maintain a sophisticated analytical tone appropriate for senior executives
+      4. Format your response cleanly with clear headings and subheadings
+      5. Focus EXCLUSIVELY on {{topicCategory.name}}-related content
+      6. If exact figures aren't provided, explicitly note this rather than making vague statements
+      
+      {% else %}
+      IMPORTANT: No documents were provided or accessible. Please verify that earnings call transcripts were correctly selected in the input.
+      {% endif %}
+
+  # Step 3: Generate the final report
+  generate-report:
+    tool: echo
+    input:
+      documentAnalysis: analyze-documents
+      topicCategory: task/topicCategory
+      availableTags: find-topic-tags
+      docCheck: document-check
+    message: |
+      # Pfizer {{topicCategory.name | capitalize}} Business Analysis
+      
+      **Selected Topic:** {{topicCategory.name | capitalize}}
+      
+      **Document Sources:**
+      {{docCheck.text}}
+      
+      **Analyst Report:**
+      {{documentAnalysis.text}}
+      
+      {% if availableTags and availableTags.size > 0 %}
+      ---
+      **Related Categories:** {% for tag in availableTags %}{{tag.name | capitalize}}{% if not forloop.last %}, {% endif %}{% endfor %}
+      {% endif %}
+
+functions:
+  # Function matching Gold Standard pattern
+  analyze-document:
+    input:
+      document:
+        type: document
+      tag:
+        type: tag
+    actions:
+      get-snippets:
+        input:
+          document: function/document
+          tag: function/tag
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [tag]
+      analyze-snippets:
+        input:
+          snippets: get-snippets
+          tag: function/tag
+        skipIfEmpty: [snippets]
+        tool: llm
+        prompt: |
+          Analyze these passages about {{tag.name}}:
+          
+          {% for s in snippets %}
+          PASSAGE {{loop.index}}:
+          ```
+          {{s.text}}
+          ```
+          {% endfor %}
+          
+          Summarize the key points and sentiment.
