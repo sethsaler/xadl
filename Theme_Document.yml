@@ -1,0 +1,144 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+  themeInput:
+    type: text
+    label: "Enter theme category to analyze"
+    defaultValue: "Theme"
+   
+actions:
+  # Find theme and time period tags
+  theme-tags:
+    tool: find-tags
+    name: "{{themeInput}}"
+
+  time-period-tags:
+    tool: find-tags
+    category: ["Time Period"]
+    
+  # Process documents for theme analysis across time periods
+  process-theme-time-analysis:
+    repeat:
+      function: analyze-theme-by-time
+      for: [themeTag]
+    input:
+      themeTag: theme-tags
+      timeTags: time-period-tags
+      documents: task/documents
+
+  # Generate the report with theme comparisons
+  render-report:
+    input:
+      documents: task/documents
+      themeAnalyses: process-theme-time-analysis
+    tool: echo
+    message: |
+      **Theme Analysis Across Time Periods**
+
+      {% for analysis in themeAnalyses -%} 
+        {{analysis.text}}
+      {% endfor -%}
+
+functions:
+  # Analyzes a specific theme across time periods
+  analyze-theme-by-time:
+    input:
+      themeTag:
+        type: tag
+      timeTags:
+        type: tag
+      documents:
+        type: document
+    actions:
+      # Get the document snippets for this theme across all time periods
+      get-time-snippets:
+        repeat:
+          function: get-snippets-for-time-period
+          for: [timeTag]
+        input:
+          themeTag: function/themeTag
+          timeTag: function/timeTags
+          documents: function/documents
+          
+      # Run a prompt to generate the comparative analysis
+      run-comparative-analysis:
+        input:
+          themeTag: function/themeTag
+          timeSnippets: get-time-snippets
+        skipIfEmpty: [timeSnippets]
+        tool: llm
+        prompt: |
+          You are analyzing how the theme {{themeTag.name}} evolves across different time periods.
+          
+          Below are document snippets related to {{themeTag.name}} organized by time period:
+          
+          {% for timeData in timeSnippets %}
+          ## Time Period: {{timeData.timeTag.name}}
+          
+          {% for snippet in timeData.snippets %}
+          FROM DOCUMENT: {{snippet.document.name}}
+          ```
+          {{snippet.text}}
+          ```
+          {% endfor %}
+          
+          {% endfor %}
+          
+          Compare the content about {{themeTag.name}} across these time periods, analyzing:
+          
+          1. Key points about {{themeTag.name}} in each time period
+          2. How the treatment/discussion of {{themeTag.name}} evolves over time
+          3. Major changes or developments between consecutive time periods
+          4. Overall patterns and trends in how {{themeTag.name}} is addressed
+          
+          Format your analysis as a sequential comparison, starting with the earliest time period and showing how the content evolves through to the latest time period.
+          
+      # Render the final analysis for this theme
+      render-theme-analysis:
+        input:
+          themeTag: function/themeTag
+          analysis: run-comparative-analysis
+        skipIfEmpty: [analysis]
+        tool: echo
+        message: |
+          ## Theme: {{themeTag.name}}
+          
+          {{analysis.text}}
+          
+          ---
+
+  # Gets snippets for a specific theme in a specific time period
+  get-snippets-for-time-period:
+    input:
+      themeTag:
+        type: tag
+      timeTag:
+        type: tag
+      documents:
+        type: document
+    actions:
+      # Get the document snippets that match both tags
+      get-snippets:
+        input:
+          themeTag: function/themeTag
+          timeTag: function/timeTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [themeTag, timeTag]
+      
+      # Package the results with the time period tag for sorting
+      format-time-snippets:
+        input:
+          timeTag: function/timeTag
+          snippets: get-snippets
+        skipIfEmpty: [snippets]
+        tool: echo
+        message: |
+          {
+            "timeTag": {{timeTag}},
+            "snippets": {{snippets}}
+          }

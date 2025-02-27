@@ -1,7 +1,7 @@
 input:
   topicCategory:
     type: tag
-    label: Topic Category  
+    label: Topic Category
   earningsCallDocuments:
     type: document
     label: Earnings call transcripts
@@ -9,168 +9,93 @@ input:
     type: workspace
 
 actions:
-  # Print document names to check what we're receiving
-  document-check:
-    tool: echo
-    input:
-      documents: task/earningsCallDocuments
-    message: |
-      {% if documents %}
-      Received {{documents.size}} document(s):
-      {% for doc in documents %}
-      - Document {{loop.index}}: {% if doc.name %}{{doc.name}}{% else %}Unnamed document{% endif %}
-      {% endfor %}
-      {% else %}
-      No documents were provided in the input.
-      {% endif %}
-
   # Find relevant topic tags first
   find-topic-tags:
     tool: find-tags
     name: "{{topicCategory.name}}"
 
-  # Add direct document checks for debugging
-  document-content-check:
-    tool: echo
-    input:
-      documents: task/earningsCallDocuments
-    message: |
-      {% if documents and documents.size > 0 %}
-      ## Document Content Check
-      
-      {% for doc in documents %}
-      ### {{doc.name}}
-      
-      First 300 characters:
-      ```
-      {{ doc.text | slice: 0, 300 }}...
-      ```
-      
-      {% if doc.text contains "vaccine" or doc.text contains "Vaccine" %}
-      ✅ Document contains mentions of vaccines
-      {% else %}
-      ❌ Document does NOT appear to contain mentions of vaccines
-      {% endif %}
-      
-      {% endfor %}
-      {% endif %}
-
-  # Modified document analysis with specific value extraction and checks
-  analyze-documents:
+  # Process documents to extract relevant information
+  process-documents:
     tool: llm
     input:
       documents: task/earningsCallDocuments
       topicCategory: task/topicCategory
-      docCheck: document-check
-      contentCheck: document-content-check
     prompt: |
-      You are an elite pharmaceutical industry analyst with expertise in earnings call analysis, specifically focusing on {{topicCategory.name}}. 
+      # DOCUMENT EXTRACTION TASK
       
-      Document Check Info: {{docCheck.text}}
+      Analyze these documents for content related to {{topicCategory.name}}.
       
-      Document Content Check: {{contentCheck.text}}
+      {% if documents.size > 0 %}
+      ## DOCUMENTS
       
-      # TASK
-      Perform a detailed extraction and analysis of Pfizer's earnings call transcripts focusing EXCLUSIVELY on {{topicCategory.name}}. 
+      {% for doc in documents %}
+      ### DOCUMENT: {{doc.name}}
       
-      {% if documents and documents.size > 0 %}
-      # DATA EXTRACTION PHASE
+      ```
+      {{doc.text}}
+      ```
       
-      For each document, you MUST:
+      {% endfor %}
       
-      1. Scan for ALL mentions of {{topicCategory.name}}, including related terms like: vaccines, vaccination, immunization, shots, boosters, COVID-19 vaccine, flu vaccine, etc.
+      ## INSTRUCTIONS
       
-      2. Extract ALL numeric values associated with {{topicCategory.name}}, such as:
-         - Revenue figures (e.g., "$10.2 billion in vaccine revenue")
-         - Growth percentages (e.g., "30% growth in vaccine sales")
-         - Market share (e.g., "captured 65% of the vaccine market")
-         - Doses (e.g., "delivered 500 million vaccine doses")
-         - Forecasts (e.g., "expect $6 billion in vaccine revenue next quarter")
+      For each document:
+      1. Identify the time period (quarter/year)
+      2. Extract all content related to {{topicCategory.name}} or similar concepts
+      3. Note any metrics or data points
+      4. Summarize how {{topicCategory.name}} is discussed
       
-      3. RECORD THE EXACT TEXT for each mention following this format:
-         ```
-         QUARTER: [Quarter/Year]
-         EXACT QUOTE: "[paste exact quote here]"
-         NUMERIC VALUES: [list all numeric values from the quote]
-         CONTEXT: [brief description of what this quote is about]
-         ```
-         
-      4. If NO specific numeric values exist for {{topicCategory.name}}, explicitly state this for each document:
-         ```
-         QUARTER: [Quarter/Year]
-         FINDING: No specific numeric values were mentioned for {{topicCategory.name}}
-         AVAILABLE QUOTES: [list any non-numeric mentions of {{topicCategory.name}}]
-         ```
-      
-      # ANALYSIS PHASE
-      
-      After extracting all data, proceed with your analysis:
-      
-      ## PART 1: EXECUTIVE SUMMARY
-      A concise 3-5 bullet point summary of the most important insights about Pfizer's {{topicCategory.name}} business evolution, WITH SPECIFIC NUMERIC VALUES when available.
-      
-      ## PART 2: QUARTERLY BREAKDOWN
-      For each quarter, provide a structured breakdown with these exact subheadings:
-      - Financial Performance (MUST include exact numeric values if present)
-      - Strategic Positioning
-      - Pipeline & Regulatory Updates
-      - Market Dynamics
-      - Forward Guidance
-      
-      ## PART 3: LONGITUDINAL ANALYSIS
-      Analyze trends across all quarters, focusing on quantitative changes where possible.
-      
-      ## PART 4: DATA QUALITY ASSESSMENT
-      Assess the quality and completeness of the data available in these documents:
-      - Are specific numeric values provided for {{topicCategory.name}}?
-      - Is the information consistent across quarters?
-      - Are there any notable gaps in the financial reporting?
-      - How detailed is the information about {{topicCategory.name}}?
-      
-      ## PART 5: STRATEGIC IMPLICATIONS
-      Conclude with 3-5 high-value insights about what this analysis reveals about Pfizer's {{topicCategory.name}} business.
-      
-      # CRITICAL REQUIREMENTS
-      1. NEVER make up or estimate numeric values - only use what is explicitly stated in the documents
-      2. Clearly distinguish between actual reported figures and any general statements
-      3. If specific numeric values for {{topicCategory.name}} are NOT present in the documents, clearly state this fact
-      4. Direct quotes must be VERBATIM from the text - do not paraphrase
-      5. If the documents appear to be synthetic or lack realistic data, note this in your analysis
-      
+      If a document doesn't mention {{topicCategory.name}}, clearly state this.
       {% else %}
-      IMPORTANT: No documents were provided or accessible. Please verify that earnings call transcripts were correctly selected in the input.
+      No documents were provided.
       {% endif %}
 
-  # Step 3: Generate the final report
+  # Analyze the processed documents
+  analyze-documents:
+    tool: llm
+    input:
+      processedData: process-documents
+      topicCategory: task/topicCategory
+    prompt: |
+      # TIME SERIES ANALYSIS
+      
+      You are analyzing earnings call transcripts to track {{topicCategory.name}} over time.
+      
+      ## DATA
+      {{processedData.text}}
+      
+      ## ANALYSIS INSTRUCTIONS
+      
+      Create a time series analysis showing how {{topicCategory.name}} is discussed across different periods.
+      
+      Include:
+      1. CHRONOLOGICAL OVERVIEW - Timeline of {{topicCategory.name}} discussions
+      2. KEY POINTS BY TIME PERIOD - Main points for each period
+      3. EVOLUTION ANALYSIS - How discussions change over time
+      4. DATA ASSESSMENT - Completeness and limitations of the data
+
+  # Generate the final report
   generate-report:
     tool: echo
     input:
       documentAnalysis: analyze-documents
       topicCategory: task/topicCategory
       availableTags: find-topic-tags
-      docCheck: document-check
-      contentCheck: document-content-check
     message: |
-      # Pfizer {{topicCategory.name | capitalize}} Business Analysis
+      # Time Series Analysis: {{topicCategory.name | capitalize}}
       
       **Selected Topic:** {{topicCategory.name | capitalize}}
       
-      **Document Sources:**
-      {{docCheck.text}}
-      
-      **Document Content Check:**
-      {{contentCheck.text}}
-      
-      **Analyst Report:**
+      **Analysis Results:**
       {{documentAnalysis.text}}
       
-      {% if availableTags and availableTags.size > 0 %}
+      {% if availableTags.size > 0 %}
       ---
       **Related Categories:** {% for tag in availableTags %}{{tag.name | capitalize}}{% if not forloop.last %}, {% endif %}{% endfor %}
       {% endif %}
 
 functions:
-  # Function matching Gold Standard pattern
+  # Function for analyzing individual documents
   analyze-document:
     input:
       document:
