@@ -8,147 +8,144 @@ actions:
   # 1) Tag Collections for Risk Management Categories
   get-risk-management-tags:
     tool: find-tags
-    name: ["General Liability", "Excess Liability", "Workers Compensation", "Auto Liability", "Loss of Use", "Policy Endorsements", "Cancellation", "Indemnity"]
+    name: ["General Liability", "Excess Liability", "Workers Compensation", "Auto Liability", "Loss of Use", "Policy Endorsements", "Cancellation", "Indemnity", "Risk Management"]
   # 2) Base configuration for shared prompt elements
   insuranceRequirements:
     tool: echo
     message: |
-      INSURANCE REQUIREMENTS ANALYSIS:
+      INSURANCE COMPLIANCE CHECKLIST:
 
       {% if tag.category == "General Liability" %}
-      GENERAL LIABILITY ANALYSIS REQUIREMENTS:
-      - Verify coverage limits meet minimum requirements
-      - Check additional insured provisions
-      - Confirm primary and non-contributory language
-      - Review aggregate limits
-      - Validate occurrence vs claims-made coverage
-      - Check exclusions and restrictions
-
-      **Compliance Checklist:**
-      - Coverage limits (typically $1M per occurrence, $2M aggregate)
-      - Additional insured status for all parties
-      - Primary and non-contributory wording
-      - Per project aggregate
-      - No unusual exclusions
+      ## GENERAL LIABILITY COMPLIANCE CHECKLIST:
+      
+      - [ ] APPROPRIATE: Contains references to "Commercial General Liability"
+      - [ ] INAPPROPRIATE: Contains references to "Comprehensive General Liability"
+      - [ ] INAPPROPRIATE: Contains references to "Public Liability" in U.S. contracts
+      - [ ] MISSING: Clear statement of coverage limits
+      - [ ] COMPLIANT: Coverage limits meet requirements (typically $1M per occurrence, $2M aggregate)
+      - [ ] COMPLIANT: Additional insured status properly specified
+      - [ ] COMPLIANT: Primary and non-contributory wording included
+      - [ ] COMPLIANT: Per project aggregate included
+      - [ ] COMPLIANT: No unusual exclusions present
       {% endif %}
 
       {% if tag.category == "Excess Liability" %}
-      EXCESS LIABILITY ANALYSIS REQUIREMENTS:
-      - Verify umbrella/excess coverage limits
-      - Check follow-form provisions
-      - Review underlying coverage requirements
-      - Validate coverage consistency
-      - Check drop-down provisions
-
-      **Compliance Checklist:**
-      - Coverage limits (typically $5M+)
-      - Follow-form coverage
-      - Proper underlying insurance
-      - No gaps in coverage
-      - Consistent terms with primary
+      ## EXCESS LIABILITY COMPLIANCE CHECKLIST:
+      
+      - [ ] REQUIRED: If liability coverage exceeds $1M per occurrence/$2M aggregate, appropriate reference to Excess/Umbrella policy
+      - [ ] APPROPRIATE: Contains language like "Production Company/lessee will provide Commercial General and Umbrella/Excess liability with combined limits of $X"
+      - [ ] APPROPRIATE: Contains language like "These limits may be met through a combination of primary and excess liability coverage"
+      - [ ] MISSING: Clear combined limits for total liability coverage
+      - [ ] COMPLIANT: Coverage limits meet requirements (typically $5M+)
+      - [ ] COMPLIANT: Follow-form coverage included
+      - [ ] COMPLIANT: Proper underlying insurance specified
+      - [ ] COMPLIANT: No gaps in coverage
+      - [ ] COMPLIANT: Terms consistent with primary coverage
       {% endif %}
 
       {% if tag.category == "Workers Compensation" %}
-      WORKERS COMPENSATION ANALYSIS REQUIREMENTS:
-      - Verify statutory coverage
-      - Check employer's liability limits
-      - Review waiver of subrogation
-      - Validate coverage territory
-      - Check stop-gap coverage if needed
-
-      **Compliance Checklist:**
-      - Statutory limits for all jurisdictions
-      - Employer's liability ($1M typical)
-      - Waiver of subrogation
-      - All states coverage
-      - USL&H if applicable
+      ## WORKERS COMPENSATION COMPLIANCE CHECKLIST:
+      
+      - [ ] APPROPRIATE: Maximum limit for Employer's Liability: $1,000,000
+      - [ ] APPROPRIATE: Workers' Compensation limit described as "Statutory"
+      - [ ] MISSING: Statement that both coverages are provided by the payroll service company
+      - [ ] MISSING: Statement that 3rd parties cannot be added as additional insured to WC or EL policies
+      - [ ] MISSING: Clarification that if a Waiver of Subrogation is required, it must be obtained by the payroll service company
+      - [ ] COMPLIANT: Statutory limits for all jurisdictions included
+      - [ ] COMPLIANT: Employer's liability limits meet requirements ($1M typical)
+      - [ ] COMPLIANT: Waiver of subrogation included if required
+      - [ ] COMPLIANT: All states coverage provided
+      - [ ] COMPLIANT: USL&H included if applicable
       {% endif %}
 
       {% if tag.category == "Auto Liability" %}
-      AUTO LIABILITY ANALYSIS REQUIREMENTS:
-      - Verify coverage for all vehicles
-      - Check liability limits
-      - Review hired/non-owned coverage
-      - Validate territory restrictions
-      - Check loading/unloading coverage
-
-      **Compliance Checklist:**
-      - Coverage limits ($1M typical)
-      - All owned autos
-      - Hired/non-owned coverage
-      - No territorial restrictions
-      - Loading/unloading included
+      ## AUTO LIABILITY COMPLIANCE CHECKLIST:
+      
+      - [ ] INAPPROPRIATE: Contains references to "owned" or "any auto" (these should be deleted)
+      - [ ] APPROPRIATE: Coverage for pollution specifically limited to "if caused by Accident"
+      - [ ] MISSING: Clarification that coverage is for hired/non-owned vehicles only
+      - [ ] FLAG: Contains language suggesting broader auto coverage than hired/non-owned vehicles
+      - [ ] COMPLIANT: Coverage limits meet requirements ($1M typical)
+      - [ ] COMPLIANT: Hired/non-owned coverage included
+      - [ ] COMPLIANT: No territorial restrictions
+      - [ ] COMPLIANT: Loading/unloading coverage included
       {% endif %}
 
       {% if tag.category == "Loss of Use" %}
-      LOSS OF USE ANALYSIS REQUIREMENTS:
-      - Review loss of use provisions
-      - Check valuation methods
-      - Verify coverage triggers
-      - Validate exclusions
-      - Review time limitations
-
-      **Compliance Checklist:**
-      - Clear valuation method
-      - Reasonable time limits
-      - No excessive exclusions
-      - Fair compensation structure
-      - Clear coverage triggers
+      ## LOSS OF USE COMPLIANCE CHECKLIST:
+      
+      - [ ] MISSING: Qualifier "actual and verifiable" before "loss of use"
+      - [ ] APPROPRIATE: Contains language limiting Loss of Use coverage to period when insured property is being repaired or until payment is made for replacement
+      - [ ] INAPPROPRIATE: Contains wording obligating Loss of Use payment until property is replaced
+      - [ ] MISSING: Clear time limitations on Loss of Use coverage
+      - [ ] COMPLIANT: Clear valuation method included
+      - [ ] COMPLIANT: Reasonable time limits specified
+      - [ ] COMPLIANT: No excessive exclusions
+      - [ ] COMPLIANT: Fair compensation structure
+      - [ ] COMPLIANT: Clear coverage triggers defined
       {% endif %}
 
       {% if tag.category == "Policy Endorsements" %}
-      POLICY ENDORSEMENT ANALYSIS REQUIREMENTS:
-      - Review all endorsements
-      - Check for restrictive conditions
-      - Verify required endorsements
-      - Validate modification impact
-      - Check endorsement consistency
-
-      **Compliance Checklist:**
-      - All required endorsements present
-      - No restrictive endorsements
-      - Proper additional insured forms
-      - Waiver endorsements if needed
-      - Primary/non-contributory endorsement
+      ## POLICY ENDORSEMENTS COMPLIANCE CHECKLIST:
+      
+      - [ ] APPROPRIATE: Contains references to "blanket endorsement" when endorsements are required
+      - [ ] INAPPROPRIATE: Contains requirements for specific endorsements showing vendor information
+      - [ ] MISSING: Clear explanation of what endorsements are required
+      - [ ] FLAG: Contains language requiring non-standard endorsements
+      - [ ] COMPLIANT: All required endorsements present
+      - [ ] COMPLIANT: No restrictive endorsements
+      - [ ] COMPLIANT: Proper additional insured forms included
+      - [ ] COMPLIANT: Waiver endorsements included if needed
+      - [ ] COMPLIANT: Primary/non-contributory endorsement included
       {% endif %}
 
       {% if tag.category == "Cancellation" %}
-      CANCELLATION PROVISION ANALYSIS REQUIREMENTS:
-      - Check notice requirements
-      - Review cancellation grounds
-      - Verify notice recipients
-      - Validate notice method
-      - Check reinstatement provisions
-
-      **Compliance Checklist:**
-      - 30-day notice minimum
-      - Notice to all parties
-      - Clear notification method
-      - Reasonable grounds only
-      - Written notice required
+      ## CANCELLATION COMPLIANCE CHECKLIST:
+      
+      - [ ] PREFERRED: Contains "Notice of cancellation shall be provided in accordance with policy provisions"
+      - [ ] INAPPROPRIATE: Contains references to "Material Change/Alteration"
+      - [ ] INAPPROPRIATE: Contains language stating "insurer shall provide notice" (should be "Lessee, Rentee, etc. shall provide notice")
+      - [ ] APPROPRIATE: For renewal certificates, contains language specifying "Evidence of renewal will be provided prior to the renewal date, or as soon as practicable thereafter"
+      - [ ] COMPLIANT: 30-day notice minimum included
+      - [ ] COMPLIANT: Notice to all parties required
+      - [ ] COMPLIANT: Clear notification method specified
+      - [ ] COMPLIANT: Only reasonable grounds for cancellation included
+      - [ ] COMPLIANT: Written notice required
       {% endif %}
 
       {% if tag.category == "Indemnity" %}
-      INDEMNIFICATION ANALYSIS REQUIREMENTS:
-      - Review scope of indemnity
-      - Check trigger events
-      - Verify parties covered
-      - Validate defense obligations
-      - Review limitations/exclusions
-
-      **Compliance Checklist:**
-      - Clear scope definition
-      - Reasonable trigger events
-      - Proper party identification
-      - Defense obligation clarity
-      - No unreasonable exclusions
+      ## INDEMNITY COMPLIANCE CHECKLIST:
+      
+      - [ ] MISSING: The qualifier "reasonable outside" before references to legal fees, counsel fees, attorney's fees, or professional fees
+      - [ ] MISSING: The phrase "in as good condition as received" regarding return of equipment/property
+      - [ ] MISSING: The phrase "reasonable wear and tear excepted" regarding condition upon return
+      - [ ] INAPPROPRIATE: Contains overly broad indemnification language that doesn't limit scope to negligence
+      - [ ] COMPLIANT: Clear scope definition included
+      - [ ] COMPLIANT: Reasonable trigger events specified
+      - [ ] COMPLIANT: Proper party identification
+      - [ ] COMPLIANT: Defense obligation clarity
+      - [ ] COMPLIANT: No unreasonable exclusions
       {% endif %}
 
-      Analyze the provided content according to these requirements. Focus on:
-      1. Identifying non-compliant language
-      2. Flagging missing required elements
-      3. Suggesting specific corrections
-      4. Noting any unusual provisions
+      {% if tag.category == "Risk Management" %}
+      ## OVERALL RISK MANAGEMENT COMPLIANCE CHECKLIST:
+      
+      - [ ] APPROPRIATE: Includes coverage for all standard insurance types (General Liability, Auto Liability, Workers Compensation, etc.)
+      - [ ] APPROPRIATE: Clearly specifies coverage limits
+      - [ ] APPROPRIATE: Contains clear language about notification requirements for claims
+      - [ ] APPROPRIATE: Contains balanced indemnity provisions
+      - [ ] APPROPRIATE: Includes clear procedures for handling incidents or losses
+      - [ ] COMPLIANT: All required coverages present
+      - [ ] COMPLIANT: Appropriate limits for each coverage
+      - [ ] COMPLIANT: Proper additional insured provisions
+      - [ ] COMPLIANT: Adequate notification requirements
+      - [ ] COMPLIANT: Clear claims procedures
+      {% endif %}
+
+      ## DEAL BREAKERS CHECKLIST:
+      - [ ] DEAL BREAKER: Contains requirements for production company to provide 3rd party with policy copies
+      - [ ] DEAL BREAKER: Contains requirements to add 3rd party as an "additional NAMED INSURED" (instead of "additional insured")
+      - [ ] DEAL BREAKER: Contains references to "Loss of Profits" coverage
 
   basePrompt:
     tool: echo
@@ -229,8 +226,8 @@ actions:
       knowledgeForDocuments: init-kset
     tool: workspace
     operations:
-      - op: set-nodes
-        nodes: knowledgeForDocuments
+      - op: add-items
+        items: knowledgeForDocuments
       - op: add-items
         items: insuranceAnalysis
 
@@ -297,7 +294,6 @@ functions:
           snippets: get-snippets
         tool: knowledge-set
         operations:
-          - op: set-nodes
+          - op: add-nodes
             nodes: "insight"
-          - op: set-nodes
-            nodes: "snippets"
+            skipIfEmpty: true
