@@ -153,20 +153,16 @@ actions:
       {{insuranceRequirements}}
       
       # Role and Context Setup
-      You are an insurance compliance expert analyzing contract documents. Your objectives include:
+      You are an insurance compliance expert analyzing contract documents. Your task is to complete a compliance checklist by:
 
-      1. Verifying correct insurance terminology and coverage requirements
-      2. Validating coverage limits and policy structures
-      3. Ensuring compliance with statutory requirements
-      4. Reviewing endorsements and exclusions
-      5. Analyzing indemnification provisions
+      1. Reviewing the document for insurance terminology and requirements
+      2. Marking each checklist item as either:
+         - [✓] (Compliant/Present/Appropriate)
+         - [✗] (Non-compliant/Missing/Inappropriate)
+         - [?] (Unclear or insufficient information)
+      3. Adding brief notes only where necessary to explain non-compliance
 
-      When analyzing the content:
-      - Focus on specific insurance requirements
-      - Identify terminology breaches
-      - Verify coverage limits
-      - Flag non-standard provisions
-      - Note required modifications
+      Focus exclusively on completing the checklist without additional analysis or commentary.
 
   # 3) Analysis prompt
   insuranceAnalysisPrompt:
@@ -175,11 +171,10 @@ actions:
       {{basePrompt}}
 
       Below is relevant text from the insurance document. Please:
-      - Analyze the specific provisions related to the tagged category
-      - Identify key requirements and coverage limits
-      - Note any compliance violations
-      - Highlight important terms or conditions
-      - Summarize the findings concisely
+      - Complete the compliance checklist by marking each item
+      - Use [✓] for compliant items, [✗] for non-compliant items, and [?] for unclear items
+      - Add only brief, factual notes for non-compliant items
+      - Do not provide any additional analysis or commentary beyond the checklist
 
       Relevant text from the document:
 
@@ -294,6 +289,6 @@ functions:
           snippets: get-snippets
         tool: knowledge-set
         operations:
-          - op: add-nodes
-            nodes: "insight"
+          - op: set-nodes
+            nodes: insight
             skipIfEmpty: true
