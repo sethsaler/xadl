@@ -219,11 +219,14 @@ actions:
   add-to-workspace:
     input:
       workspace: task/workspace
+      insuranceAnalysis: analyze-insurance-categories
       knowledgeForDocuments: init-kset
     tool: workspace
     operations:
       - op: add-items
         items: knowledgeForDocuments
+      - op: add-items
+        items: insuranceAnalysis
 
 functions:
   analyze-for-tag:
@@ -285,8 +288,9 @@ functions:
         input:
           knowledge: function/knowledge
           insight: create-insight
+          snippets: get-snippets
         tool: knowledge-set
         operations:
-          - op: set-node
-            node: insight
+          - op: set-nodes
+            nodes: insight
             skipIfEmpty: true
