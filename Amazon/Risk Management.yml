@@ -9,7 +9,23 @@ actions:
   get-risk-management-tags:
     tool: find-tags
     name: ["General Liability", "Excess Liability", "Workers Compensation", "Auto Liability", "Loss of Use", "Policy Endorsements", "Cancellation", "Indemnity", "Risk Management"]
-  # 2) Base configuration for shared prompt elements
+  
+  # 2) Document text snippet storage
+  store-document-snippets:
+    tool: echo
+    message: |
+      {% for doc in documents %}
+      # Document: {{doc.name}}
+      
+      {% for section in doc.sections %}
+      ## Section: {{section.name}}
+      
+      {{section.text}}
+      
+      {% endfor %}
+      {% endfor %}
+
+  # 3) Base configuration for shared prompt elements
   insuranceRequirements:
     tool: echo
     message: |
@@ -201,6 +217,7 @@ actions:
     input:
       documents: task/documents
       riskManagementTags: get-risk-management-tags
+      documentSnippets: store-document-snippets
     tool: knowledge-set
     knowledgeSetName: "Insurance Requirements Analysis"
     operations:
@@ -212,6 +229,9 @@ actions:
         priority: 1
       - op: set-nodes
         nodes: documents
+      - op: add-attribute
+        key: document_snippets
+        value: documentSnippets
 
   # 6) Analyze each insurance category
   analyze-insurance-categories:
@@ -225,6 +245,7 @@ actions:
       basePrompt: basePrompt
       prompt: insuranceAnalysisPrompt
       title: insuranceAnalysisTitle
+      documentSnippets: store-document-snippets
 
   # 7) Add Results to Workspace
   add-to-workspace:
@@ -254,6 +275,8 @@ functions:
         type: text
       title:
         type: text
+      documentSnippets:
+        type: text
     actions:
       get-snippets:
         input:
@@ -264,19 +287,41 @@ functions:
           tags: [tag]
         skipIfEmpty: documents
 
+      # Store snippets in a dedicated echo function for later reference
+      store-tag-snippets:
+        input:
+          snippets: get-snippets
+          tag: function/tag
+        tool: echo
+        message: |
+          # Snippets for {{tag.name}}
+          
+          {% for s in snippets %}
+          ## Document: {{s.document.name}}
+          
+          {{s.text}}
+          
+          {% endfor %}
+
       analyze-content:
         input:
           snippets: get-snippets
           basePrompt: function/basePrompt
           prompt: function/prompt
+          documentSnippets: function/documentSnippets
+          tagSnippets: store-tag-snippets
         tool: llm
         skipIfEmpty: snippets
         prompt: |
           {{basePrompt.text}}
           {{prompt.text}}
-          {% for s in snippets %}
-          {{s.text}}
-          {% endfor %}
+          
+          # Document Context
+          {{documentSnippets.text}}
+          
+          # Relevant Snippets for Analysis
+          {{tagSnippets.text}}
+          
           Please verify the source text for each checklist item and provide the relevant text from the document that supports your answer.
           **Please ensure your response is formatted using markdown, with clear headings and concise bullet points. This is crucial for the accuracy and readability of the analysis.**
 
@@ -286,10 +331,16 @@ functions:
           snippets: get-snippets
           tag: function/tag
           title: function/title
+          tagSnippets: store-tag-snippets
         skipIfEmpty: summary
         tool: insight
         text: |
           {{summary.text}}
+          
+          ---
+          
+          ### Source Snippets:
+          {{tagSnippets.text}}
         name: "{{title.text}} for {{tag.name}}"
         tags: [tag]
         attributes:
