@@ -156,12 +156,13 @@ actions:
       You are an insurance compliance expert analyzing contract documents. Your task is to complete a compliance checklist by:
 
       1. Reviewing the document for insurance terminology and requirements
-      2. Marking each checklist item as either:
-         - [✓] (Compliant/Present/Appropriate)
-         - [✗] (Non-compliant/Missing/Inappropriate)
-         - [?] (Unclear or insufficient information)
+      2. For each checklist item, replace the [ ] with one of these symbols:
+         - [✓] for Compliant/Present/Appropriate items
+         - [✗] for Non-compliant/Missing/Inappropriate items
+         - [?] for Unclear or insufficient information
       3. Adding brief notes only where necessary to explain non-compliance
 
+      IMPORTANT: Do not use tables in your response. Keep the original checklist format with one item per line.
       Focus exclusively on completing the checklist without additional analysis or commentary.
 
   # 3) Analysis prompt
@@ -171,8 +172,9 @@ actions:
       {{basePrompt}}
 
       Below is relevant text from the insurance document. Please:
-      - Complete the compliance checklist by marking each item
-      - Use [✓] for compliant items, [✗] for non-compliant items, and [?] for unclear items
+      - Complete the compliance checklist by replacing each [ ] with [✓], [✗], or [?]
+      - Maintain the original checklist format - do NOT create tables
+      - Keep one item per line in the exact format provided
       - Add only brief, factual notes for non-compliant items
       - Do not provide any additional analysis or commentary beyond the checklist
 
