@@ -161,9 +161,18 @@ actions:
          - [✗] for Non-compliant/Missing/Inappropriate items
          - [?] for Unclear or insufficient information
       3. Adding brief notes only where necessary to explain non-compliance
-
+      4. Verifying the source text for each checklist item and providing the relevant text from the document that supports your answer, formatted as follows:
+         - Use block quotes (`>`) to set off the relevant text
+         - Keep the relevant text concise and focused on the specific checklist item
+         - Place the relevant text immediately after the checklist item, on the same line, in the format: 
+           ```
+           > Relevant text from the document:
+           > 'quoted text'
+           ```
       IMPORTANT: Do not use tables in your response. Keep the original checklist format with one item per line.
       Focus exclusively on completing the checklist without additional analysis or commentary.
+
+      **Please format your response using markdown, with clear headings and concise bullet points.**
 
   # 3) Analysis prompt
   insuranceAnalysisPrompt:
@@ -176,7 +185,9 @@ actions:
       - Maintain the original checklist format - do NOT create tables
       - Keep one item per line in the exact format provided
       - Add only brief, factual notes for non-compliant items
+      - Verify the source text for each checklist item and provide the relevant text from the document that supports your answer
       - Do not provide any additional analysis or commentary beyond the checklist
+      - **Please ensure your response is formatted using markdown, with clear headings and concise bullet points.**
 
       Relevant text from the document:
 
@@ -266,6 +277,8 @@ functions:
           {% for s in snippets %}
           {{s.text}}
           {% endfor %}
+          Please verify the source text for each checklist item and provide the relevant text from the document that supports your answer.
+          **Please ensure your response is formatted using markdown, with clear headings and concise bullet points. This is crucial for the accuracy and readability of the analysis.**
 
       create-insight:
         input:
