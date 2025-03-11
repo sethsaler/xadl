@@ -1,0 +1,176 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collection for "SOP Themes"
+  get-sopThemes-tags:
+    tool: find-tags
+    category: "SOP Themes"
+  
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a compliance specialist responsible for ensuring 100% compliance with utility company policies, procedures, and standards. Your objectives include:
+
+      1. Identifying all obligations, requirements, and responsibilities outlined in the document.
+      2. Converting each obligation into a clear, actionable checklist item.
+      3. Maintaining the original meaning while simplifying complex sentences.
+      4. Assigning a unique ID to each item and including section references.
+
+      When creating checklist items:
+      - Focus on clarity, precision, and actionability.
+      - Preserve numerical values, measurements, and timeframes exactly as stated.
+      - Include information about frequency, responsible parties, and verification methods when specified.
+      - Identify any ambiguous obligations that require clarification.
+      - Note any conflicting requirements within the document.
+
+  # 3) Compliance Checklist Analysis prompt
+  complianceAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is text from a utility company document tagged with "{{tag.name}}". As a compliance specialist, you should:
+      
+      1. Extract all statements containing obligation indicators such as:
+         - Modal verbs: must, shall, will, should, required to, responsible for
+         - Time-bound requirements: daily, weekly, monthly, annually, by [date]
+         - Quantitative requirements: specific measurements, percentages, thresholds
+         - Conditional obligations: if/then statements, when/must relationships
+         - Prohibition statements: shall not, must not, prohibited, restricted
+
+      2. Convert each obligation into a clear, actionable checklist item following this format:
+      
+      ```
+      □ [{{tag.name}}-#] (Source: Section X.X): Actionable statement of the obligation
+
+      Details:
+      - Frequency: [One-time/Daily/Weekly/Monthly/Quarterly/Annually/As needed]
+      - Responsible party: [Role or department if specified]
+      - Verification method: [Documentation/Inspection/Testing/Reporting]
+      - Dependencies: [Reference to other checklist items if applicable]
+      ```
+
+      3. Use sequential numbering for each checklist item.
+      4. If information for any detail is not specified, write "Not specified" for that field.
+      5. After completing the checklist, add a summary section with total obligations by category.
+
+      Relevant text from the document:
+
+  # 4) Section Title
+  complianceAnalysisTitle:
+    tool: echo
+    message: Compliance Checklist - {{tag.name}}
+
+  # 5) Initialize Knowledge Set for SOP Themes
+  init-kset:
+    input:
+      documents: task/documents
+      sopThemesTags: get-sopThemes-tags
+    tool: knowledge-set
+    knowledgeSetName: "Utility Compliance Checklist"
+    operations:
+      - op: add-dimension
+        key: theme
+        name: SOP Themes
+        nodes: sopThemesTags
+        priority: 1
+      - op: set-nodes
+        nodes: documents
+
+  # 6) Analyze each "SOP Themes" tag
+  analyze-sopThemes:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-sopThemes-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: complianceAnalysisPrompt
+      title: complianceAnalysisTitle
+
+  # 7) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      sopThemesAnalysis: analyze-sopThemes
+      knowledgeForDocuments: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeForDocuments
+
+functions:
+  analyze-for-tag:
+    input:
+      tag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          tag: function/tag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          tags: [tag]
+      
+      run-prompt:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+          tag: function/tag
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-snippets
+          tag: function/tag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}}"
+        tags: [tag]
+        attributes:
+          category: compliance-checklist-insight
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
