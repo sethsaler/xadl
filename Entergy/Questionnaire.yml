@@ -1,0 +1,201 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collection for "SOP Themes"
+  get-sopThemes-tags:
+    tool: find-tags
+    category: "SOP Themes"
+  
+  # 2) Tag Collection for "SOP Topics"
+  get-sopTopics-tags:
+    tool: find-tags
+    category: "SOP Topics"
+  
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a compliance specialist responsible for auditing utility company compliance with policies, procedures, and standards. Your objectives include:
+
+      1. Identifying all obligations, requirements, and responsibilities outlined in the document.
+      2. Converting each obligation into a clear, answerable question for compliance verification.
+      3. Maintaining the original meaning while creating questions that have definitive yes/no answers.
+      4. Structuring questions to reveal gaps in compliance or implementation.
+
+      When creating compliance questions:
+      - Focus on clarity, precision, and auditability.
+      - Preserve numerical values, measurements, and timeframes exactly as stated.
+      - Structure questions to identify what evidence would demonstrate compliance.
+      - Format complex obligations as multiple discrete questions when necessary.
+      - Note any ambiguous or conflicting requirements that may require interpretation.
+
+  # 3) Compliance Question Analysis prompt
+  complianceAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is text from a utility company document tagged with Theme "{{themeTag.name}}" and Topic "{{topicTag.name}}". As a compliance specialist, you should:
+      
+      1. Extract all statements containing obligation indicators such as:
+         - Modal verbs: must, shall, will, should, required to, responsible for
+         - Time-bound requirements: daily, weekly, monthly, annually, by [date]
+         - Quantitative requirements: specific measurements, percentages, thresholds
+         - Conditional obligations: if/then statements, when/must relationships
+         - Prohibition statements: shall not, must not, prohibited, restricted
+
+      2. Convert each obligation into a question format that can be answered with:
+         - "Yes, the obligation is present" 
+         - "No, the obligation is not present"
+         - A detailed analysis for mixed or inconclusive cases
+      
+      3. Format each obligation question as:
+      
+      ```
+      ## Question [{{themeTag.name}}-{{topicTag.name}}-#]
+      
+      Does the [entity/system/process] [comply with specific requirement]?
+      
+      Context:
+      - Original text: "[Exact quote from the document]"
+      
+      Expected evidence for compliance:
+      - [Document/artifact/process that would demonstrate compliance]
+      ```
+
+      4. Use sequential numbering for each question.
+      5. Phrase questions clearly so they can be definitively answered yes/no.
+      6. For complex obligations, break down into multiple discrete questions.
+
+      Relevant text from the document:
+
+  # 4) Section Title
+  complianceAnalysisTitle:
+    tool: echo
+    message: Compliance Questions - {{themeTag.name}} - {{topicTag.name}}
+
+  # 5) Initialize Knowledge Set for SOP Themes and Topics
+  init-kset:
+    input:
+      documents: task/documents
+      sopThemesTags: get-sopThemes-tags
+      sopTopicsTags: get-sopTopics-tags
+    tool: knowledge-set
+    knowledgeSetName: "Utility Compliance Question Set"
+    operations:
+      - op: add-dimension
+        key: theme
+        name: SOP Themes
+        nodes: sopThemesTags
+        priority: 1
+      - op: add-dimension
+        key: topic
+        name: SOP Topics
+        nodes: sopTopicsTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # 6) Analyze for each combination of SOP Themes and SOP Topics
+  analyze-sop-tags:
+    repeat:
+      function: analyze-for-tag-combination
+      for: [themeTag, topicTag]
+    input:
+      themeTag: get-sopThemes-tags
+      topicTag: get-sopTopics-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: complianceAnalysisPrompt
+      title: complianceAnalysisTitle
+
+  # 7) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      sopTagsAnalysis: analyze-sop-tags
+      knowledgeForDocuments: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeForDocuments
+
+functions:
+  analyze-for-tag-combination:
+    input:
+      themeTag:
+        type: tag
+      topicTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [themeTag, topicTag]
+      
+      run-prompt:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-snippets
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}}"
+        tags: [themeTag, topicTag]
+        attributes:
+          category: compliance-question-insight
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
