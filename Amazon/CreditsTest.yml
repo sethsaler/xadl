@@ -10,7 +10,7 @@ actions:
     tool: find-tags
     name: ["Credit", "Preamble"]
   
-  # 2) NEW Tag Collection for "Counterparty Name"
+  # 2) Tag Collection for "Counterparty Name"
   get-counterpartyName-tags:
     tool: find-tags
     category: "Counterparty Name"
@@ -57,43 +57,43 @@ actions:
   # 5) Section Titles
   contractAnalysisTitle:
     tool: echo
-    message: Credit Obligations Output Test
+    message: Credit Obligations Analysis
 
-  # 6) Initialize Knowledge Set for Agreement Information
+  # 6) Initialize Knowledge Set for Agreement Information - MODIFIED to ensure "Credit" and "Counterparty Name" appear as dimensions
   init-kset:
     input:
       documents: task/documents
       subjectMatterTags: get-subjectMatter-tags
       counterpartyNameTags: get-counterpartyName-tags
-      # roleCategoryTags: get-roleCateogry-tags
+      roleCategoryTags: get-roleCateogry-tags
       agreementTypeTags: get-agreementType-tags
     tool: knowledge-set
     knowledgeSetName: "Credit Obligations Summary"
     operations:
       - op: add-dimension
-        key: subjectMatter
-        name: Subject Matter
+        key: credit
+        name: Credit
         nodes: subjectMatterTags
         priority: 1
-      # - op: add-dimension
-      #   key: role
-      #   name: Role
-      #   nodes: roleCategoryTags
-      #   priority: 1
       - op: add-dimension
         key: counterpartyName
-        name: Counterparty
+        name: Counterparty Name
         nodes: counterpartyNameTags
         priority: 2
+      - op: add-dimension
+        key: role
+        name: Role
+        nodes: roleCategoryTags
+        priority: 3
       - op: add-dimension
         key: agreementType
         name: Agreement Type
         nodes: agreementTypeTags
-        priority: 3
+        priority: 4
       - op: set-nodes
         nodes: documents
 
-  # 7) NEW - Analyze each "Agreement Tag" for each "Counterparty Name"
+  # 7) Analyze each tag combination - using the correct structure as per instructions
   analyze-each-documentCategory-tag:
     repeat:
       function: analyze-for-tag
@@ -156,6 +156,7 @@ functions:
       get-instruction-prompt-for-tag:
         input:
           subjectTag: function/subjectTag
+          counterpartyNameTag: function/counterpartyNameTag
         tool: echo
         message: |
           {% if subjectTag.name == "Preamble" %}
@@ -194,12 +195,20 @@ functions:
                       - "Include any information about whether the credit is applicable only to a specific episode or episodes."
                       - "Only include these items if they are explicitly mentioned; do not speculate on unmentioned conditions."
                       - "Do not include any extraneous information, including compensation, bonuses, or dollar amounts."
-              OutputFormat: "Summarize all credit obligations in a single paragraph, applying **bold formatting** to key terms (e.g., **single card**, **shared card**, **guest star**, etc.) but do not include extraneous language beyond the specific credit details required."
+              
+              MultipleAgreementsHandling:
+                  - "When a talent ({{counterpartyNameTag.name}}) appears in multiple agreements, separate each agreement's credit details into distinct paragraphs"
+                  - "Start each paragraph with the Agreement/Project name"
+                  - "Ensure clear separation between different agreement terms"
+                  - "If the same agreement has different credit requirements for different episodes/seasons, separate those into sub-paragraphs"
+              
+              OutputFormat: "For each agreement, create a separate paragraph summarizing all credit obligations, applying **bold formatting** to key terms (e.g., **single card**, **shared card**, **guest star**, etc.) but do not include extraneous language beyond the specific credit details required."
+              
               OverallGuidance:
-              - "Adhere Rigorously to the Output Format: Provide only the requested fields, only separating paragraphs if credit is different across different seasons, episodes, role, or services provided. Do not include any leading text, such as "Credit Obligations:" or "Main Titles:" or "Screen Credit:" before the response."
-              # - "Use Bold Tags: For labels (e.g., **Talent Name:**) and for any special designations within the Credit summary (e.g., **guest star**)."
+              - "Adhere Rigorously to the Output Format: Provide only the requested fields, clearly separating paragraphs for different agreements or different episodes/seasons/roles within the same agreement."
+              - "Use Bold Tags: For key terms and special designations within the Credit summary (e.g., **guest star**)."
               - "Avoid Irrelevant Content: Do not output commentary, explanations, or any information not explicitly requested."
-              - "Maintain Consistency: Ensure each section's format is consistent with these instructions. If there is any leading text, such as "Credit:" or "Scren Credit:", remove it."
+              - "Maintain Consistency: Ensure each section's format is consistent with these instructions. If there is any leading text, such as 'Credit:' or 'Screen Credit:', remove it."
           {% endif %}
 
           {% assign roles = "Preamble,Credit" | split: "," %}
@@ -216,12 +225,17 @@ functions:
           basePrompt: function/basePrompt
           instructionPrompt: get-instruction-prompt-for-tag
           prompt: function/prompt
+          counterpartyNameTag: function/counterpartyNameTag
         tool: llm
         skipIfEmpty: snippets
         prompt: |
           {{instructionPrompt.text}}
           {{prompt.text}}
+          
+          For talent: {{counterpartyNameTag.name}}
+          
           {% for s in snippets %}
+          Agreement Snippet:
           {{s.text}}
           {% endfor %}
 
