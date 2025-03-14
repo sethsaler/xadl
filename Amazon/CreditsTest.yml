@@ -1,0 +1,257 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Existing Tag Collection for Agreement Information
+  get-subjectMatter-tags:
+    tool: find-tags
+    name: ["Credit", "Preamble"]
+  
+  # 2) NEW Tag Collection for "Counterparty Name"
+  get-counterpartyName-tags:
+    tool: find-tags
+    category: "Counterparty Name"
+
+  get-roleCateogry-tags:
+    tool: find-tags
+    category: "Role Category"
+
+  get-agreementType-tags:
+    tool: find-tags
+    category: "Agreement Type"
+
+  # 3) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are in-house counsel at a major entertainment studio, responsible for assessing legal obligations, compliance risks, and business implications within talent agreements. Your objectives include:
+
+      1. Identifying all obligations, commitments, and representations the studio has made regarding screen credit for the talent.
+      2. Pinpointing potential risks or ambiguities, including any conditions or limitations on credit obligations, noting relevant union/guild requirements, deadlines, or other time-sensitive triggers.
+      3. Providing actionable insights that integrate both legal and business perspectives (e.g., compliance with labor requirements, reputation management, financial implications).
+      4. Highlighting any provisions that could require negotiation, revision, or special attention to mitigate legal or reputational exposure.
+
+      When offering analysis or summarizing findings:
+      - Focus on clarity, precision, and direct relevance to studio obligations.
+      - Avoid unnecessary speculation; stick to explicit terms and established industry standards.
+      - Provide well-reasoned justifications for any concerns or potential adjustments.
+
+  # 4) Contract Analysis prompt
+  contractAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is key text from the talent agreement. As in-house counsel, you should:
+      - Thoroughly review the credit-related clauses to ensure compliance with the studio's existing policies and any union/guild rules.
+      - Identify potential loopholes, ambiguous language, or conflicting provisions that may lead to disputes or noncompliance.
+      - Recommend steps (if any) to clarify, renegotiate, or reinforce obligations in line with best practices and studio interests.
+      - Provide your analysis succinctly, focusing on the specific clauses below.
+
+      Relevant language from the agreement:
+
+  # 5) Section Titles
+  contractAnalysisTitle:
+    tool: echo
+    message: Credit Obligations Output Test
+
+  # 6) Initialize Knowledge Set for Agreement Information
+  init-kset:
+    input:
+      documents: task/documents
+      subjectMatterTags: get-subjectMatter-tags
+      counterpartyNameTags: get-counterpartyName-tags
+      # roleCategoryTags: get-roleCateogry-tags
+      agreementTypeTags: get-agreementType-tags
+    tool: knowledge-set
+    knowledgeSetName: "Credit Obligations Summary"
+    operations:
+      - op: add-dimension
+        key: subjectMatter
+        name: Subject Matter
+        nodes: subjectMatterTags
+        priority: 1
+      # - op: add-dimension
+      #   key: role
+      #   name: Role
+      #   nodes: roleCategoryTags
+      #   priority: 1
+      - op: add-dimension
+        key: counterpartyName
+        name: Counterparty
+        nodes: counterpartyNameTags
+        priority: 2
+      - op: add-dimension
+        key: agreementType
+        name: Agreement Type
+        nodes: agreementTypeTags
+        priority: 3
+      - op: set-nodes
+        nodes: documents
+
+  # 7) NEW - Analyze each "Agreement Tag" for each "Counterparty Name"
+  analyze-each-documentCategory-tag:
+    repeat:
+      function: analyze-for-tag
+      for: [counterpartyNameTag, subjectTag, agreementTypeTag]
+    input:
+      counterpartyNameTag: get-counterpartyName-tags
+      subjectTag: get-subjectMatter-tags
+      agreementTypeTag: get-agreementType-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: contractAnalysisPrompt
+      title: contractAnalysisTitle
+
+  # 8) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      documentCategoryAnalysis: analyze-each-documentCategory-tag
+      knowledgeForDocuments: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeForDocuments
+
+functions:
+  analyze-for-tag:
+    input:
+      counterpartyNameTag:
+        type: tag
+      subjectTag:
+        type: tag
+      agreementTypeTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      get-instruction-prompt-for-tag:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          counterpartyNameTag: function/counterpartyNameTag
+          subjectTag: function/subjectTag
+          agreementTypeTag: function/agreementTypeTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [counterpartyNameTag, subjectTag, agreementTypeTag]
+      
+      get-instruction-prompt-for-tag:
+        input:
+          subjectTag: function/subjectTag
+        tool: echo
+        message: |
+          {% if subjectTag.name == "Preamble" %}
+          PREAMBLE instructions:
+              OutputFormat: |
+                  Extract and format the following information in this exact format:
+                  **Talent Name:** [Name]
+                  **Talent Type:** [Category]
+                  **Role:** [Character Name]
+                  **Agreement Name:** [Title]
+                  **Effective Date:** [Date]
+                  **Project Name:** [Title]
+              
+              RequiredFields:
+                  - TalentName: "Name of individual or team members"
+                  - TalentType: "Role category (Writer, Director, Producer, Performer, Physical Producer, Lead Cast)"
+                  - Role: "Character/role name for acting talent (N/A if not applicable)"
+                  - AgreementName: "Formal agreement title"
+                  - EffectiveDate: "Defined effective date or latest signature date. If missing, use the date the agreement was executed and specify that"
+                  - ProjectName: "Project title or working title"
+          {% endif %}
+
+          {% if subjectTag.name == "Credit" %}
+          CREDIT instructions:
+              CreditDetails:
+                  SubjectMatter: "Summarizing the credit obligations in detail."
+                  InformationNeeded:
+                      - "All relevant deal points specifically mentioned in the provided text that are specifically relevant to credit and billing for a film or series, such as:"
+                      - "Main titles vs. end titles requirements"
+                      - "Special designations (e.g., guest star, special appearance)"
+                      - "Single card vs. shared card, and any position (first, second, etc.)"
+                      - "Type size or other format requirements"
+                      - "'No less favorable than…' or parity language"
+                      - "Producer or studio discretion over any of the above"
+                      - "Any mention of the specific episodes the talent will be providing services, and if credit is different for different episodes."
+                      - "Include any information about whether the credit is applicable only to a specific episode or episodes."
+                      - "Only include these items if they are explicitly mentioned; do not speculate on unmentioned conditions."
+                      - "Do not include any extraneous information, including compensation, bonuses, or dollar amounts."
+              OutputFormat: "Summarize all credit obligations in a single paragraph, applying **bold formatting** to key terms (e.g., **single card**, **shared card**, **guest star**, etc.) but do not include extraneous language beyond the specific credit details required."
+              OverallGuidance:
+              - "Adhere Rigorously to the Output Format: Provide only the requested fields, only separating paragraphs if credit is different across different seasons, episodes, role, or services provided. Do not include any leading text, such as "Credit Obligations:" or "Main Titles:" or "Screen Credit:" before the response."
+              # - "Use Bold Tags: For labels (e.g., **Talent Name:**) and for any special designations within the Credit summary (e.g., **guest star**)."
+              - "Avoid Irrelevant Content: Do not output commentary, explanations, or any information not explicitly requested."
+              - "Maintain Consistency: Ensure each section's format is consistent with these instructions. If there is any leading text, such as "Credit:" or "Scren Credit:", remove it."
+          {% endif %}
+
+          {% assign roles = "Preamble,Credit" | split: "," %}
+
+          {% if roles contains subjectTag.name %}
+          {% else %}
+          GENERAL instructions for {{subjectTag.name}}
+          - Use your best judgment.
+          {% endif %}
+
+      run-prompt:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-tag
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-snippets
+          counterpartyNameTag: function/counterpartyNameTag
+          subjectTag: function/subjectTag
+          agreementTypeTag: function/agreementTypeTag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} for {{counterpartyNameTag.name}}"
+        tags: [counterpartyNameTag, subjectTag, agreementTypeTag]
+        attributes:
+          category: contract-analysis-insight
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
