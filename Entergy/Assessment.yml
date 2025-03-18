@@ -1,0 +1,426 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collection for SOP Themes - will contain the Heading 1 values
+  get-sop-themes-tags:
+    tool: find-tags
+    category: "SOP Themes"
+    
+  # Get SOP Topics tags (Heading 2 values)
+  get-sop-topics-tags:
+    tool: find-tags
+    category: "SOP Topics"
+  
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a compliance and safety auditor responsible for assessing Standard Operating Procedures (SOPs) and safety protocols. Your objective is to review each question in the questionnaire and provide:
+
+      1. A clear YES/NO determination for each numbered question
+      2. A brief explanation of why the answer is YES or NO
+      3. Any recommendations for addressing compliance gaps if the answer is NO
+
+      Format your response as follows for each question:
+
+      **Question X**: [Question text here]
+      **Answer**: [YES/NO]
+      **Explanation**: [Brief explanation of compliance status]
+      **Recommendation**: [Only if answer is NO - provide specific recommendation]
+
+  # 3) Analysis prompt
+  analysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below are questions from the "{{tag.name}}" section of the safety compliance questionnaire. For each numbered question:
+      
+      1. Provide a clear YES/NO answer
+      2. Include a brief explanation supporting your determination
+      3. If the answer is NO, include a specific recommendation for addressing the gap
+      
+      Questions for analysis:
+
+  # 4) Section Title
+  analysisTitle:
+    tool: echo
+    message: SOP Compliance Assessment
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      sopThemesTags: get-sop-themes-tags
+      sopTopicsTags: get-sop-topics-tags
+    tool: knowledge-set
+    knowledgeSetName: "SOP Compliance Assessment"
+    operations:
+      - op: add-dimension
+        key: theme
+        name: SOP Themes
+        nodes: sopThemesTags
+        priority: 1
+      - op: add-dimension
+        key: topic
+        name: SOP Topics
+        nodes: sopTopicsTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # 6) Analyze each SOP Theme tag with each SOP Topic tag
+  analyze-sop-themes-topics:
+    repeat:
+      function: analyze-for-tag
+      for: [themeTag, topicTag]
+    input:
+      themeTag: get-sop-themes-tags
+      topicTag: get-sop-topics-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: analysisPrompt
+      title: analysisTitle
+
+  # 7) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      sopThemesTopicsAnalysis: analyze-sop-themes-topics
+      knowledgeSet: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeSet
+
+functions:
+  analyze-for-tag:
+    input:
+      themeTag:
+        type: tag
+      topicTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-theme-topic-snippets:
+        input:
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [themeTag, topicTag]
+      
+      get-instruction-prompt-for-tag:
+        input:
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+        tool: echo
+        message: |
+          # SOP Theme: {{themeTag.name}} - Topic: {{topicTag.name}}
+          
+          You are analyzing the "{{themeTag.name}}" section with the topic "{{topicTag.name}}" from the SOP questionnaire. Your task is to provide a compliance assessment for each numbered question in this section.
+          
+          ## Instructions:
+          
+          1. For each numbered question, provide a YES/NO determination.
+          2. Include a brief explanation for each determination.
+          3. If you answer NO, provide a specific recommendation to address the gap.
+          4. Present your responses in the following format:
+          
+          ```
+          **Question X**: [Question text reproduced exactly]
+          **Answer**: [YES/NO]
+          **Explanation**: [Brief explanation - 1-2 sentences]
+          **Recommendation**: [Only include for NO answers - specific corrective action]
+          ```
+          
+          5. Number your responses to match the question numbers in the original document.
+          6. Only answer questions that appear under the "{{themeTag.name}}" heading and "{{topicTag.name}}" subheading.
+          
+          ## Specific Instructions for This Theme/Topic Combination:
+          
+          {% if themeTag.name == "Advanced and Basic Rigger Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on requirements for rigger training, qualification, certification, and inspection skills.
+          Key regulations: ASME B30.26, OSHA 1926.1400, OSHA 1910.184
+          Evaluate qualification processes, training content, and competency verification.
+          {% endif %}
+
+          {% if themeTag.name == "Confined Space Entry Procedure" and topicTag.name == "Confined Space" %}
+          Focus on written procedures, hazard communication, and pre-entry planning.
+          Key regulations: 29 CFR 1910.146
+          Evaluate alignment with Enterprise standard Pre-Job Safety Planning.
+          {% endif %}
+
+          {% if themeTag.name == "Atmospheric Testing" and topicTag.name == "Confined Space" %}
+          Focus on testing equipment, methodology, and personnel qualifications.
+          Key regulations: 29 CFR 1910.146(c)(5)
+          Evaluate calibration, verification procedures, and monitoring frequency.
+          {% endif %}
+
+          {% if themeTag.name == "Contract Partners Performing Confined Space Entry" and topicTag.name == "Confined Space" %}
+          Focus on communication of requirements and responsibilities to contractors.
+          Key regulations: 29 CFR 1910.146(c)(8)
+          Evaluate permit procedures and approval processes for contract partners.
+          {% endif %}
+
+          {% if themeTag.name == "Crane Operations Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on training program content and communication protocols.
+          Key regulations: OSHA 1926.1427, ASME B30.5
+          Evaluate signal person training and fall protection requirements.
+          {% endif %}
+
+          {% if themeTag.name == "Digger Derrick Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on operator responsibilities and equipment safety features.
+          Key regulations: OSHA 1926.1400, ANSI/ASSE A10.31
+          Evaluate job site survey processes and utility line clearance.
+          {% endif %}
+
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on training documentation and refresher requirements.
+          Key regulations: OSHA 1910.178, OSHA 1926.1427
+          Evaluate qualification verification and certification processes.
+          {% endif %}
+
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on engineering approval and documentation requirements.
+          Key regulations: ASME B30.20, AWS D1.1
+          Evaluate load testing protocols and inspection of critical welds.
+          {% endif %}
+
+          {% if themeTag.name == "Excavator Safe Operation (Lifting)" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on load chart usage and safety procedures near excavations.
+          Key regulations: OSHA 1926.1400, OSHA 1926.651
+          Evaluate rigging requirements and equipment modification controls.
+          {% endif %}
+
+          {% if themeTag.name == "General Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on Material Handling, Rigging, and Lifting process evaluation and hierarchy of controls.
+          Key regulations: OSHA 1910.178, OSHA 1926.251
+          Evaluate engineering solutions and mechanical lifting devices.
+          {% endif %}
+          
+          {% if themeTag.name == "General Requirements" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          Focus on confined space identification and procedure development.
+          Key regulations: 29 CFR 1910.146
+          Evaluate atmospheric testing and rescue planning requirements.
+          {% endif %}
+
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on lift categorization and documentation requirements.
+          Key regulations: ASME P30.1, OSHA 1926.1400
+          Evaluate critical lift planning and approval processes.
+          {% endif %}
+
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on boundary establishment and marking requirements.
+          Key regulations: OSHA 1926.1425
+          Evaluate personnel restrictions and safety distances.
+          {% endif %}
+
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on design, installation, and operational requirements.
+          Key regulations: ASME B30.16, OSHA 1910.179
+          Evaluate control mechanisms and braking systems.
+          {% endif %}
+
+          {% if themeTag.name == "Lift Director Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on qualification requirements and responsibilities.
+          Key regulations: ASME P30.1, OSHA 1926.1400
+          Evaluate designation processes and oversight capabilities.
+          {% endif %}
+
+          {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined and Enclosed Space Entry" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          Focus on workplace survey procedures and hazard assessment.
+          Key regulations: 29 CFR 1910.146(c)
+          Evaluate space classification and inventory management.
+          {% endif %}
+
+          {% if themeTag.name == "Material Handling, Rigging, and Lifting Safety Observation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on observation programs and coaching processes.
+          Key regulations: OSHA 1910.179, OSHA 1926.251
+          Evaluate documentation and corrective action procedures.
+          {% endif %}
+
+          {% if themeTag.name == "Mobile Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on pre-operation inspection and personnel safety.
+          Key regulations: OSHA 1926.1400, ASME B30.5
+          Evaluate equipment requirements and spotter utilization.
+          {% endif %}
+
+          {% if themeTag.name == "Mobile Crane Operation Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on certification processes and knowledge requirements.
+          Key regulations: OSHA 1926.1427, ASME B30.5
+          Evaluate written and practical testing procedures.
+          {% endif %}
+
+          {% if themeTag.name == "Material Handling, Rigging, and Lifting Equipment Inspection" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on inspection frequency and documentation requirements.
+          Key regulations: OSHA 1910.179, OSHA 1926.251
+          Evaluate deficiency management and repair procedures.
+          {% endif %}
+
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on safe operation guidelines and equipment restrictions.
+          Key regulations: OSHA 1910.176
+          Evaluate load handling requirements and special usage scenarios.
+          {% endif %}
+
+          {% if themeTag.name == "Non-Permit Required Confined and Enclosed Space Entry and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          Focus on safe condition maintenance and written procedures.
+          Key regulations: 29 CFR 1910.146(c)(7)
+          Evaluate space validation and atmospheric testing requirements.
+          {% endif %}
+
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on operation limitations and safety protocols.
+          Key regulations: OSHA 1910.178
+          Evaluate load handling requirements and special operations.
+          {% endif %}
+
+          {% if themeTag.name == "Powered Industrial Truck Equipment Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on equipment marking and safety features.
+          Key regulations: OSHA 1910.178
+          Evaluate nameplate maintenance and alarm systems.
+          {% endif %}
+
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on inspection requirements and operator qualifications.
+          Key regulations: OSHA 1910.179, ASME B30.2
+          Evaluate operational procedures and safety features.
+          {% endif %}
+
+          {% if themeTag.name == "Permit-Required Confined and Enclosed Space Entry" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          Focus on written procedures and permitting processes.
+          Key regulations: 29 CFR 1910.146(d)
+          Evaluate documentation and attendant responsibilities.
+          {% endif %}
+
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on clearance requirements and assembly/disassembly procedures.
+          Key regulations: OSHA 1926.1407-1411
+          Evaluate planning meeting requirements and spotter responsibilities.
+          {% endif %}
+
+          {% if themeTag.name == "Program Review and Evaluation" and (topicTag.name == "Material Handling, Rigging, and Lifting" or topicTag.name == "Confined and Enclosed Space Entry") %}
+          Focus on management review processes and update frequency.
+          Key regulations: 29 CFR 1910.146(d)(14), OSHA 1910.179
+          Evaluate documentation requirements and continuous improvement.
+          {% endif %}
+
+          {% if themeTag.name == "Re-Classified Confined and Enclosed Space Entry" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          Focus on reclassification criteria and documentation requirements.
+          Key regulations: 29 CFR 1910.146(c)(7)
+          Evaluate hazard elimination verification and temporary nature of reclassifications.
+          {% endif %}
+
+          {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          Focus on designation of services and procedure establishment.
+          Key regulations: 29 CFR 1910.146(k)
+          Evaluate rescuer capabilities and equipment provisions.
+          {% endif %}
+
+          {% if themeTag.name == "Roles and Responsibilities" and (topicTag.name == "Confined and Enclosed Space Entry" or topicTag.name == "Material Handling, Rigging, and Lifting") %}
+          Focus on leadership responsibilities and personnel obligations.
+          Key regulations: 29 CFR 1910.146, OSHA 1910.179
+          Evaluate oversight functions and implementation requirements.
+          {% endif %}
+
+          {% if themeTag.name == "Signal Person Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on qualification requirements and knowledge demonstration.
+          Key regulations: OSHA 1926.1428
+          Evaluate documentation and competency verification.
+          {% endif %}
+
+          {% if themeTag.name == "Spotter Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Focus on training effectiveness and regulatory compliance.
+          Key regulations: OSHA 1926.1428
+          Evaluate specialized training for power line spotters.
+          {% endif %}
+
+          {% if themeTag.name == "Training" and (topicTag.name == "Confined and Enclosed Space Entry" or topicTag.name == "Material Handling, Rigging, and Lifting") %}
+          Focus on training development, delivery, and documentation.
+          Key regulations: 29 CFR 1910.146(g), OSHA 1926.1427
+          Evaluate content requirements and refresher training.
+          {% endif %}
+
+          {% if themeTag.name == "Ventilation Requirements" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          Focus on method selection and duration requirements.
+          Key regulations: 29 CFR 1910.146(c)(5)
+          Evaluate qualified person involvement and testing protocols.
+          {% endif %}
+
+      run-prompt:
+        input:
+          snippets: get-theme-topic-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-tag
+          prompt: function/prompt
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          
+          ## Questions for SOP Theme "{{themeTag.name}}" and Topic "{{topicTag.name}}"
+          
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-theme-topic-snippets
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          # {{themeTag.name}} - {{topicTag.name}} Compliance Assessment
+          
+          {{summary.text}}
+          
+          ## Summary Recommendations
+          
+          The above assessment identified key compliance areas that require attention. Please review all "NO" responses and implement the corresponding recommendations.
+        name: "{{title.text}} for {{themeTag.name}} - {{topicTag.name}}"
+        tags: [themeTag, topicTag]
+        attributes:
+          category: sop-compliance-assessment
+          theme: "{{themeTag.name}}"
+          topic: "{{topicTag.name}}"
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-theme-topic-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
