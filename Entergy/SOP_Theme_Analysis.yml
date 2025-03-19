@@ -1,0 +1,258 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  get-sop-topic-tags:
+    tool: find-tags
+    category: "SOP Topics"
+
+  get-sop-theme-tags:
+    tool: find-tags
+    name: ["Roles and Responsibilities"]
+    
+  # Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      Role and Context Setup
+
+      You are a compliance and safety auditor responsible for assessing Standard Operating Procedures (SOPs) and safety protocols. Your objective is to review each question in the questionnaire and provide:
+
+      1. A clear YES/NO/MAYBE determination for each numbered question
+      2. Direct quotes or excerpts from the source document that support your determination
+      3. For NO or MAYBE answers, an explanation of why the criterion did not receive a YES
+      4. For NO or MAYBE answers, specific recommendations for content changes or additions
+
+      Use these criteria for your assessments:
+      - Answer YES when the source document FULLY addresses the question with clear, specific language
+      - Answer MAYBE when the source document partially addresses the question or contains similar but not exactly aligned information
+      - Answer NO when the source document does not address the question or contradicts it
+
+      Format your response with clear spacing and selective bold formatting for emphasis:
+
+      **QUESTION 1**: [Question text here]
+
+      **ANSWER**: **YES**/**NO**/**MAYBE**
+
+      **SOURCE EVIDENCE**:
+      [Direct quote from source document that supports your answer, ESPECIALLY IF THE ANSWER IS YES]
+
+      **EXPLANATION**: [For NO or MAYBE answers, explain why the criterion did not receive a YES, highlighting any related or similar language in the source document]
+
+      **RECOMMENDATION**: 
+      [For NO or MAYBE answers - provide specific content changes or additions:
+      - Write your recommendation in the same tone, style, and format as the source document
+      - If similar language exists: Suggest specific wording changes to meet requirements
+      - If no relevant content exists: Suggest specific language to add to document]
+
+      [Add 2 blank lines between each question for clarity]
+
+  # Analysis title
+  analysisTitle:
+    tool: echo
+    message: SOP Compliance Assessment
+
+  # Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      sopThemesTags: get-sop-theme-tags
+      sopTopicsTags: get-sop-topic-tags
+    tool: knowledge-set
+    knowledgeSetName: "SOP Compliance Assessment"
+    operations:
+      - op: add-dimension
+        key: theme
+        name: SOP Themes
+        nodes: sopThemesTags
+        priority: 1
+      - op: add-dimension
+        key: topic
+        name: SOP Topics
+        nodes: sopTopicsTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # Create insights for each theme-topic combination
+  create-insights:
+    repeat:
+      function: analyze-theme-topic
+      for: [topicTag, themeTag]
+    input:
+      topicTag: get-sop-topic-tags
+      themeTag: get-sop-theme-tags
+      documents: task/documents
+      basePrompt: basePrompt
+      title: analysisTitle
+      knowledgeSet: init-kset
+  
+  # Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      knowledgeSet: init-kset
+      insights: create-insights
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeSet
+      - op: add-items
+        items: insights
+
+functions:
+  analyze-theme-topic:
+    input:
+      topicTag:
+        type: tag
+      themeTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      title:
+        type: text
+      knowledgeSet:
+        type: knowledge-set
+    output:
+      type: insight
+
+    actions:
+      get-filtered-content:
+        input:
+          topicTag: function/topicTag
+          themeTag: function/themeTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [topicTag, themeTag]
+      
+      generate-instruction-prompt:
+        input:
+          topicTag: function/topicTag
+          themeTag: function/themeTag
+          basePrompt: function/basePrompt
+        tool: echo
+        message: |
+          {{basePrompt}}
+          
+          **SOP Theme**: {{themeTag.name}} - **Topic**: {{topicTag.name}}
+          
+          You are analyzing the "{{themeTag.name}}" section under the "{{topicTag.name}}" category of the safety compliance questionnaire. Your task is to review each question below and provide:
+          
+          1. A clear YES/NO/MAYBE determination
+          2. CRITICAL: Direct quotes from the source document that support your determination
+          3. For NO or MAYBE answers, an explanation of why the criterion did not receive a YES
+          4. For NO or MAYBE answers, specific recommendations for content changes or additions
+          
+          Use these criteria for your assessments:
+          - Answer YES when the source document FULLY addresses the question with clear, specific language
+          - Answer MAYBE when the source document partially addresses the question or contains similar but not exactly aligned information
+          - Answer NO when the source document does not address the question or contradicts it
+          
+          Please use the following format for each question:
+          
+          **QUESTION X**: [Question text]
+
+          **ANSWER**: **YES**/**NO**/**MAYBE**
+
+          **SOURCE EVIDENCE**:
+          [Direct quote or excerpt from source document]
+
+          **EXPLANATION**: [For NO or MAYBE answers, explain why the criterion did not receive a YES, highlighting any related or similar language in the source document]
+
+          **RECOMMENDATION**: 
+          [For NO or MAYBE answers - provide specific content changes or additions:
+          - Write your recommendation in the same tone, style, and format as the source document
+          - If similar language exists: Suggest specific wording changes to meet requirements
+          - If no relevant content exists: Suggest specific language to add to document]
+          
+          [Leave 2 blank lines between questions for clarity]
+          
+          IMPORTANT INSTRUCTIONS:
+          - For each question, you MUST cite specific text from the source document that supports your determination
+          - For MAYBE answers, quote and highlight ANY similar or related content from the source document, even if it doesn't fully satisfy the requirement
+          - For NO answers, quote any partially relevant language, even if insufficient, or state "No relevant documentation found"
+          - CRITICAL: All recommendations must match the writing style, terminology, formatting, and tone of the source document
+          - Recommendations should seem like a natural extension of the existing document
+          - For NO or MAYBE answers, provide a clear explanation of how the existing language falls short
+          - For NO or MAYBE answers, suggest SPECIFIC text changes or additions that would make the answer YES
+          - Your recommendations should include actual proposed language that could be added to the document
+          - Use **bold formatting** for section headers and to emphasize important content
+          - Use clear spacing between each section of your answer as shown in the format above
+          - Only answer questions that appear under the "{{themeTag.name}}" heading and "{{topicTag.name}}" subheading
+          
+          Questionnaire Questions:
+          
+          {% if themeTag.name == "Roles and Responsibilities" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Do Senior Leadership and the VP Enterprise Safety support and approve the Confined Space Entry Standard and provide the necessary resources?
+          2. Does Enterprise Safety provide governance, oversight, and conduct an annual review of the standard?
+          3. Do Functional Safety Directors/Managers ensure that proper processes, procedures, and controls are in place and that evaluations are conducted?
+          4. Are employees and Contract Partners trained and required to report any uncontrolled hazards promptly?
+          {% endif %}
+          
+          {% if themeTag.name == "Roles and Responsibilities" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Do Senior Leadership and the VP Enterprise Safety support and approve the Enterprise standard for Material Handling, Rigging, and Lifting and provide the necessary resources?
+          2. Does Enterprise Safety provide governance, oversight, and conduct annual reviews of program performance?
+          3. Do Functional Safety Directors/Managers ensure that all required processes and controls are in place and that personnel are properly trained and compliant?
+          {% endif %}
+
+      run-analysis:
+        input:
+          filtered_content: get-filtered-content
+          instructionPrompt: generate-instruction-prompt
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+        tool: llm
+        skipIfEmpty: filtered_content
+        prompt: |
+          {{instructionPrompt.text}}
+          
+          Content for SOP Theme "{{themeTag.name}}" and Topic "{{topicTag.name}}"
+          
+          {% for segment in filtered_content %}
+          {{segment.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          analysisResult: run-analysis
+          filtered_content: get-filtered-content
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          title: function/title
+          knowledgeSet: function/knowledgeSet
+        skipIfEmpty: analysisResult
+        tool: insight
+        text: |
+          **{{themeTag.name}} - {{topicTag.name}} Compliance Assessment**
+          
+          {{analysisResult.text}}
+          
+          **Summary Recommendations**
+          
+          The above assessment identified key compliance areas that require attention. Please review all **NO** and **MAYBE** responses and implement the corresponding recommendations for specific content changes or additions that would bring the document into full compliance.
+        name: "{{title.text}} for {{themeTag.name}} - {{topicTag.name}}"
+        tags: [themeTag, topicTag]
+        attributes:
+          category: sop-compliance-assessment
+          theme: "{{themeTag.name}}"
+          topic: "{{topicTag.name}}"
+        relations:
+          derived-from: [filtered_content]
+      
+      # Add the insight to the knowledge set passed from the main workflow
+      update-kset:
+        input:
+          insight: create-insight
+          knowledgeSet: function/knowledgeSet
+        tool: knowledge-set
+        knowledgeSetName: "{{knowledgeSet.name}}"
+        operations:
+          - op: set-nodes
+            nodes: insight

@@ -34,7 +34,7 @@ actions:
       
       **Results by Theme and Topic**
       {% for result in processed_results %}
-      {{result}}
+      {{result.text}}
       {% endfor %}
 
 functions:
