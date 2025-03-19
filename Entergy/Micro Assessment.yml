@@ -1,0 +1,224 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collection for SOP Themes - will contain only "Roles and Responsibilities"
+  get-sop-themes-tags:
+    tool: find-tags
+    name: "Roles and Responsibilities"
+    
+  # Get SOP Topics tags (Heading 2 values)
+  get-sop-topics-tags:
+    tool: find-tags
+    name: ["Confined Spaces", "Material Handling, Rigging, and Lifting"]
+  
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a compliance and safety auditor responsible for assessing Standard Operating Procedures (SOPs) and safety protocols. Your objective is to review each question in the questionnaire and provide:
+
+      1. A clear YES/NO determination for each numbered question
+      2. A brief explanation of why the answer is YES or NO
+      3. Any recommendations for addressing compliance gaps if the answer is NO
+
+      Format your response as follows for each question:
+
+      **Question X**: [Question text here]
+      **Answer**: [YES/NO]
+      **Explanation**: [Brief explanation of compliance status]
+      **Recommendation**: [Only if answer is NO - provide specific recommendation]
+
+  # 3) Analysis prompt
+  analysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below are questions from the "{{themeTag.name}}" section of the safety compliance questionnaire. For each numbered question:
+      
+      1. Provide a clear YES/NO answer
+      2. Include a brief explanation supporting your determination
+      3. If the answer is NO, include a specific recommendation for addressing the gap
+      
+      Questions for analysis:
+
+  # 4) Section Title
+  analysisTitle:
+    tool: echo
+    message: SOP Compliance Assessment
+
+  # 5) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      sopThemesTags: get-sop-themes-tags
+      sopTopicsTags: get-sop-topics-tags
+    tool: knowledge-set
+    knowledgeSetName: "SOP Compliance Assessment"
+    operations:
+      - op: add-dimension
+        key: theme
+        name: SOP Themes
+        nodes: sopThemesTags
+        priority: 1
+      - op: add-dimension
+        key: topic
+        name: SOP Topics
+        nodes: sopTopicsTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # 6) Create insights for each SOP Theme tag with each SOP Topic tag
+  create-insights:
+    repeat:
+      function: analyze-theme-topic
+      for: [themeTag, topicTag]
+    input:
+      themeTag: get-sop-themes-tags
+      topicTag: get-sop-topics-tags
+      documents: task/documents
+      basePrompt: basePrompt
+      title: analysisTitle
+  
+  # 7) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      knowledgeSet: init-kset
+      insights: create-insights
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeSet
+      - op: add-items
+        items: insights
+
+functions:
+  analyze-theme-topic:
+    input:
+      themeTag:
+        type: tag
+      topicTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      title:
+        type: text
+    output:
+      type: insight
+
+    actions:
+      get-theme-topic-snippets:
+        input:
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [themeTag, topicTag]
+      
+      generate-instruction-prompt:
+        input:
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          basePrompt: function/basePrompt
+        tool: echo
+        message: |
+          {{basePrompt}}
+          
+          # SOP Theme: {{themeTag.name}} - Topic: {{topicTag.name}}
+          
+          You are analyzing the "{{themeTag.name}}" section under the "{{topicTag.name}}" category of the safety compliance questionnaire. Your task is to review each question below and provide:
+          
+          1. A clear YES/NO determination.
+          2. A brief explanation of your determination.
+          3. If the answer is NO, a specific recommendation for corrective action.
+          
+          Please use the following format for each question:
+          
+          ```
+          **Question X**: [Question text]
+          **Answer**: [YES/NO]
+          **Explanation**: [Brief explanation]
+          **Recommendation**: [If answer is NO]
+          ```
+          
+          4. Number your responses to match the question numbers in the original document.
+          5. Only answer questions that appear under the "{{themeTag.name}}" heading and "{{topicTag.name}}" subheading.
+          
+          ## Questionnaire Questions:
+          
+          {% if themeTag.name == "Roles and Responsibilities" and topicTag.name == "Confined Spaces" %}
+          1. Do Senior Leadership and the VP Enterprise Safety support and approve the Confined Space Entry Standard and provide the necessary resources?
+          2. Does Enterprise Safety provide governance, oversight, and conduct an annual review of the standard?
+          3. Do Functional Safety Directors/Managers ensure that proper processes, procedures, and controls are in place and that evaluations are conducted?
+          4. Are employees and Contract Partners trained and required to report any uncontrolled hazards promptly?
+          {% endif %}
+          
+          {% if themeTag.name == "Roles and Responsibilities" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Do Senior Leadership and the VP Enterprise Safety support and approve the Enterprise standard for Material Handling, Rigging, and Lifting and provide the necessary resources?
+          2. Does Enterprise Safety provide governance, oversight, and conduct annual reviews of program performance?
+          3. Do Functional Safety Directors/Managers ensure that all required processes and controls are in place and that personnel are properly trained and compliant?
+          {% endif %}
+
+      run-analysis:
+        input:
+          snippets: get-theme-topic-snippets
+          instructionPrompt: generate-instruction-prompt
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          
+          ## Questions for SOP Theme "{{themeTag.name}}" and Topic "{{topicTag.name}}"
+          
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          analysisResult: run-analysis
+          snippets: get-theme-topic-snippets
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          title: function/title
+        skipIfEmpty: analysisResult
+        tool: insight
+        text: |
+          # {{themeTag.name}} - {{topicTag.name}} Compliance Assessment
+          
+          {{analysisResult.text}}
+          
+          ## Summary Recommendations
+          
+          The above assessment identified key compliance areas that require attention. Please review all "NO" responses and implement the corresponding recommendations.
+        name: "{{title.text}} for {{themeTag.name}} - {{topicTag.name}}"
+        tags: [themeTag, topicTag]
+        attributes:
+          category: sop-compliance-assessment
+          theme: "{{themeTag.name}}"
+          topic: "{{topicTag.name}}"
+        relations:
+          derived-from: [snippets]
+      
+      add-insight-to-kset:
+        input:
+          insight: create-insight
+          snippets: get-theme-topic-snippets
+        tool: knowledge-set
+        knowledgeSetName: "SOP Compliance Assessment"
+        operations:
+          - op: set-nodes
+            nodes: [insight]

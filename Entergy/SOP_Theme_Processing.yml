@@ -1,0 +1,74 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  get-sop-topic-tags:
+    tool: find-tags
+    category: "SOP Topics"
+
+  get-sop-theme-tags:
+    tool: find-tags
+    category: "SOP Themes"
+
+  process-documents:
+    repeat:
+      function: process-theme-in-topic
+      for: [topicTag, themeTag]
+    input:
+      topicTag: get-sop-topic-tags
+      themeTag: get-sop-theme-tags
+      documents: task/documents
+
+  render-results:
+    input:
+      documents: task/documents
+      processed_results: process-documents
+    tool: echo
+    message: |
+      **Processed Documents**
+      {% for d in documents %}{{d.name}}
+      {% endfor %}
+      
+      **Results by Theme and Topic**
+      {% for result in processed_results %}
+      {{result}}
+      {% endfor %}
+
+functions:
+  process-theme-in-topic:
+    input:
+      topicTag:
+        type: tag
+      themeTag:
+        type: tag
+      documents:
+        type: document
+    actions:
+      get-filtered-content:
+        input:
+          topicTag: function/topicTag
+          themeTag: function/themeTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [topicTag, themeTag]
+      
+      generate-result:
+        input:
+          topicTag: function/topicTag
+          themeTag: function/themeTag
+          filtered_content: get-filtered-content
+        tool: echo
+        message: |
+          **{{topicTag.name}} - {{themeTag.name}}**
+          {% if filtered_content.size > 0 %}
+          {% for segment in filtered_content %}
+          {{segment.text}}
+          {% endfor %}
+          {% else %}
+          No content found for this combination.
+          {% endif %} 
