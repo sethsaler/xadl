@@ -1,0 +1,207 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # get-document-tags:
+  #   tool: find-tags
+  #   name: ["AT&T", "T-Mobile"]
+
+  # Get both company tags in one call
+  get-company-tags:
+    tool: find-tags
+    name: ["AT&T", "T-Mobile"]
+
+  # Individual company tags (still needed for text extraction)
+  get-left-company-tag: 
+    tool: find-tags
+    name: ["AT&T"]
+
+  get-right-company-tag: 
+    tool: find-tags
+    name: ["T-Mobile"]
+
+  get-category-tags:
+    tool: find-tags
+    name: ["Term and Termination", "Customer Invoices and Payment; Disputed Amounts", 
+           "Order and Repair Processes", "Rates and Charges", "Provided Facilities and Equipment", 
+           "Successors and Assigns", "Indemnification", "Liability"]
+    # This returns an array of tag objects
+
+  # Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      companyTags: get-company-tags
+      categoryTags: get-category-tags
+    tool: knowledge-set
+    knowledgeSetName: "Telco Contract Comparison Analysis"
+    operations:
+      # Set documents as nodes
+      - op: set-nodes
+        nodes: documents
+      # Create company dimension with combined tags
+      - op: add-dimension
+        key: company
+        name: "Company" 
+        nodes: companyTags
+        priority: 1
+      # Create category dimension
+      - op: add-dimension
+        key: category
+        name: "Category"
+        nodes: categoryTags
+        priority: 2
+
+  summarize-categories:
+        repeat:
+            function: summarize-category
+            for: [tag]
+        input:
+            leftCompanyTag: get-left-company-tag
+            rightCompanyTag: get-right-company-tag
+            tag: get-category-tags
+            documents: task/documents
+            knowledge: init-kset
+
+  # Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      knowledge: init-kset
+      categoryAnalysis: summarize-categories
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
+  # Original render action (commented out)
+  # render:
+  #       input:
+  #           documents: task/documents
+  #           summaries: summarize-categories
+  #       tool: echo
+  #       message: |
+  #         # Comparison Analysis: AT&T vs T-Mobile Contract Provisions
+  #         
+  #         {% for summary in summaries %}
+  #         {{summary}}
+  #         
+  #         {% endfor %}
+
+functions:
+  summarize-category:
+    input:
+      leftCompanyTag:
+        type: tag
+      rightCompanyTag:
+        type: tag
+      tag:
+          type: tag
+      documents:
+          type: document
+      knowledge:
+          type: knowledge-set
+    actions:
+
+      get-left-company-text:
+        input:
+          tag: function/tag
+          leftCompanyTag: function/leftCompanyTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+            operator: "and"
+            tags: [tag, leftCompanyTag]
+      
+      get-right-company-text:
+        input:
+          tag: function/tag
+          rightCompanyTag: function/rightCompanyTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+            operator: "and"
+            tags: [tag, rightCompanyTag]
+
+      generate-compare:
+        input:
+          tag: function/tag
+          leftCompanyText: get-left-company-text
+          rightCompanyText: get-right-company-text
+        tool: echo
+        message: |
+          COMPARE {{tag.name}}
+          LEFT: {% for t in leftCompanyText%}{{t.text}}{% endfor %}
+          RIGHT: {% for t in rightCompanyText%}{{t.text}}{% endfor %}
+      
+      compare-provisions:
+        input:
+          tag: function/tag
+          leftCompanyText: get-left-company-text
+          rightCompanyText: get-right-company-text
+          compareSummary: generate-compare
+        tool: llm
+        prompt: |
+          # Role and Context
+          You are a telecommunications contract analyst specializing in comparing legal provisions between carrier agreements.
+          
+          # Task
+          Compare the following contract provisions for category "{{tag.name}}" between AT&T and T-Mobile.
+          
+          # Comparison Data
+          ## AT&T Provision
+          {% for t in leftCompanyText %}{{t.text}}{% endfor %}
+          
+          ## T-Mobile Provision
+          {% for t in rightCompanyText %}{{t.text}}{% endfor %}
+          
+          # Analysis Instructions
+          Provide a structured comparison with these sections:
+          
+          1. **Key Similarities**: Identify shared approaches or requirements
+          2. **Material Differences**: Highlight significant differences in approach, requirements, or language
+          3. **Risk Assessment**: Evaluate comparative risk levels and identify which party bears more risk
+          4. **Financial Impact**: Assess potential cost differences between provisions
+          5. **Recommendation**: Provide a brief recommendation on which provision is more favorable
+          
+          Focus on substantive differences that impact operations, risk exposure, or financial implications.
+      
+      create-comparison-insight:
+        input:
+          comparison: compare-provisions
+          tag: function/tag
+          leftCompanyTag: function/leftCompanyTag
+          rightCompanyTag: function/rightCompanyTag
+          leftCompanyText: get-left-company-text
+          rightCompanyText: get-right-company-text
+        skipIfEmpty: comparison
+        tool: insight
+        text: |
+          # Comparison Analysis: {{tag.name}}
+          
+          {{comparison.text}}
+        name: "Contract Comparison: {{tag.name}} - {{leftCompanyTag.name}} vs {{rightCompanyTag.name}}"
+        tags: [tag, leftCompanyTag, rightCompanyTag]
+        attributes:
+          category: telco-contract-comparison
+          analysisType: cross-company
+        relations:
+          derived-from: [leftCompanyText, rightCompanyText]
+
+      add-insight-to-knowledge:
+        input:
+          knowledge: function/knowledge
+          insight: create-comparison-insight
+          leftCompanyText: get-left-company-text
+          rightCompanyText: get-right-company-text
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: leftCompanyText
+          - op: set-nodes
+            nodes: rightCompanyText

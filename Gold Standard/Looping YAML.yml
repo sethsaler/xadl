@@ -1,0 +1,91 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # get-document-tags:
+  #   tool: find-tags
+  #   name: ["AT&T", "T-Mobile"]
+
+  get-left-company-tags: 
+    tool: find-tags
+    category: "Customer"
+
+  get-right-company-tags: 
+    tool: find-tags
+    category: "Customer"
+
+  get-category-tags:
+    tool: find-tags
+    name: ["Term and Termination", "Customer Invoices and Payment; Disputed Amounts", 
+           "Order and Repair Processes", "Rates and Charges", "Provided Facilities and Equipment", 
+           "Successors and Assigns", "Indemnification", "Liability"]
+
+  summarize-categories:
+        repeat:
+            function: summarize-category
+            for: [tag, leftCompanyTag, rightCompanyTag]
+        input:
+            leftCompanyTag: get-left-company-tags
+            rightCompanyTag: get-right-company-tags
+            tag: get-category-tags
+            documents: task/documents
+
+  render:
+        input:
+            documents: task/documents
+            summaries: summarize-categories
+        tool: echo
+        message: |
+          **Summarized Documents**
+          {% for d in documents%}{{d.name}}
+          {% endfor %}
+          **Summaries**
+          {% for s in summaries%}{{s.text}}
+          {% endfor %}
+
+functions:
+  summarize-category:
+    input:
+      leftCompanyTag:
+        type: tag
+      rightCompanyTag:
+        type: tag
+      tag:
+          type: tag
+      documents:
+          type: document
+    actions:
+
+      get-left-company-text:
+        input:
+          tag: function/tag
+          leftCompanyTag: function/leftCompanyTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+            operator: "and"
+            tags: [tag, leftCompanyTag]
+      
+      get-right-company-text:
+        input:
+          tag: function/tag
+          rightCompanyTag: function/rightCompanyTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+            operator: "and"
+            tags: [tag, rightCompanyTag]
+
+      generate-compare:
+        input:
+          tag: function/tag
+          leftCompanyText: get-left-company-text
+          rightCompanyText: get-right-company-text
+        tool: echo
+        message: |
+          COMPARE {{tag.name}}
+          LEFT: {% for t in leftCompanyText%}{{t.text}}{% endfor %}
+          RIGHT: {% for t in rightCompanyText%}{{t.text}}{% endfor %}
