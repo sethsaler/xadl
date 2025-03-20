@@ -7,7 +7,7 @@ input:
 actions:
   get-document-category-tags: 
     tool: find-tags
-    category: "Document"
+    category: "Project"
 
   get-credit-tags: 
     tool: find-tags
@@ -31,8 +31,8 @@ actions:
         name: Tags
         nodes: creditTags
         priority: 2
-      - op: add-items
-        items: documents
+      - op: set-nodes
+        nodes: documents
 
   analyze-document-credits:
     repeat:
@@ -50,13 +50,21 @@ actions:
       knowledge: init-kset
     tool: llm
     prompt: |
-      You are reviewing credit provisions across multiple agreements. Create a comprehensive summary that:
+      You are reviewing credit provisions across multiple talent and production agreements. Create a comprehensive cross-agreement summary that:
       
-      1. Identifies common credit patterns across agreements
-      2. Highlights any unique or unusual credit provisions
-      3. Notes any inconsistencies that might create compliance challenges
+      1. Identifies specific credit term patterns (e.g., consistent positioning, formatting, or designation requirements)
+      2. Categorizes terms by type (main titles, end credits, paid advertising, etc.)
+      3. Highlights any unique or unusual credit provisions in specific agreements
+      4. Notes inconsistencies or potential conflicts between different agreements
+      5. Summarizes approval rights, special conditions, and any guild/union requirements
       
-      Base your summary only on the credit summaries provided:
+      Focus specifically on the credit terms themselves - positioning, format, size, placement, and special requirements.
+      
+      Use bold formatting for key terms and requirements that appear across multiple agreements.
+      
+      Structure your analysis by credit term categories rather than by agreement, so stakeholders can understand common patterns.
+      
+      Base your summary only on the credit summaries provided below:
       
       {% for summary in creditSummaries %}
       ## {{summary.name}}
@@ -81,8 +89,8 @@ actions:
       insight: add-summary-insight
     tool: knowledge-set
     operations:
-      - op: add-items
-        items: insight
+      - op: set-nodes
+        nodes: insight
     
   add-to-workspace:
     input:
@@ -119,6 +127,7 @@ functions:
       get-credit-text:
         input:
           creditTag: function/creditTag
+          documentTag: function/documentTag
           documents: function/documents
         tool: document-text
         textFilter:
@@ -212,7 +221,7 @@ functions:
         skipIfEmpty: insight
         tool: knowledge-set
         operations:
-          - op: add-items
-            items: insight
-          - op: add-items
-            items: creditText 
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: creditText 
