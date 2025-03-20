@@ -7,7 +7,7 @@ input:
 actions:
   get-document-category-tags: 
     tool: find-tags
-    category: "Project"
+    category: "Counterparty Name"
 
   get-credit-tags: 
     tool: find-tags
@@ -123,6 +123,7 @@ functions:
         textFilter:
           operator: "and"
           tags: [documentTag]
+        skipIfEmpty: documentTag
       
       get-credit-text:
         input:
@@ -133,6 +134,7 @@ functions:
         textFilter:
           operator: "and"
           tags: [creditTag, documentTag]
+        skipIfEmpty: [creditTag, documentTag]
 
       generate-credit-summary:
         input:
