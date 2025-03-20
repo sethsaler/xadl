@@ -75,10 +75,21 @@ actions:
     attributes:
       category: summary-insight
     
+  add-summary-to-knowledge:
+    input:
+      knowledge: init-kset
+      insight: add-summary-insight
+    tool: knowledge-set
+    operations:
+      - op: add-items
+        items: insight
+    
   add-to-workspace:
     input:
       workspace: task/workspace
       knowledge: init-kset
+      documentCredits: analyze-document-credits
+      summaryInsight: add-summary-to-knowledge
     tool: workspace
     operations:
       - op: add-items
