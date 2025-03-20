@@ -134,14 +134,52 @@ functions:
         tool: llm
         skipIfEmpty: creditText
         prompt: |
-          You are reviewing the credit provisions in a talent or production agreement. 
-          
-          Create a concise summary of the credit terms that:
-          1. Identifies specifically what credit must be given (title, position, etc.)
-          2. Notes any positioning requirements (sole, shared, first position, etc.)
-          3. Describes size, format, and placement requirements
-          4. Highlights any conditions or contingencies affecting the credit
-          5. Mentions any approval rights or notification requirements
+          CREDIT ANALYSIS REQUIREMENTS:
+
+          <overview>
+          Create a single, concise paragraph that includes ONLY explicitly stated credit information. Bold all key terms that appear in the text. Start directly with the found information - no lead-in phrases. Use quotes for specific credit text or formatting requirements.
+          </overview>
+
+          <required_elements>
+          Elements to include (ONLY if explicitly stated in the text):
+          - Talent category and role
+          - Credit position/placement 
+          - Card type and format
+          - Special credit designations (exact text in quotes)
+          - Size and format requirements
+          - Credit parity provisions
+          - Guild credit requirements
+          - Credit approval rights
+          - Special conditions affecting credit display
+          - Paid advertising credit requirements
+          </required_elements>
+
+          <examples>
+          Note: These are ONLY example formats to demonstrate proper formatting - DO NOT use these examples in your analysis:
+          Format Example 1: When text states "Credit shall be in end titles", write: **Credit** shall appear in the **end titles**.
+          Format Example 2: When text states "Credit as Executive Producer", write: **Executive Producer** credit shall appear as "**Executive Producer**".
+          Format Example 3: When text states "Credit equal to director", write: Credit shall appear in **size and style** equal to the **director** credit.
+
+          IMPORTANT: DO NOT use these examples in your analysis. ONLY analyze the actual provided text snippets.
+          </examples>
+
+          <rules>
+          Rules:
+          1. Start directly with the information - no introductory phrases
+          2. Include ONLY information explicitly stated in the provided text snippets
+          3. DO NOT use any information from the examples above
+          4. DO NOT mention missing or unspecified terms
+          5. DO NOT use phrases like "not specified" or "no requirements mentioned"
+          6. Bold ONLY terms that appear in the actual source text snippets
+          7. Use quotes for exact credit text/formatting requirements ONLY from source text
+          8. Maintain a natural, flowing narrative
+          9. EXCLUDE all compensation and payment terms
+          10. No bullet points or separate sections
+          11. No commentary about missing information
+          12. NEVER copy or reference the example formats above - analyze ONLY the provided snippets
+          </rules>
+
+          Document: {{documentTag.name}}
           
           Base your analysis on the credit-specific text provided:
           
