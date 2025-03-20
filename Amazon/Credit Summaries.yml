@@ -1,0 +1,169 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  get-document-category-tags: 
+    tool: find-tags
+    category: "Document"
+
+  get-credit-tags: 
+    tool: find-tags
+    name: ["Credit"]
+
+  init-kset:
+    input:
+      documents: task/documents
+      documentTags: get-document-category-tags
+      creditTags: get-credit-tags
+    tool: knowledge-set
+    knowledgeSetName: "Credit Analysis"
+    operations:
+      - op: add-dimension
+        key: agreement
+        name: Agreement
+        nodes: documentTags
+        priority: 1
+      - op: add-dimension
+        key: theme
+        name: Tags
+        nodes: creditTags
+        priority: 2
+      - op: add-items
+        items: documents
+
+  analyze-document-credits:
+    repeat:
+      function: create-credit-summary
+      for: [documentTag, creditTag]
+    input:
+      documentTag: get-document-category-tags
+      creditTag: get-credit-tags
+      documents: task/documents
+      knowledge: init-kset
+
+  create-summary-of-summaries:
+    input:
+      creditSummaries: analyze-document-credits
+      knowledge: init-kset
+    tool: llm
+    prompt: |
+      You are reviewing credit provisions across multiple agreements. Create a comprehensive summary that:
+      
+      1. Identifies common credit patterns across agreements
+      2. Highlights any unique or unusual credit provisions
+      3. Notes any inconsistencies that might create compliance challenges
+      
+      Base your summary only on the credit summaries provided:
+      
+      {% for summary in creditSummaries %}
+      ## {{summary.name}}
+      {{summary.text}}
+      
+      {% endfor %}
+
+  add-summary-insight:
+    input:
+      knowledge: init-kset
+      summary: create-summary-of-summaries
+    tool: insight
+    text: |
+      {{summary.text}}
+    name: "Cross-Agreement Credit Analysis"
+    attributes:
+      category: summary-insight
+    
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      knowledge: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
+functions:
+  create-credit-summary:
+    input:
+      documentTag:
+        type: tag
+      creditTag:
+        type: tag
+      documents:
+        type: document
+      knowledge:
+        type: knowledge-set
+    actions:
+      get-document-text:
+        input:
+          documentTag: function/documentTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [documentTag]
+      
+      get-credit-text:
+        input:
+          creditTag: function/creditTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [creditTag, documentTag]
+
+      generate-credit-summary:
+        input:
+          documentTag: function/documentTag
+          creditTag: function/creditTag
+          documentText: get-document-text
+          creditText: get-credit-text
+        tool: llm
+        skipIfEmpty: creditText
+        prompt: |
+          You are reviewing the credit provisions in a talent or production agreement. 
+          
+          Create a concise summary of the credit terms that:
+          1. Identifies specifically what credit must be given (title, position, etc.)
+          2. Notes any positioning requirements (sole, shared, first position, etc.)
+          3. Describes size, format, and placement requirements
+          4. Highlights any conditions or contingencies affecting the credit
+          5. Mentions any approval rights or notification requirements
+          
+          Base your analysis on the credit-specific text provided:
+          
+          {% for text in creditText %}
+          {{text.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: generate-credit-summary
+          creditText: get-credit-text
+          documentTag: function/documentTag
+          creditTag: function/creditTag
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "Credit Summary for {{documentTag.name}}"
+        tags: [documentTag, creditTag]
+        attributes:
+          category: credit-insight
+        relations:
+          derived-from: [creditText]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          creditText: get-credit-text
+        skipIfEmpty: insight
+        tool: knowledge-set
+        operations:
+          - op: add-items
+            items: insight
+          - op: add-items
+            items: creditText 
