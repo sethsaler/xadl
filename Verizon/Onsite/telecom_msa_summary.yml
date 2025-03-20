@@ -1,0 +1,417 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # Get contract theme tags
+  get-contract-theme-tags:
+    tool: find-tags
+    category: "Contract Theme"
+  
+  # Base prompt configuration
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context
+      You are a telecom legal and business expert specializing in Master Services Agreements (MSAs). Your task is to extract and summarize key information from contract sections to provide executives with critical insights about cell site agreements.
+      
+      When summarizing:
+      - Focus on material obligations, rights, and limitations
+      - Highlight unusual or non-standard terms
+      - Flag any potential risks or opportunities
+      - Be thorough but concise, using industry-standard terminology
+      - Provide actionable business context where relevant
+      - Use **bold** formatting for critical terms, financial figures, and key dates
+      - Use *italics* for important qualifications, exceptions, or conditional elements
+      - Include direct quotations from the contract when particularly significant
+
+  # Theme-specific instructions
+  themeInstructions:
+    tool: echo
+    message: |
+      {% if themeTag.name == "Applicable Law; Construction" %}
+      Extract: Governing state/jurisdiction, any choice of law provisions, interpretation principles, and conflict resolution between provisions.
+      Focus on: Which state's laws apply, how ambiguities are resolved, and any non-standard construction provisions that might affect cell site agreements.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Assurance of Payment" %}
+      Extract: Payment security requirements, deposit conditions, credit requirements and verification processes.
+      Focus on: Financial assurance mechanisms, triggers for additional security, and impact on cell site service delivery.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Authorization" %}
+      Extract: Authorization requirements, who can bind the parties, and what approvals are needed for cell site agreements.
+      Focus on: Signature authority limitations, approval processes for cell site installations, and potential bottlenecks.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Composition of Agreement" %}
+      Extract: Document hierarchy, incorporated materials, and how conflicts between documents are resolved for cell site agreements.
+      Focus on: Order of precedence, which exhibits/attachments are incorporated for cell sites, and amendment processes.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Confidential Information" %}
+      Extract: Definition of confidential information, protection requirements for cell site data, and permitted disclosures.
+      Focus on: Duration of confidentiality obligations, exclusions, and data security requirements for site information.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Counterparts" %}
+      Extract: Provisions for execution in counterparts and electronic signature validity for cell site agreements.
+      Focus on: Any unusual requirements for effective execution or delivery of cell site documentation.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Default" %}
+      Extract: Default triggers, cure periods, and remedies available to non-defaulting party in cell site agreements.
+      Focus on: Notice requirements, materiality thresholds, and escalation procedures for cell site service issues.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Definitions" %}
+      Extract: Key defined terms that impact material obligations or interpretations for cell site services.
+      Focus on: Definitions of "Cell Site," "Backhaul," "Installation," "Service Specifications," and other terms that could affect rights or obligations.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Dispute Resolution" %}
+      Extract: Dispute resolution process, escalation requirements, arbitration provisions for cell site service disputes.
+      Focus on: Mandatory vs. optional processes, time limits, and whether litigation is permitted for site-related issues.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Entire Agreement; Modifications in Writing" %}
+      Extract: Integration clause scope and requirements for valid modifications to cell site agreements.
+      Focus on: Whether oral modifications are permitted and the process for written amendments to cell site specifications.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Force Majeure" %}
+      Extract: Qualifying events, notice requirements, and relief provided for cell site services.
+      Focus on: Whether cell site service payments are suspended during force majeure events, unusual exclusions, and impact on service levels.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Good Faith Performance" %}
+      Extract: Good faith obligations, cooperation requirements for cell site installations and services.
+      Focus on: Specific areas requiring cooperation and any objective standards for measuring good faith in cell site implementations.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Headings" %}
+      Extract: Status of headings in interpretation of the cell site agreement.
+      Focus on: Whether headings are binding or merely for convenience in cell site specifications.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Indemnification" %}
+      Extract: Indemnification scope, triggers, exclusions, and defense obligations related to cell site services.
+      Focus on: Whether mutual or one-sided, cap limits for cell site incidents, and notification requirements.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Intellectual Property" %}
+      Extract: IP ownership for cell site technologies, license grants, restrictions, and infringement responsibilities.
+      Focus on: Rights to derivative works, license limitations for cell site technology, and indemnification for infringement.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Invoices and Payment; Disputed Amounts" %}
+      Extract: Cell site service payment terms, installation fees, recurring charges, dispute procedures, and consequences of non-payment.
+      Focus on: Payment timeframes, MRC structure, volume discounts, dispute notice requirements, and whether undisputed amounts must be paid.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Joint Work Product" %}
+      Extract: Treatment of jointly created materials for cell sites, ownership rights, and license provisions.
+      Focus on: IP assignment, usage rights, and any restrictions on joint work products related to cell site technologies.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Law Enforcement" %}
+      Extract: Obligations related to law enforcement requests, subpoenas, and surveillance for cell site data.
+      Focus on: Notice requirements, cost allocation, and cooperation obligations for cell site surveillance requests.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Liability" %}
+      Extract: Liability limitations, exclusions, caps, and carve-outs for cell site services and installations.
+      Focus on: Whether consequential damages are excluded for cell site failures, liability caps, and exceptions to limitations.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Notices" %}
+      Extract: Notice delivery methods, addresses, and when notices are deemed effective for cell site services.
+      Focus on: Electronic notice provisions for service disruptions, required recipients, and timing considerations.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Ordering and Repair Processes" %}
+      Extract: Cell site order submission requirements, service specifications, connection architecture, interface types, acceptance procedures, and repair response times.
+      Focus on: Cell site installation processes, SLAs, MTTR, jitter/latency requirements, escalation processes, and order modification/cancellation rights.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Provided Facilities and Equipment" %}
+      Extract: Cell site equipment provision, backhaul configuration, technology migration support, ownership, maintenance responsibilities, and return obligations.
+      Focus on: Title transfer provisions, risk allocation, and replacement requirements for cell site equipment.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Publicity and Use of Trademarks or Service Marks" %}
+      Extract: Rights to use names/logos for cell site installations, approval requirements, and publicity restrictions.
+      Focus on: Approval processes, prohibited uses, and whether reference to cell sites is permitted in customer materials.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Rates and Charges" %}
+      Extract: Cell site rate structures, installation fees, recurring cost structure (MRC), volume discounts, adjustment mechanisms, and additional fee provisions.
+      Focus on: Price change notice requirements, volume discount eligibility, minimum commitments for cell site services.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Regulatory Requirements" %}
+      Extract: Regulatory compliance obligations for cell sites, reporting requirements, and change management.
+      Focus on: Responsibility allocation for compliance costs and regulatory change impacts on cell site installations.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Relationship of the Parties" %}
+      Extract: Independent contractor provisions and agency limitations for cell site services.
+      Focus on: Any unusual authority grants or limitations on the relationship for cell site installation personnel.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Sections 251/252/271" %}
+      Extract: Telecommunications Act compliance provisions and interconnection requirements affecting cell sites.
+      Focus on: Specific regulatory compliance mechanisms and impact on cell site services.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Successors and Assigns" %}
+      Extract: Assignment rights for cell site agreements, restrictions, and notice/consent requirements.
+      Focus on: Whether consent can be unreasonably withheld and change of control provisions affecting cell site services.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Survival" %}
+      Extract: Provisions that survive termination of cell site agreements and their duration.
+      Focus on: Key surviving obligations and any unusual survival terms for decommissioned cell sites.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Taxes" %}
+      Extract: Tax responsibility allocation for cell site services, exemption certificate requirements, and dispute processes.
+      Focus on: Who bears which taxes for cell site equipment and services, documentation requirements, and tax audit cooperation.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Term and Termination" %}
+      Extract: Initial term, renewal mechanisms, termination rights, early termination fees, and post-termination obligations for cell site services.
+      Focus on: Auto-renewal provisions, convenience termination rights, transition assistance provisions, wind-down requirements for cell sites.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Third Party Beneficiaries" %}
+      Extract: Whether third parties have rights under the cell site agreement and any exceptions.
+      Focus on: Any named beneficiaries for cell site services and the scope of their rights.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Unenforceability of Provisions" %}
+      Extract: Severability provisions and reformation approaches for cell site agreements.
+      Focus on: Whether the whole cell site agreement fails if key provisions are invalid.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Use of ACNAs" %}
+      Extract: Access Customer Name Abbreviation usage requirements and restrictions for cell site services.
+      Focus on: Specific ACNA assignment processes and compliance requirements for cell site interconnections.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Waiver" %}
+      Extract: Waiver requirements, effect of waiver, and non-waiver provisions for cell site agreements.
+      Focus on: Whether waivers must be in writing and if single waivers affect future rights for cell site services.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name == "Warranties" %}
+      Extract: Express warranties, warranty disclaimers, and remedies for breach related to cell site services and equipment.
+      Focus on: Whether implied warranties are disclaimed and warranty limitations for cell site installations.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+      
+      {% if themeTag.name != "Applicable Law; Construction" and themeTag.name != "Assurance of Payment" and themeTag.name != "Authorization" and themeTag.name != "Composition of Agreement" and themeTag.name != "Confidential Information" and themeTag.name != "Counterparts" and themeTag.name != "Default" and themeTag.name != "Definitions" and themeTag.name != "Dispute Resolution" and themeTag.name != "Entire Agreement; Modifications in Writing" and themeTag.name != "Force Majeure" and themeTag.name != "Good Faith Performance" and themeTag.name != "Headings" and themeTag.name != "Indemnification" and themeTag.name != "Intellectual Property" and themeTag.name != "Invoices and Payment; Disputed Amounts" and themeTag.name != "Joint Work Product" and themeTag.name != "Law Enforcement" and themeTag.name != "Liability" and themeTag.name != "Notices" and themeTag.name != "Ordering and Repair Processes" and themeTag.name != "Provided Facilities and Equipment" and themeTag.name != "Publicity and Use of Trademarks or Service Marks" and themeTag.name != "Rates and Charges" and themeTag.name != "Regulatory Requirements" and themeTag.name != "Relationship of the Parties" and themeTag.name != "Sections 251/252/271" and themeTag.name != "Successors and Assigns" and themeTag.name != "Survival" and themeTag.name != "Taxes" and themeTag.name != "Term and Termination" and themeTag.name != "Third Party Beneficiaries" and themeTag.name != "Unenforceability of Provisions" and themeTag.name != "Use of ACNAs" and themeTag.name != "Waiver" and themeTag.name != "Warranties" %}
+      Extract: Key obligations, rights, limitations, and unusual provisions related to cell site agreements.
+      Focus on: Material terms that affect cell site operations, risk allocation, and compliance requirements.
+      Replicate relevant contract text snippets to support each summary point.
+      Include specific clause references where possible.
+      {% endif %}
+
+  # Enhanced contract analysis prompt
+  contractSummaryPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+      
+      Below is text from a telecom MSA related to {{themeTag.name}}. 
+      
+      {{themeInstructions}}
+      
+      Please provide a comprehensive summary (5-7 sentences) that captures the critical information based on the focus areas identified above. Use **bold** for key terms, financial figures, and timelines. Use *italics* for important qualifications or exceptions. Include direct quotes where particularly illustrative.
+      
+      Contract text:
+
+  # Initialize knowledge set for organizing summaries
+  init-knowledge-set:
+    input:
+      documents: task/documents
+      contractThemeTags: get-contract-theme-tags
+    tool: knowledge-set
+    knowledgeSetName: "Telecom MSA Key Facts Summary"
+    operations:
+      - op: add-dimension
+        key: theme
+        name: Contract Themes
+        nodes: contractThemeTags
+        priority: 1
+      - op: set-nodes
+        nodes: documents
+
+  # Analyze each contract theme tag
+  summarize-each-theme:
+    repeat:
+      function: summarize-theme
+      for: [themeTag]
+    input:
+      themeTag: get-contract-theme-tags
+      documents: task/documents
+      knowledge: init-knowledge-set
+      basePrompt: basePrompt
+      themeInstructions: themeInstructions
+      prompt: contractSummaryPrompt
+
+  # Add results to workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      themeSummaries: summarize-each-theme
+      knowledgeSet: init-knowledge-set
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeSet
+
+functions:
+  summarize-theme:
+    input:
+      themeTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      themeInstructions:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+
+    actions:
+      # Get all text snippets for this theme tag
+      get-theme-snippets:
+        input:
+          themeTag: function/themeTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          tags: [themeTag]
+      
+      # Generate summary using LLM
+      generate-summary:
+        input:
+          snippets: get-theme-snippets
+          themeTag: function/themeTag
+          basePrompt: function/basePrompt
+          themeInstructions: function/themeInstructions
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      # Create insight from summary
+      create-insight:
+        input:
+          summary: generate-summary
+          snippets: get-theme-snippets
+          themeTag: function/themeTag
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "Key Facts: {{themeTag.name}}"
+        tags: [themeTag]
+        attributes:
+          category: telecom-msa-summary
+        relations:
+          derived-from: [snippets]
+
+      # Add insight to knowledge set
+      add-theme-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-theme-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets 
