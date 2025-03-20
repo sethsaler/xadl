@@ -1,0 +1,238 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  get-document-category-tags: 
+    tool: find-tags
+    category: "Counterparty Name"
+
+  get-credit-tags: 
+    tool: find-tags
+    name: ["Credit"]
+
+  init-kset:
+    input:
+      documents: task/documents
+      documentTags: get-document-category-tags
+      creditTags: get-credit-tags
+    tool: knowledge-set
+    knowledgeSetName: "Credit Analysis"
+    operations:
+      - op: add-dimension
+        key: counterparty
+        name: Counterparty
+        nodes: documentTags
+        priority: 1
+      - op: add-dimension
+        key: theme
+        name: Tags
+        nodes: creditTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  analyze-document-credits:
+    repeat:
+      function: create-credit-summary
+      for: [documentTag, creditTag]
+    input:
+      documentTag: get-document-category-tags
+      creditTag: get-credit-tags
+      documents: task/documents
+      knowledge: init-kset
+
+  create-summary-of-summaries:
+    input:
+      creditSummaries: analyze-document-credits
+      knowledge: init-kset
+    tool: llm
+    prompt: |
+      You are reviewing credit provisions across multiple talent and production agreements. Create a comprehensive summary organized by talent (Counterparty Name).
+
+      ## Organization Requirements
+      1. Group all credit provisions by Counterparty Name - this is the primary organization method
+      2. For each counterparty, list and summarize ALL their credit provisions across different agreements 
+      3. If a counterparty has multiple roles (e.g., actor in one project, writer in another), group these by the counterparty and clearly distinguish between roles
+      4. Include the project/agreement name for each credit provision
+      
+      ## Content Requirements
+      For each counterparty:
+      1. Begin with their name as a header
+      2. List each project/role with its specific credit requirements
+      3. Provide a brief paragraph summarizing patterns across their agreements
+      4. Highlight any unique or unusual provisions specific to this counterparty
+      5. Note any inconsistencies in how this counterparty's credits are handled across projects
+      
+      ## Formatting
+      - Use bold for counterparty names and project names
+      - Use bullet points to separate different projects/roles for the same counterparty
+      - Use quotes for specific credit text requirements
+      - Highlight key terms consistently across all counterparties
+      
+      Base your summary on the credit summaries provided below, focusing on organizing by counterparty rather than by project:
+      
+      {% for summary in creditSummaries %}
+      ## {{summary.name}}
+      {{summary.text}}
+      
+      {% endfor %}
+
+  add-summary-insight:
+    input:
+      knowledge: init-kset
+      summary: create-summary-of-summaries
+    tool: insight
+    text: |
+      {{summary.text}}
+    name: "Cross-Agreement Credit Analysis"
+    attributes:
+      category: summary-insight
+    
+  add-summary-to-knowledge:
+    input:
+      knowledge: init-kset
+      insight: add-summary-insight
+    tool: knowledge-set
+    operations:
+      - op: set-nodes
+        nodes: insight
+    
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      knowledge: init-kset
+      documentCredits: analyze-document-credits
+      summaryInsight: add-summary-to-knowledge
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledge
+
+functions:
+  create-credit-summary:
+    input:
+      documentTag:
+        type: tag
+      creditTag:
+        type: tag
+      documents:
+        type: document
+      knowledge:
+        type: knowledge-set
+    actions:
+      get-document-text:
+        input:
+          documentTag: function/documentTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [documentTag]
+        skipIfEmpty: documentTag
+      
+      get-credit-text:
+        input:
+          creditTag: function/creditTag
+          documentTag: function/documentTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [creditTag, documentTag]
+        skipIfEmpty: [creditTag, documentTag]
+
+      generate-credit-summary:
+        input:
+          documentTag: function/documentTag
+          creditTag: function/creditTag
+          documentText: get-document-text
+          creditText: get-credit-text
+        tool: llm
+        skipIfEmpty: creditText
+        prompt: |
+          CREDIT ANALYSIS REQUIREMENTS:
+
+          <overview>
+          Create a single, concise paragraph that includes ONLY explicitly stated credit information. Bold all key terms that appear in the text. Start directly with the found information - no lead-in phrases. Use quotes for specific credit text or formatting requirements.
+          </overview>
+
+          <required_elements>
+          Elements to include (ONLY if explicitly stated in the text):
+          - Talent category and role
+          - Credit position/placement 
+          - Card type and format
+          - Special credit designations (exact text in quotes)
+          - Size and format requirements
+          - Credit parity provisions
+          - Guild credit requirements
+          - Credit approval rights
+          - Special conditions affecting credit display
+          - Paid advertising credit requirements
+          </required_elements>
+
+          <examples>
+          Note: These are ONLY example formats to demonstrate proper formatting - DO NOT use these examples in your analysis:
+          Format Example 1: When text states "Credit shall be in end titles", write: **Credit** shall appear in the **end titles**.
+          Format Example 2: When text states "Credit as Executive Producer", write: **Executive Producer** credit shall appear as "**Executive Producer**".
+          Format Example 3: When text states "Credit equal to director", write: Credit shall appear in **size and style** equal to the **director** credit.
+
+          IMPORTANT: DO NOT use these examples in your analysis. ONLY analyze the actual provided text snippets.
+          </examples>
+
+          <rules>
+          Rules:
+          1. Start directly with the information - no introductory phrases
+          2. Include ONLY information explicitly stated in the provided text snippets
+          3. DO NOT use any information from the examples above
+          4. DO NOT mention missing or unspecified terms
+          5. DO NOT use phrases like "not specified" or "no requirements mentioned"
+          6. Bold ONLY terms that appear in the actual source text snippets
+          7. Use quotes for exact credit text/formatting requirements ONLY from source text
+          8. Maintain a natural, flowing narrative
+          9. EXCLUDE all compensation and payment terms
+          10. No bullet points or separate sections
+          11. No commentary about missing information
+          12. NEVER copy or reference the example formats above - analyze ONLY the provided snippets
+          </rules>
+
+          Document: {{documentTag.name}}
+          
+          Base your analysis on the credit-specific text provided:
+          
+          {% for text in creditText %}
+          {{text.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: generate-credit-summary
+          creditText: get-credit-text
+          documentTag: function/documentTag
+          creditTag: function/creditTag
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "Credit Summary for {{documentTag.name}}"
+        tags: [documentTag, creditTag]
+        attributes:
+          category: credit-insight
+          counterparty: "{{documentTag.name}}"
+        relations:
+          derived-from: [creditText]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          creditText: get-credit-text
+        skipIfEmpty: insight
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: creditText 
