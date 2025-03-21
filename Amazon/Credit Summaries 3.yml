@@ -55,52 +55,62 @@ actions:
       documents: task/documents
       knowledge: init-kset
 
-  create-summary-of-summaries:
+  create-counterparty-summaries-by-agreement:
     input:
       creditSummaries: analyze-document-credits
+      documentTags: get-document-category-tags
+      agreementTags: get-agreement-tags
+      knowledge: init-kset
+    repeat:
+      function: summarize-counterparty-in-agreement
+      for: [agreementTag]
+    tool: knowledge-set
+    operations:
+      - op: set-nodes
+        nodes: agreementTags
+
+  create-agreement-summary-of-summaries:
+    input:
+      counterpartySummaries: create-counterparty-summaries-by-agreement
       knowledge: init-kset
     tool: llm
     prompt: |
-      You are reviewing credit provisions across multiple talent and production agreements. Create a comprehensive summary organized by talent (Counterparty Name) and agreement.
+      You are reviewing credit provisions across multiple talent and production agreements. Create a comprehensive summary organized by agreement type, summarizing the counterparty credit provisions within each agreement.
 
       ## Organization Requirements
-      1. Group all credit provisions by Counterparty Name - this is the primary organization method
-      2. Within each counterparty section, further organize by Agreement
-      3. For each counterparty and agreement combination, list and summarize ALL their credit provisions 
-      4. If a counterparty has multiple roles (e.g., actor in one project, writer in another), clearly distinguish between roles
-      5. Include both the counterparty name and agreement name for each credit provision
+      1. Group all credit provisions by Agreement Type - this is the primary organization method
+      2. Within each agreement section, include a summary of the patterns and notable provisions across all counterparties
+      3. Highlight commonalities and differences in credit requirements across counterparties for each agreement type
       
       ## Content Requirements
-      For each counterparty:
-      1. Begin with their name as a header
-      2. List each agreement with specific credit requirements
-      3. For each agreement, detail the specific credit provisions
-      4. Provide a brief paragraph summarizing patterns across their agreements
-      5. Highlight any unique or unusual provisions specific to this counterparty
-      6. Note any inconsistencies in how this counterparty's credits are handled across agreements
+      For each agreement type:
+      1. Begin with the agreement type as a header
+      2. Provide an overview summary of typical credit provisions for this agreement type
+      3. Highlight notable patterns across counterparties
+      4. Identify any unique or unusual provisions within this agreement type
+      5. Note any inconsistencies in how credits are handled within this agreement type
       
       ## Formatting
-      - Use bold for counterparty names and agreement names
-      - Use bullet points to separate different agreements/roles for the same counterparty
+      - Use bold for agreement type names
+      - Use bullet points to separate different patterns or notable provisions
       - Use quotes for specific credit text requirements
-      - Highlight key terms consistently across all counterparties
+      - Highlight key terms consistently across all agreement types
       
-      Base your summary on the credit summaries provided below, focusing on organizing by counterparty and agreement:
+      Base your summary on the counterparty summaries provided below, focusing on organizing by agreement type:
       
-      {% for summary in creditSummaries %}
+      {% for summary in counterpartySummaries %}
       ## {{summary.name}}
       {{summary.text}}
-      
       {% endfor %}
 
   add-summary-insight:
     input:
       knowledge: init-kset
-      summary: create-summary-of-summaries
+      summary: create-agreement-summary-of-summaries
     tool: insight
     text: |
       {{summary.text}}
-    name: "Cross-Agreement Credit Analysis"
+    name: "Agreement-Based Credit Analysis"
     attributes:
       category: summary-insight
     
@@ -118,7 +128,8 @@ actions:
       workspace: task/workspace
       knowledge: init-kset
       documentCredits: analyze-document-credits
-      summaryInsight: add-summary-to-knowledge
+      agreementSummaries: create-counterparty-summaries-by-agreement
+      finalSummary: add-summary-to-knowledge
     tool: workspace
     operations:
       - op: add-items
@@ -257,3 +268,70 @@ functions:
             nodes: insight
           - op: set-nodes
             nodes: creditText 
+
+  summarize-counterparty-in-agreement:
+    input:
+      agreementTag:
+        type: tag
+      creditSummaries:
+        type: text
+      documentTags:
+        type: tag
+      knowledge:
+        type: knowledge-set
+    actions:
+      generate-counterparty-agreement-summary:
+        input:
+          agreementTag: function/agreementTag
+          creditSummaries: function/creditSummaries
+          documentTags: function/documentTags
+        tool: llm
+        prompt: |
+          You are reviewing credit provisions for all counterparties within a specific agreement type. Create a comprehensive summary organized by counterparty for the specified agreement type.
+
+          ## Organization Requirements
+          1. Focus only on the agreement type: {{agreementTag.name}}
+          2. Group credit provisions by Counterparty Name within this agreement type
+          3. For each counterparty, summarize their credit provisions for this agreement type
+          
+          ## Content Requirements
+          For each counterparty within this agreement type:
+          1. List their name and role clearly
+          2. Detail their specific credit provisions for this agreement type
+          3. Highlight any unique or unusual provisions specific to this counterparty
+          
+          ## Formatting
+          - Use bold for counterparty names
+          - Use bullet points to separate different credit requirements
+          - Use quotes for specific credit text requirements
+          
+          Base your summary ONLY on credit summaries that match both the counterparty and this specific agreement type:
+          
+          {% for summary in creditSummaries %}
+          {% if summary.attributes.agreement == agreementTag.name %}
+          ## {{summary.attributes.counterparty}} - {{agreementTag.name}}
+          {{summary.text}}
+          {% endif %}
+          {% endfor %}
+
+      create-agreement-insight:
+        input:
+          summary: generate-counterparty-agreement-summary
+          agreementTag: function/agreementTag
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "Counterparty Credits in {{agreementTag.name}}"
+        tags: [agreementTag]
+        attributes:
+          category: agreement-summary
+          agreement: "{{agreementTag.name}}"
+
+      add-agreement-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-agreement-insight
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight 
