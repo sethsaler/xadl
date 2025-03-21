@@ -44,80 +44,54 @@ actions:
       - op: set-nodes
         nodes: documents
 
-  analyze-document-credits:
-    repeat:
-      function: create-credit-summary
-      for: [documentTag, creditTag, agreementTag]
+  create-document-credit-insight:
     input:
-      documentTag: get-document-category-tags
-      creditTag: get-credit-tags
-      agreementTag: get-agreement-tags
       documents: task/documents
-      knowledge: init-kset
-
-  create-counterparty-summaries-by-agreement:
-    input:
-      creditSummaries: analyze-document-credits
       documentTags: get-document-category-tags
       agreementTags: get-agreement-tags
-      knowledge: init-kset
-    repeat:
-      function: summarize-counterparty-in-agreement
-      for: [agreementTag]
-    tool: knowledge-set
-    operations:
-      - op: set-nodes
-        nodes: agreementTags
-
-  create-agreement-summary-of-summaries:
-    input:
-      counterpartySummaries: create-counterparty-summaries-by-agreement
-      knowledge: init-kset
+      creditTags: get-credit-tags
     tool: llm
     prompt: |
-      You are reviewing credit provisions across multiple talent and production agreements. Create a comprehensive summary organized by agreement type, summarizing the counterparty credit provisions within each agreement.
+      You are analyzing entertainment credits across different agreements and counterparties.
+      
+      First, extract all entertainment credit-related provisions from the provided documents. 
+      Focus on screen credits, billing, and attribution in entertainment contracts - NOT financial credit.
+      
+      For each document, identify:
+      - Credit position (main titles, end credits)
+      - Credit size and format
+      - Billing order
+      - Special credit designations
+      - Approval rights
+      - Paid advertising credits
+      
+      Then organize your findings by agreement type. For each agreement type, summarize:
+      1. Overview of typical credit provisions
+      2. Common patterns across counterparties
+      3. Unique or unusual provisions
+      4. Inconsistencies in credit handling
+      
+      Format your response with:
+      - Bold for agreement type names
+      - Bullet points for clarity
+      - Bold for key terms from the documents
+      
+      Focus ONLY on entertainment credits and ignore any financial credit provisions.
 
-      ## Organization Requirements
-      1. Group all credit provisions by Agreement Type - this is the primary organization method
-      2. Within each agreement section, include a summary of the patterns and notable provisions across all counterparties
-      3. Highlight commonalities and differences in credit requirements across counterparties for each agreement type
-      
-      ## Content Requirements
-      For each agreement type:
-      1. Begin with the agreement type as a header
-      2. Provide an overview summary of typical credit provisions for this agreement type
-      3. Highlight notable patterns across counterparties
-      4. Identify any unique or unusual provisions within this agreement type
-      5. Note any inconsistencies in how credits are handled within this agreement type
-      
-      ## Formatting
-      - Use bold for agreement type names
-      - Use bullet points to separate different patterns or notable provisions
-      - Use quotes for specific credit text requirements
-      - Highlight key terms consistently across all agreement types
-      
-      Base your summary on the counterparty summaries provided below, focusing on organizing by agreement type:
-      
-      {% for summary in counterpartySummaries %}
-      ## {{summary.name}}
-      {{summary.text}}
-      {% endfor %}
-
-  add-summary-insight:
+  create-credit-insight:
     input:
-      knowledge: init-kset
-      summary: create-agreement-summary-of-summaries
+      creditAnalysis: create-document-credit-insight
     tool: insight
     text: |
-      {{summary.text}}
-    name: "Agreement-Based Credit Analysis"
+      {{creditAnalysis.text}}
+    name: "Entertainment Credit Analysis by Agreement Type"
     attributes:
       category: summary-insight
     
-  add-summary-to-knowledge:
+  add-to-knowledge:
     input:
       knowledge: init-kset
-      insight: add-summary-insight
+      insight: create-credit-insight
     tool: knowledge-set
     operations:
       - op: set-nodes
@@ -127,211 +101,7 @@ actions:
     input:
       workspace: task/workspace
       knowledge: init-kset
-      documentCredits: analyze-document-credits
-      agreementSummaries: create-counterparty-summaries-by-agreement
-      finalSummary: add-summary-to-knowledge
     tool: workspace
     operations:
       - op: add-items
-        items: knowledge
-
-functions:
-  create-credit-summary:
-    input:
-      documentTag:
-        type: tag
-      creditTag:
-        type: tag
-      agreementTag:
-        type: tag
-      documents:
-        type: document
-      knowledge:
-        type: knowledge-set
-    actions:
-      get-document-text:
-        input:
-          documentTag: function/documentTag
-          agreementTag: function/agreementTag
-          documents: function/documents
-        tool: document-text
-        textFilter:
-          operator: "and"
-          tags: [documentTag, agreementTag]
-        skipIfEmpty: [documentTag, agreementTag]
-      
-      get-credit-text:
-        input:
-          creditTag: function/creditTag
-          documentTag: function/documentTag
-          agreementTag: function/agreementTag
-          documents: function/documents
-        tool: document-text
-        textFilter:
-          operator: "and"
-          tags: [creditTag, documentTag, agreementTag]
-        skipIfEmpty: [creditTag, documentTag, agreementTag]
-
-      generate-credit-summary:
-        input:
-          documentTag: function/documentTag
-          creditTag: function/creditTag
-          agreementTag: function/agreementTag
-          documentText: get-document-text
-          creditText: get-credit-text
-        tool: llm
-        skipIfEmpty: creditText
-        prompt: |
-          CREDIT ANALYSIS REQUIREMENTS:
-
-          <overview>
-          Create a single, concise paragraph that includes ONLY explicitly stated credit information. Bold all key terms that appear in the text. Start directly with the found information - no lead-in phrases. Use quotes for specific credit text or formatting requirements.
-          </overview>
-
-          <required_elements>
-          Elements to include (ONLY if explicitly stated in the text):
-          - Talent category and role
-          - Credit position/placement 
-          - Card type and format
-          - Special credit designations (exact text in quotes)
-          - Size and format requirements
-          - Credit parity provisions
-          - Guild credit requirements
-          - Credit approval rights
-          - Special conditions affecting credit display
-          - Paid advertising credit requirements
-          </required_elements>
-
-          <examples>
-          Note: These are ONLY example formats to demonstrate proper formatting - DO NOT use these examples in your analysis:
-          Format Example 1: When text states "Credit shall be in end titles", write: **Credit** shall appear in the **end titles**.
-          Format Example 2: When text states "Credit as Executive Producer", write: **Executive Producer** credit shall appear as "**Executive Producer**".
-          Format Example 3: When text states "Credit equal to director", write: Credit shall appear in **size and style** equal to the **director** credit.
-
-          IMPORTANT: DO NOT use these examples in your analysis. ONLY analyze the actual provided text snippets.
-          </examples>
-
-          <rules>
-          Rules:
-          1. Start directly with the information - no introductory phrases
-          2. Include ONLY information explicitly stated in the provided text snippets
-          3. DO NOT use any information from the examples above
-          4. DO NOT mention missing or unspecified terms
-          5. DO NOT use phrases like "not specified" or "no requirements mentioned"
-          6. Bold ONLY terms that appear in the actual source text snippets
-          7. Use quotes for exact credit text/formatting requirements ONLY from source text
-          8. Maintain a natural, flowing narrative
-          9. EXCLUDE all compensation and payment terms
-          10. No bullet points or separate sections
-          11. No commentary about missing information
-          12. NEVER copy or reference the example formats above - analyze ONLY the provided snippets
-          </rules>
-
-          Document: {{documentTag.name}}
-          Agreement: {{agreementTag.name}}
-          
-          Base your analysis on the credit-specific text provided:
-          
-          {% for text in creditText %}
-          {{text.text}}
-          {% endfor %}
-
-      create-insight:
-        input:
-          summary: generate-credit-summary
-          creditText: get-credit-text
-          documentTag: function/documentTag
-          agreementTag: function/agreementTag
-          creditTag: function/creditTag
-        skipIfEmpty: summary
-        tool: insight
-        text: |
-          {{summary.text}}
-        name: "Credit Summary for {{documentTag.name}} in {{agreementTag.name}}"
-        tags: [documentTag, creditTag, agreementTag]
-        attributes:
-          category: credit-insight
-          counterparty: "{{documentTag.name}}"
-          agreement: "{{agreementTag.name}}"
-        relations:
-          derived-from: [creditText]
-
-      add-insight:
-        input:
-          knowledge: function/knowledge
-          insight: create-insight
-          creditText: get-credit-text
-        skipIfEmpty: insight
-        tool: knowledge-set
-        operations:
-          - op: set-nodes
-            nodes: insight
-          - op: set-nodes
-            nodes: creditText 
-
-  summarize-counterparty-in-agreement:
-    input:
-      agreementTag:
-        type: tag
-      creditSummaries:
-        type: text
-      documentTags:
-        type: tag
-      knowledge:
-        type: knowledge-set
-    actions:
-      generate-counterparty-agreement-summary:
-        input:
-          agreementTag: function/agreementTag
-          creditSummaries: function/creditSummaries
-          documentTags: function/documentTags
-        tool: llm
-        prompt: |
-          You are reviewing credit provisions for all counterparties within a specific agreement type. Create a comprehensive summary organized by counterparty for the specified agreement type.
-
-          ## Organization Requirements
-          1. Focus only on the agreement type: {{agreementTag.name}}
-          2. Group credit provisions by Counterparty Name within this agreement type
-          3. For each counterparty, summarize their credit provisions for this agreement type
-          
-          ## Content Requirements
-          For each counterparty within this agreement type:
-          1. List their name and role clearly
-          2. Detail their specific credit provisions for this agreement type
-          3. Highlight any unique or unusual provisions specific to this counterparty
-          
-          ## Formatting
-          - Use bold for counterparty names
-          - Use bullet points to separate different credit requirements
-          - Use quotes for specific credit text requirements
-          
-          Base your summary ONLY on credit summaries that match both the counterparty and this specific agreement type:
-          
-          {% for summary in creditSummaries %}
-          {% if summary.attributes.agreement == agreementTag.name %}
-          ## {{summary.attributes.counterparty}} - {{agreementTag.name}}
-          {{summary.text}}
-          {% endif %}
-          {% endfor %}
-
-      create-agreement-insight:
-        input:
-          summary: generate-counterparty-agreement-summary
-          agreementTag: function/agreementTag
-        tool: insight
-        text: |
-          {{summary.text}}
-        name: "Counterparty Credits in {{agreementTag.name}}"
-        tags: [agreementTag]
-        attributes:
-          category: agreement-summary
-          agreement: "{{agreementTag.name}}"
-
-      add-agreement-insight:
-        input:
-          knowledge: function/knowledge
-          insight: create-agreement-insight
-        tool: knowledge-set
-        operations:
-          - op: set-nodes
-            nodes: insight 
+        items: knowledge 
