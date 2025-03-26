@@ -1,0 +1,194 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collection for "OSHA"
+  get-osha-tags:
+    tool: find-tags
+    category: "OSHA"
+  
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are an OSHA compliance specialist responsible for auditing workplace safety and health compliance with OSHA standards, regulations, and requirements. Your objectives include:
+
+      1. Identifying all OSHA-specific obligations, requirements, and responsibilities outlined in the document.
+      2. Converting each OSHA requirement into a clear, answerable question for compliance verification.
+      3. Maintaining the original meaning while creating questions that have definitive yes/no answers.
+      4. Structuring questions to reveal gaps in safety compliance or implementation.
+
+      When creating OSHA compliance questions:
+      - Focus on specific OSHA standard citations and requirements
+      - Preserve exact numerical values, measurements, and timeframes as stated
+      - Structure questions to identify what documentation and evidence would demonstrate compliance
+      - Format complex OSHA requirements as multiple discrete questions when necessary
+      - Note any ambiguous or conflicting requirements that may require OSHA interpretation
+      - Consider both general industry and specific industry standards where applicable
+
+  # 3) OSHA Compliance Question Analysis prompt
+  complianceAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is text from a workplace safety document tagged with OSHA category "{{tag.name}}". As an OSHA compliance specialist, you should:
+      
+      1. Extract all statements containing OSHA-specific obligation indicators such as:
+         - OSHA standard citations and references
+         - Safety requirements: must, shall, will, should, required to, responsible for
+         - Time-bound safety requirements: daily, weekly, monthly, annually, by [date]
+         - Quantitative safety requirements: specific measurements, percentages, thresholds
+         - Safety equipment and PPE requirements
+         - Training and certification requirements
+         - Recordkeeping and documentation requirements
+         - Hazard communication requirements
+         - Emergency response procedures
+         - Workplace safety program requirements
+
+      2. Convert each OSHA obligation into a question format that can be answered with:
+         - "Yes, the OSHA requirement is fully implemented and documented"
+         - "No, the OSHA requirement is not implemented or documented"
+         - A detailed analysis for partial compliance cases
+      
+      3. Format each OSHA obligation question as:
+      
+      ```
+      ## Question [{{tag.name}}-#]
+      
+      Does the workplace [comply with specific OSHA requirement]?
+      
+      Context:
+      - OSHA Standard: "[Relevant OSHA standard citation]"
+      - Original text: "[Exact quote from the document]"
+      
+      Expected evidence for compliance:
+      - [Required documentation/records/training certificates]
+      - [Required safety equipment/PPE]
+      - [Required workplace safety programs/procedures]
+      - [Required employee training/qualifications]
+      ```
+
+      4. Use sequential numbering for each question.
+      5. Phrase questions clearly so they can be definitively answered yes/no.
+      6. For complex OSHA requirements, break down into multiple discrete questions.
+
+      Relevant text from the document:
+
+  # 4) Section Title
+  complianceAnalysisTitle:
+    tool: echo
+    message: OSHA Compliance Questions - {{tag.name}}
+
+  # 5) Initialize Knowledge Set for OSHA Tags
+  init-kset:
+    input:
+      documents: task/documents
+      oshaTags: get-osha-tags
+    tool: knowledge-set
+    knowledgeSetName: "OSHA Compliance Question Set"
+    operations:
+      - op: add-dimension
+        key: tag
+        name: OSHA
+        nodes: oshaTags
+        priority: 1
+      - op: set-nodes
+        nodes: documents
+
+  # 6) Analyze for each OSHA tag
+  analyze-osha-tags:
+    repeat:
+      function: analyze-for-tag
+      for: [tag]
+    input:
+      tag: get-osha-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: complianceAnalysisPrompt
+      title: complianceAnalysisTitle
+
+  # 7) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      oshaTagsAnalysis: analyze-osha-tags
+      knowledgeForDocuments: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeForDocuments
+
+functions:
+  analyze-for-tag:
+    input:
+      tag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          tag: function/tag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [tag]
+      
+      run-prompt:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          prompt: function/prompt
+          tag: function/tag
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-snippets
+          tag: function/tag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}}"
+        tags: [tag]
+        attributes:
+          category: osha-compliance-question-insight
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets 
