@@ -136,35 +136,6 @@ functions:
         message: |
           # SOP Theme: {{themeTag.name}} - Topic: {{topicTag.name}}
           
-          You are analyzing the "{{themeTag.name}}" section with the topic "{{topicTag.name}}" from the SOP questionnaire. Your task is to provide a compliance assessment for each numbered question in this section.
-          
-          ## Instructions:
-          
-          1. For each numbered question, provide a YES/NO determination.
-          2. Include a brief explanation for each determination.
-          3. If you answer NO, provide a specific recommendation to address the gap.
-          4. Present your responses in the following format:
-          
-          ```
-          **Question X**: [Question text reproduced exactly]
-          **Answer**: [YES/NO]
-          **Explanation**: [Brief explanation - 1-2 sentences]
-          **Recommendation**: [Only include for NO answers - specific corrective action]
-          ```
-          
-          5. Number your responses to match the question numbers in the original document.
-          6. Only answer questions that appear under the "{{themeTag.name}}" heading and "{{topicTag.name}}" subheading.
-          
-          ## Specific Instructions for This Theme/Topic Combination:
-          
-                get-instruction-prompt-for-tag:
-        input:
-          themeTag: function/themeTag
-          topicTag: function/topicTag
-        tool: echo
-        message: |
-          # SOP Theme: {{themeTag.name}} - Topic: {{topicTag.name}}
-          
           You are analyzing the "{{themeTag.name}}" section under the "{{topicTag.name}}" category of the safety compliance questionnaire. Your task is to review each question below and provide:
           
           1. A clear YES/NO determination.
@@ -180,486 +151,461 @@ functions:
           **Recommendation**: [If answer is NO]
           ```
           
+          4. Number your responses to match the question numbers in the original document.
+          5. Only answer questions that appear under the "{{themeTag.name}}" heading and "{{topicTag.name}}" subheading.
+          
           ## Questionnaire Questions:
           
-          get-instruction-prompt-for-tag:
-            input:
-              themeTag: function/themeTag
-              topicTag: function/topicTag
-            tool: echo
-            message: |
-              # SOP Theme: {{themeTag.name}} - Topic: {{topicTag.name}}
-              
-              You are analyzing the "{{themeTag.name}}" section under the "{{topicTag.name}}" category of the safety compliance questionnaire. Your task is to review each question below and provide:
-              
-              1. A clear YES/NO determination.
-              2. A brief explanation of your determination.
-              3. If the answer is NO, a specific recommendation for corrective action.
-              
-              Please use the following format for each question:
-              
-              ```
-              **Question X**: [Question text]
-              **Answer**: [YES/NO]
-              **Explanation**: [Brief explanation]
-              **Recommendation**: [If answer is NO]
-              ```
-              
-              4. Number your responses to match the question numbers in the original document.
-              5. Only answer questions that appear under the "{{themeTag.name}}" heading and "{{topicTag.name}}" subheading.
-              
-              ## Questionnaire Questions:
-              
-              {% if themeTag.name == "Advanced and Basic Rigger Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the training and qualification for Advanced and Basic Riggers comply with the requirement to be conducted by a third party possessing a certification from a nationally recognized accreditation organization or accredited Business Function training program?
-              2. Does the training for Basic Riggers comply with the requirement to enable them to inspect rigging before use?
-              3. Does the training for Basic Riggers comply with the requirement to enable them to identify and attach rigging with basic knowledge of hitch configurations, capacities, and basic knots?
-              4. Does the training for Basic Riggers comply with the requirement to enable them to recognize associated hazards?
-              5. Does the training for Basic Riggers comply with the requirement to enable them to signal operations?
-              6. Does the training for Basic Riggers comply with the requirement to enable them to use various types of rigging equipment and basic hitches and their applications?
-              7. Does the training for Advanced Riggers comply with the requirement to enable them to perform rigging tasks unsupervised?
-              8. Does the training for Advanced Riggers comply with the requirement to enable them to select rigging components and procedures based on rigging capacity?
-              9. Does the training for Advanced Riggers comply with the requirement to enable them to estimate load weight and center of gravity?
-              10. Does the training for Advanced Riggers comply with the requirement to enable them to identify lift points?
-              11. Does the training for Advanced Riggers comply with the requirement to enable them to determine and select rigging based on loading?
-              12. Does the training for Advanced Riggers comply with the requirement to perform pre-use inspection of rigging and lift points?
-              13. Does the training for Advanced Riggers comply with the requirement to identify and attach rigging with knowledge of hitch configurations, load angle factors, rigging capacities, and load integrity?
-              14. Does the training for Advanced Riggers comply with the requirement to understand load dynamics and associated hazards?
-              15. Does the training for Riggers comply with the minimum requirement of 8 hours of instructional time, practical training, and evaluation of the Rigger’s performance by a qualified individual?
-              16. Are Riggers required to pass a written examination and a practical rigging examination?
-              17. Is the evaluation cycle for Advanced Riggers and Basic Riggers every 3 years?
-              18. Is the evaluation conducted by a third party or an individual who has the knowledge, training, and experience necessary to assess rigging operations?
-              {% endif %}
-              
-              {% if themeTag.name == "Confined Space Entry Procedure" and topicTag.name == "Confined Space" %}
-              1. Does the Business Function develop and establish a written confined space entry procedure per the requirements of 29 CFR 1910.146?
-              2. Does the written procedure include specific entry procedures, including communication of and review of known hazards and mitigations or control measures, and attendant requirements?
-              3. Is the written procedure in alignment with the requirements of the Enterprise standard Pre-Job Safety Planning EHS-SOH-4.1.1.11?
-              4. Are all of the following evaluated prior to entry: the initial space classification, the work to be performed within the space, and the activities/conditions in adjacent areas that could impact the entry?
-              5. Are appropriate barriers in place to manage hazards from outside work or conditions before entry?
-              6. Are all unclassified or unconfirmed confined spaces treated as hazardous and permit-required until a pre-entry assessment deems otherwise?
-              7. Is any space not listed on the confined space inventory prevented from entry until evaluated and classified by a qualified person?
-              {% endif %}
-              
-              {% if themeTag.name == "Atmospheric Testing" and topicTag.name == "Confined Space" %}
-              1. Does the Business Function ensure that all necessary testing for hazardous atmospheres is completed before authorizing entry into a confined space?
-              2. Are test equipment and accessories approved or certified for use in hazardous areas and calibrated as recommended by the manufacturer?
-              3. Is all atmospheric testing conducted by a Qualified Person?
-              4. Are employees or their representatives given the opportunity to observe the pre-entry testing?
-              5. Is testing conducted in a manner that accurately reflects the atmosphere in the confined space?
-              6. Do testing durations reflect the capabilities of the test equipment and follow manufacturer recommendations for sample pumps?
-              7. Is a routine testing frequency defined to verify acceptable entry conditions?
-              8. Must verification testing be completed and recorded on the permit before first entry into permit-required spaces?
-              9. Is continuous monitoring required when welding, cutting, or painting operations are performed within the confined space?
-              10. Is testing performed in the order of Oxygen, then Combustible gases, followed by Toxic gases/vapors if needed?
-              {% endif %}
-              
-              {% if themeTag.name == "Contract Partners Performing Confined Space Entry" and topicTag.name == "Confined Space" %}
-              1. Does the Business Function establish a process for communicating the requirements of the Confined Space Entry Standard?
-              2. Does the Business Function inform contract partners on site of the location of confined spaces?
-              3. Are all associated hazards communicated to the contract partners?
-              4. Must the Contract Partner complete an Entergy confined space permit before entering a permit-required space?
-              5. Must the Contract Partner obtain approval from an Entry Supervisor before entry?
-              6. Must the Contract Partner also obtain approval from other designated individuals prior to entry?
-              {% endif %}
-              
-              {% if themeTag.name == "Crane Operations Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the entity responsible for crane operations ensure that all personnel receive appropriate training?
-              2. Do the Signal Person, operator, and Lift Director communicate with each other prior to operations when non‐standard hand signals are used?
-              3. Is fall protection training provided to all employees potentially exposed to fall hazards in accordance with Enterprise standards?
-              4. Are lifting personnel trained on work area controls to prevent entry into swing radius hazard areas?
-              5. Are employees trained on the procedures to follow in the event of electrical contact with a power line?
-              {% endif %}
-              
-              {% if themeTag.name == "Digger Derrick Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the operator adhere to all applicable manufacturer and Business Function-specific safe operation procedures?
-              2. Are the operator and ground personnel fully familiar with operating procedures, inspection requirements, control locations, lifting capacities, emergency procedures, and field maintenance requirements?
-              3. Is a pre-job brief or tailgate session conducted before operation?
-              4. Have operators received training to safely operate the equipment?
-              5. Are all safety signs, guards, and safety features in place and in proper condition?
-              6. Is a Job Site Survey performed to assess ground slope, firmness, potential hazards (e.g., ditches, drop offs, holes, debris, vegetation, underground or overhead utilities, or boom interferences)?
-              {% endif %}
-              
-              {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the Business Function ensure that equipment operators are trained on the safe operation of their specific equipment before use?
-              2. Is the training documented and does it include formal instruction, practical training, and performance evaluation by a Qualified Individual?
-              3. Are operators required to pass a written/oral examination and a practical operating examination unless they provide sufficient evidence of qualifications?
-              4. Is refresher training provided when unsafe operation is observed, following an accident/close call, or when evaluations indicate unsafe practices?
-              5. Is each operator’s performance evaluated and documented at least once every 3 years?
-              6. Does the certification process for powered industrial truck and digger derrick operators include the operator’s name, training date, evaluation date, and evaluator’s identity?
-              7. Can contract partners provide documentation proving compliance with training certifications?
-              8. For digger derrick operations (e.g., auger use, pole placement/removal, handling associated materials, or setting underground equipment), are certifications required?
-              9. Are instructors verified to have the necessary expertise and experience for training?
-              10. For hoist operators, is qualification determined based on load weight (basic vs. advanced) or through supervised operation?
-              11. Are non-powered industrial truck operators trained to perform their tasks effectively?
-              {% endif %}
-              
-              {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the entity obtain licensed professional engineer approval for any site Engineered Temporary Lift Assembly?
-              2. Is the assembly’s design supported by detailed drawings, specifications, evaluations, or certifications?
-              3. Is a load test performed on the assembly in every configuration in which it will be used?
-              4. Is the load test performed at no less than 100% of the rated load or more than 125% (whichever governs)?
-              5. Is a written report of the test (including load details and operations performed) prepared and filed?
-              6. Is the person conducting the test responsible for preparing and filing the report?
-              7. Are all critical (load-bearing) welds inspected (e.g., by magnetic particle or liquid penetrant methods) before use?
-              8. Are temporary assemblies permanently marked with their load rating before use?
-              9. For serialized devices, is documentation available supporting the intended lift?
-              10. Is the load test performed as outlined in the controlling document—including test load lift distance, hold time (minimum 10 minutes), trolley transport, and intermediate positioning?
-              11. Is the test load moved along the full length of the bridge/runway with proper positioning on both ends?
-              12. Is the test load lowered to an intermediate position and held with brakes for at least 1 minute (or as otherwise specified)?
-              13. Is specified information permanently attached to all temporary hoisting assemblies?
-              14. If required, does the entity develop a documented engineering response—including third-party reviews, independent verification of vendor calculations, and code application—for Critical/Complex Lifts?
-              15. Is 3D finite element analysis performed if a load test of no less than 110% (or 125%) has not been conducted?
-              16. Is load testing verified per ASME B30.20 and, where applicable, are additional safety factors specified if testing is not possible?
-              17. Are critical welds re-examined post load test per AWS D1.1, and is proper installation verified?
-              18. Is the lifting boundary area assessed for potential collateral damage or personnel injury in the event of assembly failure?
-              {% endif %}
-              
-              {% if themeTag.name == "Excavator Safe Operation (Lifting)" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the Business Function ensure that load charts and lifting attachment points are used according to the manufacturer’s instructions?
-              2. Are modifications affecting capacity or safe operation made only with the manufacturer’s written approval?
-              3. If modifications occur, are capacity, operation, and maintenance instructions updated accordingly?
-              4. Is the equipment’s original safety factor maintained?
-              5. Is the equipment kept at least 5 feet from the edge of an excavation during lifts near an open excavation?
-              6. Are nonessential personnel removed from the excavation area during such lifts?
-              7. Are Basic Riggers required for all excavator lifting operations?
-              {% endif %}
-              
-              {% if themeTag.name == "General Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the Material Handling process evaluate needs in terms of weight, size, distance, and movement path?
-              2. Does the process follow a hierarchy for selecting appropriate material handling methods?
-              3. Is elimination of material handling needs through engineering solutions considered?
-              4. Does the process involve mechanical movement (e.g., lift trucks, overhead cranes, conveyors)?
-              5. Does the process allow for manual movement using handling aids (e.g., dollies or carts)?
-              6. Are safe lifting techniques utilized?
-              {% endif %}
-              
-              {% if themeTag.name == "General Requirements" and topicTag.name == "Confined Spaces" %}
-              1. Does the entity conduct an Identification and Hazard Evaluation of Confined Spaces?
-              2. Does the entity have a Confined Space Entry Procedure for both permit-required and non-permit-required spaces?
-              3. Is Atmospheric Testing performed?
-              4. Is there a Rescue Plan in place?
-              5. Is Training provided for personnel working in confined or enclosed spaces?
-              {% endif %}
-              
-              {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the Business Function ensure that a lift plan is developed for each lift?
-              2. Is each lift categorized as a Critical, Complex, or Common Lift?
-              3. Must a Critical Lift plan be completed before a Critical Lift is conducted?
-              4. Must Critical Lifts be performed under the direction of a Lift Director?
-              5. Is the Business Function responsible for developing its own critical lift plan?
-              6. Do Critical Lift plans include details on crane configuration, environmental/ground conditions, load radius/size/weight, personnel qualifications, communication procedures, inspection, and weather conditions?
-              7. Are sketches (such as a Rigging Sketch or Load-Path Sketch) included as needed?
-              8. Are Equipment Inspections documented with dates and names of the competent personnel?
-              9. Is a sign-off sheet included to verify that the Critical Lift plan has been reviewed?
-              10. Do all workers involved sign off on the plan?
-              11. Is the plan reviewed by an Entergy employee/agent and, for certain lifts, approved by a professional engineer?
-              12. Is a documented Lift Plan required before a Complex Lift, and are Common Lifts incorporated into a documented job briefing under the direction of a Basic Rigger?
-              13. Is Appendix E – Lifting Plan Example used for repetitive Common Lifts?
-              {% endif %}
-              
-              {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the Business Function ensure that lifting boundaries or exclusion zones are established prior to any lift?
-              2. Does the boundary include lower levels in multi-level areas?
-              3. Is the boundary large enough to encompass the affected area, load, and equipment?
-              4. Is the boundary marked with appropriate flagging and signage?
-              5. Does the boundary account for potential load swing, movement, or drop?
-              6. Does the boundary size increase as the load is raised?
-              7. Are only essential personnel allowed within the boundary?
-              8. Is the forklift/equipment operator required to remain stationary until ground personnel are safely clear?
-              9. Is a minimum safe radius (for example, at least 15 feet) maintained during active loading/unloading or movement operations?
-              10. Must the driver turn off the engine, apply brakes, vacate the vehicle, and reposition safely before loading/unloading begins?
-              {% endif %}
-              
-              {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Are powered hoists’ winch attachments and anchorages designed by a qualified person?
-              2. Does winch installation allow for proper rope spooling on the drums?
-              3. Are winches clearly marked with their ratings, rope diameters, and power requirements?
-              4. Are drum sizes (barrel diameter, barrel length, flange diameter) clearly indicated?
-              5. Is rope speed (in feet per minute or meters per second) at rated load specified?
-              6. Are exposed moving parts effectively guarded?
-              7. Are all controls used during normal operation located within easy reach of the operator’s station?
-              8. Do electric hoists include a disconnect device that cuts power in the event of a failure?
-              9. Is there an over-speed preventive device where applicable?
-              10. Do remotely operated hoists stop when controls become ineffective?
-              11. Do base-mounted drum hoists meet all applicable design, installation, testing, inspection, and operational requirements?
-              12. Do remote-operated winches stop if the control signal is lost?
-              13. Do prime mover controls return to neutral when released?
-              14. Is each winch equipped with a brake capable of holding at least 125% of the rated load?
-              15. Are remote-operated winches fitted with a self-setting brake?
-              16. Are foot-operated brakes designed so that the operator’s foot remains securely positioned?
-              17. For winches that allow simultaneous underwind and overwind, is there a brake that holds 125% of the rated load?
-              18. Is there a means to control drum speed during load movement?
-              19. Do braking systems allow for adjustments to compensate for wear?
-              20. Are ropes of sufficient size, minimum breaking force, and construction used—and are any alternative materials used only on the recommendation of a qualified person?
-              {% endif %}
-              
-              {% if themeTag.name == "Lift Director Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the Lift Director hold an Advanced Rigger qualification?
-              2. Does the Lift Director oversee and manage Critical Lift activities?
-              3. Is the Lift Director capable of performing nearly all Common, Complex, or Critical Lifts?
-              4. Are Lift Directors designated by site management based on the qualifications specified in this standard?
-              {% endif %}
-              
-              {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined Spaces" %}
-              1. Does the Business Function conduct an initial survey to identify all confined spaces required by the standard?
-              2. Is the survey conducted by a qualified person designated by the Business Function?
-              3. Is a hazard assessment performed for each confined space or type of confined space?
-              4. Does the assessment review past and current uses of the confined space?
-              5. Does it review the space’s physical characteristics, configuration, location, and access/egress points?
-              6. Are existing or potential atmospheric hazards evaluated?
-              7. Are biological, mechanical, electrical, physical, and chemical hazards reviewed?
-              8. Are any other serious hazards identified?
-              9. Does the Business Function classify each space as permit-required, non-permit-required, or enclosed?
-              10. Is an inventory maintained detailing the classification of each space?
-              11. Is there a process for managing and updating the confined space inventory?
-              12. Are periodic evaluations of confined spaces conducted according to the established frequency?
-              13. Is the inventory updated as needed?
-              14. Are danger signs posted for permit-required spaces, and are these signs legible and durable?
-              {% endif %}
-              
-              {% if themeTag.name == "Material Handling Safety Observation" and topicTag.name == "Material Handling" %}
-              1. Does the Business Function integrate safety observations of Material Handling activities into its overall observation programs?
-              2. Do Business Function representatives provide safety coaching or mentoring when deficiencies are identified?
-              3. Are safety observations analyzed on a regular basis?
-              4. Do the observations meet or exceed the content outlined in Appendix F – Material Handling Observation Example?
-              5. Are systems such as AirsWeb or equivalent used to capture Contract Partner observations?
-              {% endif %}
-              
-              {% if themeTag.name == "Mobile Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Is the crane inspected and its functionality verified per section 4.3.10 before any lift is performed?
-              2. Are all personnel clear of the load path prior to hoisting?
-              3. Is an appropriate fire extinguisher available in the crane cab?
-              4. Are the controls de-energized when the cab is unattended?
-              5. Is operation halted immediately if a problem arises?
-              6. Is more than one Spotter required when necessary (for example, when moving into a building or when view is restricted)?
-              {% endif %}
-              
-              {% if themeTag.name == "Mobile Crane Operation Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does each crane operator receive training, certification/licensing, and evaluation before operating mobile cranes?
-              2. Is the training and certification/licensing conducted by a third party with recognized accreditation?
-              3. Is the training developed in accordance with the specific requirements outlined in the document?
-              4. Is there a written test covering the controls and operational/performance characteristics of the equipment?
-              5. Are operators required to calculate load/capacity for various configurations?
-              6. Must operators know the procedures for preventing and responding to power line contact?
-              7. Are operators required to have technical knowledge as outlined (for example, in Appendix J)?
-              8. Must operators be able to locate and read relevant information in equipment manuals?
-              9. Is there a practical test to verify that operators possess the necessary skills for safe operation?
-              10. Are control mechanisms and drive components inspected for excessive wear or maladjustments?
-              11. Are air, hydraulic, and other pressurized lines inspected for deterioration or leakage?
-              12. Are hooks, latches, and wire ropes inspected according to manufacturer specifications and regulatory requirements?
-              13. Are tires inspected for proper inflation and condition?
-              14. Is ground condition assessed to ensure adequate support for the equipment?
-              15. Must equipment be level as specified by manufacturer tolerances?
-              16. Are operator cab windows, safety devices, and operational aids inspected for proper functionality?
-              17. Is there a requirement to apply load chart information and safe shutdown procedures during operation?
-              18. Is the accreditation for training reviewed every 3 years, with certifications valid for five years and audited per 29 CFR 1926.1427(e)?
-              19. Are evaluations conducted by qualified Entergy personnel or agents?
-              20. Is it verified that each operator is capable of safely operating the equipment under varying workplace conditions?
-              {% endif %}
-              
-              {% if themeTag.name == "Material Handling Equipment Inspection" and topicTag.name == "Material Handling" %}
-              1. Does the equipment operator perform a documented pre-use inspection according to the manufacturer’s instructions?
-              2. Are documented inspections conducted at least once per year?
-              3. Is a periodic inspection of all rigging equipment performed by a qualified person on an annual basis?
-              4. Are any deficiencies documented and promptly reported for corrective action?
-              5. Is equipment removed from service if it is found to be defective or unsafe?
-              6. Is a legible manufacturer’s manual readily accessible during equipment use?
-              7. Are preventive maintenance tasks performed by a skilled maintenance person to ensure safe operation?
-              8. Are inspection records maintained for at least 5 years?
-              {% endif %}
-              
-              {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the entity adhere to safe operation guidelines for non-powered industrial trucks?
-              2. Are four-wheel carts with a tongue-type pull handle prohibited?
-              3. Are non-powered industrial trucks inspected prior to use?
-              4. Is the manufacturing or modification of non-powered industrial trucks avoided?
-              5. Are non-powered industrial trucks used strictly for their intended purposes and design?
-              6. Is the load capacity of non-powered industrial trucks not exceeded during operation?
-              7. Is equipment designed specifically for moving barrels, drums, gas cylinders, or dewars used when appropriate?
-              8. Is a non-powered truck pushed rather than pulled except when necessary for transitioning over thresholds or inclines?
-              9. Are load securing devices (such as straps, chains, bars, or pins) used as required?
-              10. Are load paths kept clear of obstructions, uneven surfaces, inclines, or declines?
-              11. Is the truck with the lowest profile selected to keep the center of gravity low?
-              12. Is the load’s center of gravity maintained three feet or less from the ground for heavy loads?
-              13. Are stairs avoided unless specific conditions are met, and if used, is equipment designed for stair use with proper safety measures?
-              14. Are entrances to stairs flagged or guarded to prevent accidental entry?
-              15. Are loads secured when non-powered trucks are used on stairs?
-              16. Is it ensured that no personnel involved in load movement are in the line of fire?
-              {% endif %}
-              
-              {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined Spaces" %}
-              1. Does the Business Function demonstrate that non-permit required and enclosed spaces are maintained in a safe condition?
-              2. Are all non-permit required confined space entries aligned with the Enterprise standard Pre-Job Safety Planning EHS-SOH-4.1.1.11?
-              3. Is there a written procedure for entry into non-permit required confined spaces?
-              4. Does the procedure specify prohibited tasks, allowable tasks, equipment needs, PPE requirements, energy isolation, proper ventilation, hot work safeguards, and rescue equipment?
-              5. Does the procedure require confirmation that the space is on the inventory list and validated as non-permit required before entry?
-              6. Is a qualified person responsible for determining the need for atmospheric testing, and is entry halted if test results are unacceptable?
-              7. Is the space re-evaluated before entry if there are changes in use or potential hazards?
-              8. If a hazardous atmosphere is detected, must work stop immediately and the area be secured?
-              9. Must the space be evaluated for the cause of the hazard before re-entry is allowed?
-              {% endif %}
-              
-              {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the powered industrial truck operate strictly in accordance with the manufacturer’s instructions and for the conditions for which it is designed?
-              2. Is altering or eliminating forklift parts or adding accessories prohibited unless approved by the manufacturer in writing?
-              3. Is free rigging disallowed without written approval or a proper engineering review?
-              4. Are modifications affecting capacity and safe operation made only with prior written approval?
-              5. Are capacity, operation, and maintenance instructions updated if modifications occur?
-              6. Are only stable or safely arranged loads handled?
-              7. Are unstable loads secured to prevent them from falling?
-              8. Must the operator slow down and sound the horn when vision is obstructed at cross aisles?
-              9. If the load obstructs the forward view, must the operator travel with the load trailing and sound the horn?
-              10. Are spotters used when the driver’s view is compromised?
-              11. When descending an incline with a load, must the operator back down the incline?
-              12. When ascending an incline, must the operator drive forward up the incline?
-              13. Are sudden stops that might spill the load avoided?
-              14. In enclosed areas using forklifts with internal combustion engines, is adequate ventilation provided to prevent carbon monoxide buildup?
-              15. Are forklifts operated at a safe speed dictated by surrounding conditions?
-              16. When moving, must the forks be carried as low as possible while still clearing uneven surfaces?
-              17. Are forklifts prohibited from being used to lift employees unless they are designed for that purpose?
-              18. Are special precautions taken during loading/unloading inside vans or trucks, including proper docking and chocking?
-              19. When not in use, are the forks fully lowered, brakes set, and the unit turned off?
-              20. Are personnel kept clear from beneath elevated forks at all times?
-              21. Are forklifts never used as a jack to lift vehicles?
-              22. Is riding on forklifts restricted to the driver only, with no additional personnel riding on the load?
-              23. Is proper stacking of materials on pallets and storage racks exercised?
-              24. Are only loads that are securely and safely loaded, and within rated capacity, handled?
-              25. Are forklifts prohibited from loading/unloading poles in the “headache” position?
-              26. During refueling, is the engine turned off?
-              {% endif %}
-              
-              {% if themeTag.name == "Powered Industrial Truck Equipment Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the truck with front-end attachments display attachment identification and show the approximate weight of the truck/attachment combination at maximum elevation with the load centered?
-              2. Are all nameplates and markings maintained in a legible condition?
-              3. Is each forklift equipped with rollover protection and an approved seat belt that is always used?
-              4. Does each forklift have an operable back-up alarm that is checked prior to each use?
-              5. Is the load rating clearly indicated on the forklift or pallet jack?
-              {% endif %}
-              
-              {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the crane operate only after meeting inspection requirements per section 4.3.10 of the standard?
-              2. Are only qualified personnel permitted to operate the overhead crane?
-              3. Is the crane de-energized before anyone goes on top or on the rails if operational procedures are not in place?
-              4. Are rated load markings clearly visible on each side of the crane from the ground?
-              5. Are stops installed to limit trolley and bridge travel?
-              6. Are all exposed moving parts and electrical equipment enclosed or guarded in accordance with OSHA standards?
-              7. Is the controller operating handle located within convenient reach of the operator?
-              8. Is the cab lighting sufficient for safe operation?
-              9. Does each crane have a power travelling mechanism with an effective warning signal?
-              10. Is a fire extinguisher available in the cab?
-              11. Do operators ensure that overhead crane operations comply with the lifting boundary criteria specified in section 4.2.2?
-              12. Is the load attached by approved devices (such as slings) and secured properly before lifting more than a few inches?
-              13. Are brakes tested by raising the load slightly and applying the brakes to confirm no load creep?
-              14. Is the hook maneuvered to prevent swinging of the load?
-              15. Is there no sudden acceleration or deceleration of the load?
-              16. Does the load never contact obstructions or pass over people?
-              17. Does the operator remain at the controls while the load is suspended unless approved by senior management?
-              {% endif %}
-              
-              {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined Spaces" %}
-              1. Does the Business Function develop and implement a written confined space procedure that complies with 29 CFR 1910.146?
-              2. Is the written procedure readily available for employee inspection?
-              3. Is there a permitting process for reviewing hazards, mitigation measures, and authorization by a Qualified Person prior to entry?
-              4. Does the permit system require that the entry, purpose, date, and duration of the permit be specified?
-              5. Does the permit system require the designation of named personnel as attendants and an entry supervisor with signature or initials?
-              6. Are hazards within the permit space identified and are isolation/control measures specified?
-              7. Are atmospheric test results (including date, time, and tester’s initials) required and recorded as part of the permit?
-              8. Does the permit system include details on rescue and emergency services and the communication procedures to be used during entry?
-              9. Are additional permits (such as for hot work) referenced as necessary?
-              10. Is a unique identifier assigned for tracking each permit?
-              11. Is the permit approved by a Qualified Person and posted on site for the duration of the job?
-              12. If conditions change during the work, must the existing permit be cancelled, retested, and reissued before work resumes?
-              13. Are attendants required to be posted immediately outside designated entry points, and are other entry points properly barricaded?
-              14. If work activities deviate from the approved permit scope, is the permit immediately revoked and work halted?
-              15. Are communication devices (such as radios or phones) tested and verified to be working before entry is allowed?
-              {% endif %}
-              
-              {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the equipment assembly/disassembly process determine if any part of the equipment, load line, or load comes within 20 feet of a power line?
-              2. If within 20 feet, does the process comply with one of the options outlined in 29 CFR 1926.1407?
-              3. Is the power line de-energized and visibly grounded at the worksite before assembly/disassembly begins?
-              4. Is a clearance of at least 20 feet maintained throughout the process?
-              5. Is a planning meeting conducted with the A/D director, operator, assembly/disassembly crew, and others to review the location of power lines?
-              6. Are nonconductive tag lines used during assembly/disassembly?
-              7. Are additional measures implemented to prevent encroachment near power lines?
-              8. Is there a dedicated spotter in continuous contact with the equipment operator?
-              9. Is the spotter equipped with visual aids and communication devices to ensure the required clearance is maintained?
-              10. Are proximity alarms or automatic stopping/limiting devices used to prevent encroachment?
-              11. Are elevated warning lines, barricades, or high-visibility markings employed as needed?
-              12. Are the voltage and minimum clearance distances determined per Table A before operations and maintained during operations?
-              13. Are hazard assessments and safe travel paths identified, especially in conditions of poor visibility or at night?
-              14. Is compliance with §1926.959 confirmed for power lines over 350 kV or for other voltage levels as specified?
-              {% endif %}
-              
-              {% if themeTag.name == "Program Review and Evaluation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. For Material Handling: Does the Business Function conduct a formal review of the program as part of management reviews, and does Enterprise Safety review and update the standard at least every three years?
-              {% endif %}
-              
-              {% if themeTag.name == "Program Review and Evaluation" and topicTag.name == "Confined Spaces" %}
-              1. For Confined Spaces: Does the Business Function perform an annual formal review of the Confined Space program—including cancelled permits, the confined space inventory, and reclassified spaces—with updates at least every three years?
-              {% endif %}
-              
-              {% if themeTag.name == "Re-Classified Confined Spaces" and topicTag.name == "Confined Spaces" %}
-              1. Does the Business Function allow reclassification of permit-required spaces to non-permit required only under specified conditions where hazards are eliminated without entry?
-              2. Is entry required to eliminate hazards, and is the hazard elimination verified by testing or inspection?
-              3. Is the basis for hazard elimination documented and shared with affected personnel?
-              4. If hazards reappear in a reclassified space, must personnel immediately exit and be re-evaluated for reclassification?
-              5. Are reclassifications treated as temporary and verified to ensure that all hazards remain eliminated during entry?
-              {% endif %}
-              
-              {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined Spaces" %}
-              1. Does the Business Function designate rescue and emergency services and establish procedures for summoning, performing rescues, and preventing unauthorized rescue attempts?
-              2. Is the prospective rescuer’s response time, ability, and proficiency evaluated?
-              3. Is at least one team member trained in basic first aid and CPR?
-              4. If applicable, is additional rescue training provided?
-              {% endif %}
-              
-              {% if themeTag.name == "Roles and Responsibilities" and topicTag.name == "Confined Spaces" %}
-              1. Do Senior Leadership and the VP Enterprise Safety support and approve the Confined Space Entry Standard and provide the necessary resources?
-              2. Does Enterprise Safety provide governance, oversight, and conduct an annual review of the standard?
-              3. Do Functional Safety Directors/Managers ensure that proper processes, procedures, and controls are in place and that evaluations are conducted?
-              4. Are employees and Contract Partners trained and required to report any uncontrolled hazards promptly?
-              {% endif %}
-              
-              {% if themeTag.name == "Roles and Responsibilities" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Do Senior Leadership and the VP Enterprise Safety support and approve the Enterprise standard for Material Handling, Rigging, and Lifting and provide the necessary resources?
-              2. Does Enterprise Safety provide governance, oversight, and conduct annual reviews of program performance?
-              3. Do Functional Safety Directors/Managers ensure that all required processes and controls are in place and that personnel are properly trained and compliant?
-              {% endif %}
-              
-              {% if themeTag.name == "Signal Person Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the Signal Person meet the qualification requirements before giving any signals?
-              2. Is qualification obtained via a third-party evaluation or through Business Function-led training?
-              3. Is the qualification documentation readily available and does it specify the types of signaling for which the person is qualified?
-              4. Does the Signal Person understand and competently apply the required signals (including standard hand signals) and demonstrate competence through testing?
-              {% endif %}
-              
-              {% if themeTag.name == "Spotter Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the Spotter receive training that meets the requirements to perform their task effectively?
-              2. For power line operations, does the Dedicated Spotter comply with the training requirements as specified in 29 CFR 1926.1428?
-              {% endif %}
-              
-              {% if themeTag.name == "Training" and topicTag.name == "Confined Spaces" %}
-              1. Does the Business Function develop, deliver, and manage confined space training for all employees involved in or supporting confined space entry activities?
-              2. Does the training establish the necessary proficiency and introduce any new or revised procedures for compliance?
-              3. Are contract partners appropriately trained per Enterprise standards, with training provided prior to entry and on an annual basis thereafter?
-              4. Does the training cover confined space entry procedures, the differences between permit-required and non-permit-required spaces, the use of permits, and emergency procedures?
-              5. Are attendants, entry supervisors, atmospheric testers, and rescue personnel trained in their respective duties?
-              {% endif %}
-              
-              {% if themeTag.name == "Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
-              1. Does the entity perform documented inspections of rigging equipment at least annually?
-              2. Are periodic inspections conducted by qualified personnel, with deficiencies documented and equipment removed from service if unsafe?
-              3. Is a manufacturer’s manual readily accessible and are preventive maintenance tasks documented?
-              4. Does the Business Function provide and manage training for all employees performing material handling, lifting, or rigging activities in accordance with Enterprise standards?
-              {% endif %}
-              
-              {% if themeTag.name == "Ventilation Requirements" and topicTag.name == "Confined Spaces" %}
-              1. Does the Business Function ensure that ventilation methods are selected, set up, or approved by a qualified person?
-              2. Is the space maintained in a ventilated condition until atmospheric testing confirms acceptable levels?
-              3. During entry, if atmospheric conditions risk becoming unacceptable, is ventilation maintained continuously?
-              {% endif %}
+          {% if themeTag.name == "Advanced and Basic Rigger Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the training and qualification for Advanced and Basic Riggers comply with the requirement to be conducted by a third party possessing a certification from a nationally recognized accreditation organization or accredited Business Function training program?
+          2. Does the training for Basic Riggers comply with the requirement to enable them to inspect rigging before use?
+          3. Does the training for Basic Riggers comply with the requirement to enable them to identify and attach rigging with basic knowledge of hitch configurations, capacities, and basic knots?
+          4. Does the training for Basic Riggers comply with the requirement to enable them to recognize associated hazards?
+          5. Does the training for Basic Riggers comply with the requirement to enable them to signal operations?
+          6. Does the training for Basic Riggers comply with the requirement to enable them to use various types of rigging equipment and basic hitches and their applications?
+          7. Does the training for Advanced Riggers comply with the requirement to enable them to perform rigging tasks unsupervised?
+          8. Does the training for Advanced Riggers comply with the requirement to enable them to select rigging components and procedures based on rigging capacity?
+          9. Does the training for Advanced Riggers comply with the requirement to enable them to estimate load weight and center of gravity?
+          10. Does the training for Advanced Riggers comply with the requirement to enable them to identify lift points?
+          11. Does the training for Advanced Riggers comply with the requirement to enable them to determine and select rigging based on loading?
+          12. Does the training for Advanced Riggers comply with the requirement to perform pre-use inspection of rigging and lift points?
+          13. Does the training for Advanced Riggers comply with the requirement to identify and attach rigging with knowledge of hitch configurations, load angle factors, rigging capacities, and load integrity?
+          14. Does the training for Advanced Riggers comply with the requirement to understand load dynamics and associated hazards?
+          15. Does the training for Riggers comply with the minimum requirement of 8 hours of instructional time, practical training, and evaluation of the Rigger's performance by a qualified individual?
+          16. Are Riggers required to pass a written examination and a practical rigging examination?
+          17. Is the evaluation cycle for Advanced Riggers and Basic Riggers every 3 years?
+          18. Is the evaluation conducted by a third party or an individual who has the knowledge, training, and experience necessary to assess rigging operations?
+          {% endif %}
+          
+          {% if themeTag.name == "Confined Space Entry Procedure" and topicTag.name == "Confined Space" %}
+          1. Does the Business Function develop and establish a written confined space entry procedure per the requirements of 29 CFR 1910.146?
+          2. Does the written procedure include specific entry procedures, including communication of and review of known hazards and mitigations or control measures, and attendant requirements?
+          3. Is the written procedure in alignment with the requirements of the Enterprise standard Pre-Job Safety Planning EHS-SOH-4.1.1.11?
+          4. Are all of the following evaluated prior to entry: the initial space classification, the work to be performed within the space, and the activities/conditions in adjacent areas that could impact the entry?
+          5. Are appropriate barriers in place to manage hazards from outside work or conditions before entry?
+          6. Are all unclassified or unconfirmed confined spaces treated as hazardous and permit-required until a pre-entry assessment deems otherwise?
+          7. Is any space not listed on the confined space inventory prevented from entry until evaluated and classified by a qualified person?
+          {% endif %}
+          
+          {% if themeTag.name == "Atmospheric Testing" and topicTag.name == "Confined Space" %}
+          1. Does the Business Function ensure that all necessary testing for hazardous atmospheres is completed before authorizing entry into a confined space?
+          2. Are test equipment and accessories approved or certified for use in hazardous areas and calibrated as recommended by the manufacturer?
+          3. Is all atmospheric testing conducted by a Qualified Person?
+          4. Are employees or their representatives given the opportunity to observe the pre-entry testing?
+          5. Is testing conducted in a manner that accurately reflects the atmosphere in the confined space?
+          6. Do testing durations reflect the capabilities of the test equipment and follow manufacturer recommendations for sample pumps?
+          7. Is a routine testing frequency defined to verify acceptable entry conditions?
+          8. Must verification testing be completed and recorded on the permit before first entry into permit-required spaces?
+          9. Is continuous monitoring required when welding, cutting, or painting operations are performed within the confined space?
+          10. Is testing performed in the order of Oxygen, then Combustible gases, followed by Toxic gases/vapors if needed?
+          {% endif %}
+          
+          {% if themeTag.name == "Contract Partners Performing Confined Space Entry" and topicTag.name == "Confined Space" %}
+          1. Does the Business Function establish a process for communicating the requirements of the Confined Space Entry Standard?
+          2. Does the Business Function inform contract partners on site of the location of confined spaces?
+          3. Are all associated hazards communicated to the contract partners?
+          4. Must the Contract Partner complete an Entergy confined space permit before entering a permit-required space?
+          5. Must the Contract Partner obtain approval from an Entry Supervisor before entry?
+          6. Must the Contract Partner also obtain approval from other designated individuals prior to entry?
+          {% endif %}
+          
+          {% if themeTag.name == "Crane Operations Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the entity responsible for crane operations ensure that all personnel receive appropriate training?
+          2. Do the Signal Person, operator, and Lift Director communicate with each other prior to operations when non-standard hand signals are used?
+          3. Is fall protection training provided to all employees potentially exposed to fall hazards in accordance with Enterprise standards?
+          4. Are lifting personnel trained on work area controls to prevent entry into swing radius hazard areas?
+          5. Are employees trained on the procedures to follow in the event of electrical contact with a power line?
+          {% endif %}
+          
+          {% if themeTag.name == "Digger Derrick Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the operator adhere to all applicable manufacturer and Business Function-specific safe operation procedures?
+          2. Are the operator and ground personnel fully familiar with operating procedures, inspection requirements, control locations, lifting capacities, emergency procedures, and field maintenance requirements?
+          3. Is a pre-job brief or tailgate session conducted before operation?
+          4. Have operators received training to safely operate the equipment?
+          5. Are all safety signs, guards, and safety features in place and in proper condition?
+          6. Is a Job Site Survey performed to assess ground slope, firmness, potential hazards (e.g., ditches, drop offs, holes, debris, vegetation, underground or overhead utilities, or boom interferences)?
+          {% endif %}
+          
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Business Function ensure that equipment operators are trained on the safe operation of their specific equipment before use?
+          2. Is the training documented and does it include formal instruction, practical training, and performance evaluation by a Qualified Individual?
+          3. Are operators required to pass a written/oral examination and a practical operating examination unless they provide sufficient evidence of qualifications?
+          4. Is refresher training provided when unsafe operation is observed, following an accident/close call, or when evaluations indicate unsafe practices?
+          5. Is each operator's performance evaluated and documented at least once every 3 years?
+          6. Does the certification process for powered industrial truck and digger derrick operators include the operator's name, training date, evaluation date, and evaluator's identity?
+          7. Can contract partners provide documentation proving compliance with training certifications?
+          8. For digger derrick operations (e.g., auger use, pole placement/removal, handling associated materials, or setting underground equipment), are certifications required?
+          9. Are instructors verified to have the necessary expertise and experience for training?
+          10. For hoist operators, is qualification determined based on load weight (basic vs. advanced) or through supervised operation?
+          11. Are non-powered industrial truck operators trained to perform their tasks effectively?
+          {% endif %}
+          
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the entity obtain licensed professional engineer approval for any site Engineered Temporary Lift Assembly?
+          2. Is the assembly's design supported by detailed drawings, specifications, evaluations, or certifications?
+          3. Is a load test performed on the assembly in every configuration in which it will be used?
+          4. Is the load test performed at no less than 100% of the rated load or more than 125% (whichever governs)?
+          5. Is a written report of the test (including load details and operations performed) prepared and filed?
+          6. Is the person conducting the test responsible for preparing and filing the report?
+          7. Are all critical (load-bearing) welds inspected (e.g., by magnetic particle or liquid penetrant methods) before use?
+          8. Are temporary assemblies permanently marked with their load rating before use?
+          9. For serialized devices, is documentation available supporting the intended lift?
+          10. Is the load test performed as outlined in the controlling document—including test load lift distance, hold time (minimum 10 minutes), trolley transport, and intermediate positioning?
+          11. Is the test load moved along the full length of the bridge/runway with proper positioning on both ends?
+          12. Is the test load lowered to an intermediate position and held with brakes for at least 1 minute (or as otherwise specified)?
+          13. Is specified information permanently attached to all temporary hoisting assemblies?
+          14. If required, does the entity develop a documented engineering response—including third-party reviews, independent verification of vendor calculations, and code application—for Critical/Complex Lifts?
+          15. Is 3D finite element analysis performed if a load test of no less than 110% (or 125%) has not been conducted?
+          16. Is load testing verified per ASME B30.20 and, where applicable, are additional safety factors specified if testing is not possible?
+          17. Are critical welds re-examined post load test per AWS D1.1, and is proper installation verified?
+          18. Is the lifting boundary area assessed for potential collateral damage or personnel injury in the event of assembly failure?
+          {% endif %}
+          
+          {% if themeTag.name == "Excavator Safe Operation (Lifting)" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Business Function ensure that load charts and lifting attachment points are used according to the manufacturer's instructions?
+          2. Are modifications affecting capacity or safe operation made only with the manufacturer's written approval?
+          3. If modifications occur, are capacity, operation, and maintenance instructions updated accordingly?
+          4. Is the equipment's original safety factor maintained?
+          5. Is the equipment kept at least 5 feet from the edge of an excavation during lifts near an open excavation?
+          6. Are nonessential personnel removed from the excavation area during such lifts?
+          7. Are Basic Riggers required for all excavator lifting operations?
+          {% endif %}
+          
+          {% if themeTag.name == "General Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Material Handling process evaluate needs in terms of weight, size, distance, and movement path?
+          2. Does the process follow a hierarchy for selecting appropriate material handling methods?
+          3. Is elimination of material handling needs through engineering solutions considered?
+          4. Does the process involve mechanical movement (e.g., lift trucks, overhead cranes, conveyors)?
+          5. Does the process allow for manual movement using handling aids (e.g., dollies or carts)?
+          6. Are safe lifting techniques utilized?
+          {% endif %}
+          
+          {% if themeTag.name == "General Requirements" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the entity conduct an Identification and Hazard Evaluation of Confined Spaces?
+          2. Does the entity have a Confined Space Entry Procedure for both permit-required and non-permit-required spaces?
+          3. Is Atmospheric Testing performed?
+          4. Is there a Rescue Plan in place?
+          5. Is Training provided for personnel working in confined or enclosed spaces?
+          {% endif %}
+          
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Business Function ensure that a lift plan is developed for each lift?
+          2. Is each lift categorized as a Critical, Complex, or Common Lift?
+          3. Must a Critical Lift plan be completed before a Critical Lift is conducted?
+          4. Must Critical Lifts be performed under the direction of a Lift Director?
+          5. Is the Business Function responsible for developing its own critical lift plan?
+          6. Do Critical Lift plans include details on crane configuration, environmental/ground conditions, load radius/size/weight, personnel qualifications, communication procedures, inspection, and weather conditions?
+          7. Are sketches (such as a Rigging Sketch or Load-Path Sketch) included as needed?
+          8. Are Equipment Inspections documented with dates and names of the competent personnel?
+          9. Is a sign-off sheet included to verify that the Critical Lift plan has been reviewed?
+          10. Do all workers involved sign off on the plan?
+          11. Is the plan reviewed by an Entergy employee/agent and, for certain lifts, approved by a professional engineer?
+          12. Is a documented Lift Plan required before a Complex Lift, and are Common Lifts incorporated into a documented job briefing under the direction of a Basic Rigger?
+          13. Is Appendix E – Lifting Plan Example used for repetitive Common Lifts?
+          {% endif %}
+          
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Business Function ensure that lifting boundaries or exclusion zones are established prior to any lift?
+          2. Does the boundary include lower levels in multi-level areas?
+          3. Is the boundary large enough to encompass the affected area, load, and equipment?
+          4. Is the boundary marked with appropriate flagging and signage?
+          5. Does the boundary account for potential load swing, movement, or drop?
+          6. Does the boundary size increase as the load is raised?
+          7. Are only essential personnel allowed within the boundary?
+          8. Is the forklift/equipment operator required to remain stationary until ground personnel are safely clear?
+          9. Is a minimum safe radius (for example, at least 15 feet) maintained during active loading/unloading or movement operations?
+          10. Must the driver turn off the engine, apply brakes, vacate the vehicle, and reposition safely before loading/unloading begins?
+          {% endif %}
+          
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Are powered hoists' winch attachments and anchorages designed by a qualified person?
+          2. Does winch installation allow for proper rope spooling on the drums?
+          3. Are winches clearly marked with their ratings, rope diameters, and power requirements?
+          4. Are drum sizes (barrel diameter, barrel length, flange diameter) clearly indicated?
+          5. Is rope speed (in feet per minute or meters per second) at rated load specified?
+          6. Are exposed moving parts effectively guarded?
+          7. Are all controls used during normal operation located within easy reach of the operator's station?
+          8. Do electric hoists include a disconnect device that cuts power in the event of a failure?
+          9. Is there an over-speed preventive device where applicable?
+          10. Do remotely operated hoists stop when controls become ineffective?
+          11. Do base-mounted drum hoists meet all applicable design, installation, testing, inspection, and operational requirements?
+          12. Do remote-operated winches stop if the control signal is lost?
+          13. Do prime mover controls return to neutral when released?
+          14. Is each winch equipped with a brake capable of holding at least 125% of the rated load?
+          15. Are remote-operated winches fitted with a self-setting brake?
+          16. Are foot-operated brakes designed so that the operator's foot remains securely positioned?
+          17. For winches that allow simultaneous underwind and overwind, is there a brake that holds 125% of the rated load?
+          18. Is there a means to control drum speed during load movement?
+          19. Do braking systems allow for adjustments to compensate for wear?
+          20. Are ropes of sufficient size, minimum breaking force, and construction used—and are any alternative materials used only on the recommendation of a qualified person?
+          {% endif %}
+          
+          {% if themeTag.name == "Lift Director Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Lift Director hold an Advanced Rigger qualification?
+          2. Does the Lift Director oversee and manage Critical Lift activities?
+          3. Is the Lift Director capable of performing nearly all Common, Complex, or Critical Lifts?
+          4. Are Lift Directors designated by site management based on the qualifications specified in this standard?
+          {% endif %}
+          
+          {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Function conduct an initial survey to identify all confined spaces required by the standard?
+          2. Is the survey conducted by a qualified person designated by the Business Function?
+          3. Is a hazard assessment performed for each confined space or type of confined space?
+          4. Does the assessment review past and current uses of the confined space?
+          5. Does it review the space's physical characteristics, configuration, location, and access/egress points?
+          6. Are existing or potential atmospheric hazards evaluated?
+          7. Are biological, mechanical, electrical, physical, and chemical hazards reviewed?
+          8. Are any other serious hazards identified?
+          9. Does the Business Function classify each space as permit-required, non-permit-required, or enclosed?
+          10. Is an inventory maintained detailing the classification of each space?
+          11. Is there a process for managing and updating the confined space inventory?
+          12. Are periodic evaluations of confined spaces conducted according to the established frequency?
+          13. Is the inventory updated as needed?
+          14. Are danger signs posted for permit-required spaces, and are these signs legible and durable?
+          {% endif %}
+          
+          {% if themeTag.name == "Material Handling Safety Observation" and topicTag.name == "Material Handling" %}
+          1. Does the Business Function integrate safety observations of Material Handling activities into its overall observation programs?
+          2. Do Business Function representatives provide safety coaching or mentoring when deficiencies are identified?
+          3. Are safety observations analyzed on a regular basis?
+          4. Do the observations meet or exceed the content outlined in Appendix F – Material Handling Observation Example?
+          5. Are systems such as AirsWeb or equivalent used to capture Contract Partner observations?
+          {% endif %}
+          
+          {% if themeTag.name == "Mobile Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Is the crane inspected and its functionality verified per section 4.3.10 before any lift is performed?
+          2. Are all personnel clear of the load path prior to hoisting?
+          3. Is an appropriate fire extinguisher available in the crane cab?
+          4. Are the controls de-energized when the cab is unattended?
+          5. Is operation halted immediately if a problem arises?
+          6. Is more than one Spotter required when necessary (for example, when moving into a building or when view is restricted)?
+          {% endif %}
+          
+          {% if themeTag.name == "Mobile Crane Operation Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does each crane operator receive training, certification/licensing, and evaluation before operating mobile cranes?
+          2. Is the training and certification/licensing conducted by a third party with recognized accreditation?
+          3. Is the training developed in accordance with the specific requirements outlined in the document?
+          4. Is there a written test covering the controls and operational/performance characteristics of the equipment?
+          5. Are operators required to calculate load/capacity for various configurations?
+          6. Must operators know the procedures for preventing and responding to power line contact?
+          7. Are operators required to have technical knowledge as outlined (for example, in Appendix J)?
+          8. Must operators be able to locate and read relevant information in equipment manuals?
+          9. Is there a practical test to verify that operators possess the necessary skills for safe operation?
+          10. Are control mechanisms and drive components inspected for excessive wear or maladjustments?
+          11. Are air, hydraulic, and other pressurized lines inspected for deterioration or leakage?
+          12. Are hooks, latches, and wire ropes inspected according to manufacturer specifications and regulatory requirements?
+          13. Are tires inspected for proper inflation and condition?
+          14. Is ground condition assessed to ensure adequate support for the equipment?
+          15. Must equipment be level as specified by manufacturer tolerances?
+          16. Are operator cab windows, safety devices, and operational aids inspected for proper functionality?
+          17. Is there a requirement to apply load chart information and safe shutdown procedures during operation?
+          18. Is the accreditation for training reviewed every 3 years, with certifications valid for five years and audited per 29 CFR 1926.1427(e)?
+          19. Are evaluations conducted by qualified Entergy personnel or agents?
+          20. Is it verified that each operator is capable of safely operating the equipment under varying workplace conditions?
+          {% endif %}
+          
+          {% if themeTag.name == "Material Handling Equipment Inspection" and topicTag.name == "Material Handling" %}
+          1. Does the equipment operator perform a documented pre-use inspection according to the manufacturer's instructions?
+          2. Are documented inspections conducted at least once per year?
+          3. Is a periodic inspection of all rigging equipment performed by a qualified person on an annual basis?
+          4. Are any deficiencies documented and promptly reported for corrective action?
+          5. Is equipment removed from service if it is found to be defective or unsafe?
+          6. Is a legible manufacturer's manual readily accessible during equipment use?
+          7. Are preventive maintenance tasks performed by a skilled maintenance person to ensure safe operation?
+          8. Are inspection records maintained for at least 5 years?
+          {% endif %}
+          
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the entity adhere to safe operation guidelines for non-powered industrial trucks?
+          2. Are four-wheel carts with a tongue-type pull handle prohibited?
+          3. Are non-powered industrial trucks inspected prior to use?
+          4. Is the manufacturing or modification of non-powered industrial trucks avoided?
+          5. Are non-powered industrial trucks used strictly for their intended purposes and design?
+          6. Is the load capacity of non-powered industrial trucks not exceeded during operation?
+          7. Is equipment designed specifically for moving barrels, drums, gas cylinders, or dewars used when appropriate?
+          8. Is a non-powered truck pushed rather than pulled except when necessary for transitioning over thresholds or inclines?
+          9. Are load securing devices (such as straps, chains, bars, or pins) used as required?
+          10. Are load paths kept clear of obstructions, uneven surfaces, inclines, or declines?
+          11. Is the truck with the lowest profile selected to keep the center of gravity low?
+          12. Is the load's center of gravity maintained three feet or less from the ground for heavy loads?
+          13. Are stairs avoided unless specific conditions are met, and if used, is equipment designed for stair use with proper safety measures?
+          14. Are entrances to stairs flagged or guarded to prevent accidental entry?
+          15. Are loads secured when non-powered trucks are used on stairs?
+          16. Is it ensured that no personnel involved in load movement are in the line of fire?
+          {% endif %}
+          
+          {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Function demonstrate that non-permit required and enclosed spaces are maintained in a safe condition?
+          2. Are all non-permit required confined space entries aligned with the Enterprise standard Pre-Job Safety Planning EHS-SOH-4.1.1.11?
+          3. Is there a written procedure for entry into non-permit required confined spaces?
+          4. Does the procedure specify prohibited tasks, allowable tasks, equipment needs, PPE requirements, energy isolation, proper ventilation, hot work safeguards, and rescue equipment?
+          5. Does the procedure require confirmation that the space is on the inventory list and validated as non-permit required before entry?
+          6. Is a qualified person responsible for determining the need for atmospheric testing, and is entry halted if test results are unacceptable?
+          7. Is the space re-evaluated before entry if there are changes in use or potential hazards?
+          8. If a hazardous atmosphere is detected, must work stop immediately and the area be secured?
+          9. Must the space be evaluated for the cause of the hazard before re-entry is allowed?
+          {% endif %}
+          
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the powered industrial truck operate strictly in accordance with the manufacturer's instructions and for the conditions for which it is designed?
+          2. Is altering or eliminating forklift parts or adding accessories prohibited unless approved by the manufacturer in writing?
+          3. Is free rigging disallowed without written approval or a proper engineering review?
+          4. Are modifications affecting capacity and safe operation made only with prior written approval?
+          5. Are capacity, operation, and maintenance instructions updated if modifications occur?
+          6. Are only stable or safely arranged loads handled?
+          7. Are unstable loads secured to prevent them from falling?
+          8. Must the operator slow down and sound the horn when vision is obstructed at cross aisles?
+          9. If the load obstructs the forward view, must the operator travel with the load trailing and sound the horn?
+          10. Are spotters used when the driver's view is compromised?
+          11. When descending an incline with a load, must the operator back down the incline?
+          12. When ascending an incline, must the operator drive forward up the incline?
+          13. Are sudden stops that might spill the load avoided?
+          14. In enclosed areas using forklifts with internal combustion engines, is adequate ventilation provided to prevent carbon monoxide buildup?
+          15. Are forklifts operated at a safe speed dictated by surrounding conditions?
+          16. When moving, must the forks be carried as low as possible while still clearing uneven surfaces?
+          17. Are forklifts prohibited from being used to lift employees unless they are designed for that purpose?
+          18. Are special precautions taken during loading/unloading inside vans or trucks, including proper docking and chocking?
+          19. When not in use, are the forks fully lowered, brakes set, and the unit turned off?
+          20. Are personnel kept clear from beneath elevated forks at all times?
+          21. Are forklifts never used as a jack to lift vehicles?
+          22. Is riding on forklifts restricted to the driver only, with no additional personnel riding on the load?
+          23. Is proper stacking of materials on pallets and storage racks exercised?
+          24. Are only loads that are securely and safely loaded, and within rated capacity, handled?
+          25. Are forklifts prohibited from loading/unloading poles in the "headache" position?
+          26. During refueling, is the engine turned off?
+          {% endif %}
+          
+          {% if themeTag.name == "Powered Industrial Truck Equipment Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the truck with front-end attachments display attachment identification and show the approximate weight of the truck/attachment combination at maximum elevation with the load centered?
+          2. Are all nameplates and markings maintained in a legible condition?
+          3. Is each forklift equipped with rollover protection and an approved seat belt that is always used?
+          4. Does each forklift have an operable back-up alarm that is checked prior to each use?
+          5. Is the load rating clearly indicated on the forklift or pallet jack?
+          {% endif %}
+          
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the crane operate only after meeting inspection requirements per section 4.3.10 of the standard?
+          2. Are only qualified personnel permitted to operate the overhead crane?
+          3. Is the crane de-energized before anyone goes on top or on the rails if operational procedures are not in place?
+          4. Are rated load markings clearly visible on each side of the crane from the ground?
+          5. Are stops installed to limit trolley and bridge travel?
+          6. Are all exposed moving parts and electrical equipment enclosed or guarded in accordance with OSHA standards?
+          7. Is the controller operating handle located within convenient reach of the operator?
+          8. Is the cab lighting sufficient for safe operation?
+          9. Does each crane have a power travelling mechanism with an effective warning signal?
+          10. Is a fire extinguisher available in the cab?
+          11. Do operators ensure that overhead crane operations comply with the lifting boundary criteria specified in section 4.2.2?
+          12. Is the load attached by approved devices (such as slings) and secured properly before lifting more than a few inches?
+          13. Are brakes tested by raising the load slightly and applying the brakes to confirm no load creep?
+          14. Is the hook maneuvered to prevent swinging of the load?
+          15. Is there no sudden acceleration or deceleration of the load?
+          16. Does the load never contact obstructions or pass over people?
+          17. Does the operator remain at the controls while the load is suspended unless approved by senior management?
+          {% endif %}
+          
+          {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Function develop and implement a written confined space procedure that complies with 29 CFR 1910.146?
+          2. Is the written procedure readily available for employee inspection?
+          3. Is there a permitting process for reviewing hazards, mitigation measures, and authorization by a Qualified Person prior to entry?
+          4. Does the permit system require that the entry, purpose, date, and duration of the permit be specified?
+          5. Does the permit system require the designation of named personnel as attendants and an entry supervisor with signature or initials?
+          6. Are hazards within the permit space identified and are isolation/control measures specified?
+          7. Are atmospheric test results (including date, time, and tester's initials) required and recorded as part of the permit?
+          8. Does the permit system include details on rescue and emergency services and the communication procedures to be used during entry?
+          9. Are additional permits (such as for hot work) referenced as necessary?
+          10. Is a unique identifier assigned for tracking each permit?
+          11. Is the permit approved by a Qualified Person and posted on site for the duration of the job?
+          12. If conditions change during the work, must the existing permit be cancelled, retested, and reissued before work resumes?
+          13. Are attendants required to be posted immediately outside designated entry points, and are other entry points properly barricaded?
+          14. If work activities deviate from the approved permit scope, is the permit immediately revoked and work halted?
+          15. Are communication devices (such as radios or phones) tested and verified to be working before entry is allowed?
+          {% endif %}
+          
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the equipment assembly/disassembly process determine if any part of the equipment, load line, or load comes within 20 feet of a power line?
+          2. If within 20 feet, does the process comply with one of the options outlined in 29 CFR 1926.1407?
+          3. Is the power line de-energized and visibly grounded at the worksite before assembly/disassembly begins?
+          4. Is a clearance of at least 20 feet maintained throughout the process?
+          5. Is a planning meeting conducted with the A/D director, operator, assembly/disassembly crew, and others to review the location of power lines?
+          6. Are nonconductive tag lines used during assembly/disassembly?
+          7. Are additional measures implemented to prevent encroachment near power lines?
+          8. Is there a dedicated spotter in continuous contact with the equipment operator?
+          9. Is the spotter equipped with visual aids and communication devices to ensure the required clearance is maintained?
+          10. Are proximity alarms or automatic stopping/limiting devices used to prevent encroachment?
+          11. Are elevated warning lines, barricades, or high-visibility markings employed as needed?
+          12. Are the voltage and minimum clearance distances determined per Table A before operations and maintained during operations?
+          13. Are hazard assessments and safe travel paths identified, especially in conditions of poor visibility or at night?
+          14. Is compliance with §1926.959 confirmed for power lines over 350 kV or for other voltage levels as specified?
+          {% endif %}
+          
+          {% if themeTag.name == "Program Review and Evaluation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. For Material Handling: Does the Business Function conduct a formal review of the program as part of management reviews, and does Enterprise Safety review and update the standard at least every three years?
+          {% endif %}
+          
+          {% if themeTag.name == "Program Review and Evaluation" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. For Confined Spaces: Does the Business Function perform an annual formal review of the Confined Space program—including cancelled permits, the confined space inventory, and reclassified spaces—with updates at least every three years?
+          {% endif %}
+          
+          {% if themeTag.name == "Re-Classified Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Function allow reclassification of permit-required spaces to non-permit required only under specified conditions where hazards are eliminated without entry?
+          2. Is entry required to eliminate hazards, and is the hazard elimination verified by testing or inspection?
+          3. Is the basis for hazard elimination documented and shared with affected personnel?
+          4. If hazards reappear in a reclassified space, must personnel immediately exit and be re-evaluated for reclassification?
+          5. Are reclassifications treated as temporary and verified to ensure that all hazards remain eliminated during entry?
+          {% endif %}
+          
+          {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Function designate rescue and emergency services and establish procedures for summoning, performing rescues, and preventing unauthorized rescue attempts?
+          2. Is the prospective rescuer's response time, ability, and proficiency evaluated?
+          3. Is at least one team member trained in basic first aid and CPR?
+          4. If applicable, is additional rescue training provided?
+          {% endif %}
+          
+          {% if themeTag.name == "Roles and Responsibilities" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Do Senior Leadership and the VP Enterprise Safety support and approve the Confined Space Entry Standard and provide the necessary resources?
+          2. Does Enterprise Safety provide governance, oversight, and conduct an annual review of the standard?
+          3. Do Functional Safety Directors/Managers ensure that proper processes, procedures, and controls are in place and that evaluations are conducted?
+          4. Are employees and Contract Partners trained and required to report any uncontrolled hazards promptly?
+          {% endif %}
+          
+          {% if themeTag.name == "Roles and Responsibilities" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Do Senior Leadership and the VP Enterprise Safety support and approve the Enterprise standard for Material Handling, Rigging, and Lifting and provide the necessary resources?
+          2. Does Enterprise Safety provide governance, oversight, and conduct annual reviews of program performance?
+          3. Do Functional Safety Directors/Managers ensure that all required processes and controls are in place and that personnel are properly trained and compliant?
+          {% endif %}
+          
+          {% if themeTag.name == "Signal Person Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Signal Person meet the qualification requirements before giving any signals?
+          2. Is qualification obtained via a third-party evaluation or through Business Function-led training?
+          3. Is the qualification documentation readily available and does it specify the types of signaling for which the person is qualified?
+          4. Does the Signal Person understand and competently apply the required signals (including standard hand signals) and demonstrate competence through testing?
+          {% endif %}
+          
+          {% if themeTag.name == "Spotter Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Spotter receive training that meets the requirements to perform their task effectively?
+          2. For power line operations, does the Dedicated Spotter comply with the training requirements as specified in 29 CFR 1926.1428?
+          {% endif %}
+          
+          {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Function develop, deliver, and manage confined space training for all employees involved in or supporting confined space entry activities?
+          2. Does the training establish the necessary proficiency and introduce any new or revised procedures for compliance?
+          3. Are contract partners appropriately trained per Enterprise standards, with training provided prior to entry and on an annual basis thereafter?
+          4. Does the training cover confined space entry procedures, the differences between permit-required and non-permit-required spaces, the use of permits, and emergency procedures?
+          5. Are attendants, entry supervisors, atmospheric testers, and rescue personnel trained in their respective duties?
+          {% endif %}
+          
+          {% if themeTag.name == "Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the entity perform documented inspections of rigging equipment at least annually?
+          2. Are periodic inspections conducted by qualified personnel, with deficiencies documented and equipment removed from service if unsafe?
+          3. Is a manufacturer's manual readily accessible and are preventive maintenance tasks documented?
+          4. Does the Business Function provide and manage training for all employees performing material handling, lifting, or rigging activities in accordance with Enterprise standards?
+          {% endif %}
+          
+          {% if themeTag.name == "Ventilation Requirements" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Function ensure that ventilation methods are selected, set up, or approved by a qualified person?
+          2. Is the space maintained in a ventilated condition until atmospheric testing confirms acceptable levels?
+          3. During entry, if atmospheric conditions risk becoming unacceptable, is ventilation maintained continuously?
+          {% endif %}
 
       run-prompt:
         input:

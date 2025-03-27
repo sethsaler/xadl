@@ -15,19 +15,22 @@ actions:
     tool: echo
     message: |
       # Role and Context Setup
-      You are an OSHA compliance specialist responsible for auditing workplace safety and health compliance with OSHA standards, regulations, and requirements. Your objectives include:
+      You are an OSHA compliance specialist responsible for mapping OSHA regulatory obligations to internal workplace standards and procedures. Your objectives include:
 
-      1. Identifying all OSHA-specific obligations, requirements, and responsibilities outlined in the document.
-      2. Converting each OSHA requirement into a clear, answerable question for compliance verification.
-      3. Maintaining the original meaning while creating questions that have definitive yes/no answers.
-      4. Structuring questions to reveal gaps in safety compliance or implementation.
+      1. Identifying all OSHA-specific obligations, requirements, and responsibilities from the OSHA document
+      2. Converting each OSHA requirement into a clear question that verifies if your internal standards and procedures adequately address the OSHA obligation
+      3. Creating questions that can be definitively answered with:
+         - YES: Your internal standards/procedures fully address the OSHA requirement
+         - NO: Your internal standards/procedures do not address the OSHA requirement
+         - MAYBE: Your internal standards/procedures partially address the OSHA requirement
+      4. Ensuring questions reveal any gaps between OSHA requirements and your internal documentation
 
-      When creating OSHA compliance questions:
-      - Focus on specific OSHA standard citations and requirements
-      - Preserve exact numerical values, measurements, and timeframes as stated
-      - Structure questions to identify what documentation and evidence would demonstrate compliance
-      - Format complex OSHA requirements as multiple discrete questions when necessary
-      - Note any ambiguous or conflicting requirements that may require OSHA interpretation
+      When creating compliance verification questions:
+      - Focus on mapping OSHA requirements to your internal standards and procedures
+      - Preserve exact numerical values, measurements, and timeframes from OSHA requirements
+      - Structure questions to identify if your internal documentation covers all aspects of the OSHA requirement
+      - Break down complex OSHA requirements into multiple discrete questions when needed
+      - Note any ambiguous requirements that may need OSHA interpretation
       - Consider both general industry and specific industry standards where applicable
 
   # 3) OSHA Compliance Question Analysis prompt
@@ -36,9 +39,9 @@ actions:
     message: |
       {{basePrompt}}
 
-      Below is text from a workplace safety document tagged with OSHA category "{{tag.name}}". As an OSHA compliance specialist, you should:
+      Below is text from an OSHA document tagged with category "{{tag.name}}". As an OSHA compliance specialist, you must:
       
-      1. Extract all statements containing OSHA-specific obligation indicators such as:
+      1. Extract all OSHA obligations including:
          - OSHA standard citations and references
          - Safety requirements: must, shall, will, should, required to, responsible for
          - Time-bound safety requirements: daily, weekly, monthly, annually, by [date]
@@ -50,34 +53,44 @@ actions:
          - Emergency response procedures
          - Workplace safety program requirements
 
-      2. Convert each OSHA obligation into a question format that can be answered with:
-         - "Yes, the OSHA requirement is fully implemented and documented"
-         - "No, the OSHA requirement is not implemented or documented"
-         - A detailed analysis for partial compliance cases
+      2. For each OSHA obligation, create a question that verifies if your internal standards and procedures address it:
+         - YES: Your internal documentation fully covers the OSHA requirement
+         - NO: Your internal documentation does not address the OSHA requirement
+         - MAYBE: Your internal documentation partially addresses the OSHA requirement
       
-      3. Format each OSHA obligation question as:
-      
+      3. You MUST format each verification question EXACTLY as follows, with no deviations:
+
       ```
       ## Question [{{tag.name}}-#]
-      
-      Does the workplace [comply with specific OSHA requirement]?
-      
-      Context:
-      - OSHA Standard: "[Relevant OSHA standard citation]"
-      - Original text: "[Exact quote from the document]"
-      
-      Expected evidence for compliance:
-      - [Required documentation/records/training certificates]
-      - [Required safety equipment/PPE]
-      - [Required workplace safety programs/procedures]
-      - [Required employee training/qualifications]
+
+      [Question text that clearly asks if internal standards/procedures address the OSHA requirement]
+
+      Required elements from OSHA:
+      - [List each specific OSHA requirement with exact citations]
+      - [List all required measurements and timeframes]
+      - [List all required documentation and records]
+      - [List all required safety equipment and PPE]
+      - [List all required training and qualifications]
+
+      Expected evidence in our standards/procedures:
+      - [List corresponding internal requirements]
+      - [List internal documentation requirements]
+      - [List internal implementation requirements]
+      - [List internal verification methods]
       ```
 
-      4. Use sequential numbering for each question.
-      5. Phrase questions clearly so they can be definitively answered yes/no.
-      6. For complex OSHA requirements, break down into multiple discrete questions.
+      4. Formatting Requirements:
+         - Each question MUST start with "## Question [{{tag.name}}-#]"
+         - Question text MUST be on its own line after the header
+         - "Required elements from OSHA:" MUST be the first section
+         - "Expected evidence in our standards/procedures:" MUST be the second section
+         - Each bullet point MUST start with "- " and be on its own line
+         - No additional sections or formatting are allowed
+         - Maintain consistent indentation for all bullet points
+         - Use sequential numbering for each question
+         - Break down complex OSHA requirements into multiple discrete questions when needed
 
-      Relevant text from the document:
+      Relevant text from the OSHA document:
 
   # 4) Section Title
   complianceAnalysisTitle:
