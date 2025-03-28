@@ -1,0 +1,93 @@
+input:
+  documents:
+    type: document
+  # Removed workspace and knowledgeset inputs
+
+actions:
+  # 1) Existing Tag Collection for Agreement Information
+  get-agreementInformation-tags:
+    tool: find-tags
+    name: ["Credit", "Preamble"]
+  
+  # 2) REMOVED Tag Collection for "Document Tags"
+  # get-documentCategory-tags:
+  #   tool: find-tags
+  #   category: "Document Tags"
+
+  # 3) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are in-house counsel at a major entertainment studio, responsible for assessing legal obligations, compliance risks, and business implications within talent agreements. Your objectives include:
+
+      1. Identifying all obligations, commitments, and representations the studio has made regarding screen credit for the talent.
+      2. Pinpointing potential risks or ambiguities, including any conditions or limitations on credit obligations, noting relevant union/guild requirements, deadlines, or other time-sensitive triggers.
+      3. Providing actionable insights that integrate both legal and business perspectives (e.g., compliance with labor requirements, reputation management, financial implications).
+      4. Highlighting any provisions that could require negotiation, revision, or special attention to mitigate legal or reputational exposure.
+
+      When offering analysis or summarizing findings:
+      - Focus on clarity, precision, and direct relevance to studio obligations.
+      - Avoid unnecessary speculation; stick to explicit terms and established industry standards.
+      - Provide well-reasoned justifications for any concerns or potential adjustments.
+
+  # 4) Extract relevant snippets based on Agreement Information tags
+  get-relevant-snippets:
+    input:
+      documents: task/documents
+      tags: get-agreementInformation-tags # Focus on Credit and Preamble tags
+    tool: document-text
+    # Fetches text associated with any tag in get-agreementInformation-tags
+
+  # 5) Generate the consolidated summary using LLM
+  generate-summary:
+    input:
+      snippets: get-relevant-snippets
+      basePrompt: basePrompt
+    tool: llm
+    skipIfEmpty: snippets # Use SkipIfEmpty as requested
+    prompt: |
+      {{basePrompt.message}} # Include the base role/context setup
+
+      # Analysis Task
+      Below is key text extracted from talent agreement(s) related to Preamble information and Credit obligations. As in-house counsel, your task is to consolidate this information into a single summary document.
+
+      # Processing Instructions
+      Analyze the snippets and structure your output as follows:
+
+      ## Preamble Information
+      Extract and format the following information if found in the text, using this exact format:
+      **Talent Name:** [Name]
+      **Talent Type:** [Category]
+      **Role:** [Character Name]
+      **Agreement Name:** [Title]
+      **Effective Date:** [Date]
+      **Project Name:** [Title]
+
+      RequiredFields (definitions):
+          - TalentName: "Name of individual or team members"
+          - TalentType: "Role category (Writer, Director, Producer, Performer, Physical Producer, Lead Cast)"
+          - Role: "Character/role name for acting talent (N/A if not applicable)"
+          - AgreementName: "Formal agreement title"
+          - EffectiveDate: "Defined effective date or latest signature date. If missing, use the date the agreement was executed and specify that"
+          - ProjectName: "Project title or working title"
+
+      ## Credit Obligations Summary
+      Summarize all credit obligations found in the text into a single paragraph. Focus on:
+      - Main titles vs. end titles requirements
+      - Special designations (e.g., guest star, special appearance)
+      - Single card vs. shared card, and any position (first, second, etc.)
+      - Type size or other format requirements
+      - 'No less favorable than…' or parity language
+      - Producer or studio discretion over any of the above
+      - Applicability to specific episodes.
+      - Only include items explicitly mentioned; do not speculate.
+      - Do not include extraneous information (e.g., compensation).
+      - Adhere Rigorously to the Output Format: Provide only the requested information, with no additional text or commentary like "Credit Obligations:".
+
+      # Relevant Text Snippets:
+      {% for s in snippets %}
+      --- Snippet Start ---
+      {{s.text}}
+      --- Snippet End ---
+      {% endfor %}
