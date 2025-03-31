@@ -20,39 +20,34 @@ actions:
     tool: echo
     message: |
       # Role and Context Setup
-      You are a compliance and safety auditor responsible for assessing Standard Operating Procedures (SOPs) and safety protocols. Your objective is to review each question in the questionnaire and provide:
+      You are a compliance and safety auditor responsible for assessing Standard Operating Procedures (SOPs) and safety protocols against a provided questionnaire. Your objective is to review each numbered question in the questionnaire and, based ONLY on the provided text snippets from the relevant documents, provide:
 
-      1. A clear YES/NO determination for each numbered question
-      2. A brief explanation of why the answer is YES or NO
-      3. Any recommendations for addressing compliance gaps if the answer is NO
+      1. A clear determination: **YES**, **NO**, or **MAYBE**.
+          - **YES**: The document explicitly confirms the requirement is met. (Confidence: High)
+          - **MAYBE**: The document provides related information, but it's ambiguous, incomplete, or requires interpretation to fully answer the question. (Confidence: Medium)
+          - **NO**: The document explicitly contradicts the requirement, or the requirement is clearly absent from the relevant sections. (Confidence: High/Medium depending on whether it's explicitly contradicted vs. just absent)
+      2. A confidence level for your determination: **High** or **Medium**.
+          - **High**: Direct evidence supports the YES/NO determination.
+          - **Medium**: Evidence is indirect, ambiguous, or requires inference (likely leading to a MAYBE or a less certain NO).
+      3. A direct **Citation** from the provided document snippets that supports your determination.
+          - For **YES**, cite the text confirming compliance.
+          - For **MAYBE**, cite the text that causes ambiguity or partial alignment.
+          - For **NO**, cite text contradicting the requirement, or state "N/A - Requirement not found in provided snippets" if absent.
+          - **Emphasize** the key phrase(s) within the citation using ***bold and italics***.
 
       Format your response as follows for each question:
 
       **Question X**: [Question text here]
-      **Answer**: [YES/NO]
-      **Explanation**: [Brief explanation of compliance status]
-      **Recommendation**: [Only if answer is NO - provide specific recommendation]
+      **Determination**: [YES/NO/MAYBE]
+      **Confidence**: [High/Medium]
+      **Citation**: [***Relevant snippet text with emphasis*** or "N/A - Requirement not found in provided snippets"]
 
-  # 3) Analysis prompt
-  analysisPrompt:
-    tool: echo
-    message: |
-      {{basePrompt}}
-
-      Below are questions from the "{{tag.name}}" section of the safety compliance questionnaire. For each numbered question:
-      
-      1. Provide a clear YES/NO answer
-      2. Include a brief explanation supporting your determination
-      3. If the answer is NO, include a specific recommendation for addressing the gap
-      
-      Questions for analysis:
-
-  # 4) Section Title
+  # 3) Section Title
   analysisTitle:
     tool: echo
     message: SOP Compliance Assessment
 
-  # 5) Initialize Knowledge Set
+  # 4) Initialize Knowledge Set
   init-kset:
     input:
       documents: task/documents
@@ -74,7 +69,7 @@ actions:
       - op: set-nodes
         nodes: documents
 
-  # 6) Analyze each SOP Theme tag with each SOP Topic tag
+  # 5) Analyze each SOP Theme tag with each SOP Topic tag
   analyze-sop-themes-topics:
     repeat:
       function: analyze-for-tag
@@ -85,10 +80,9 @@ actions:
       documents: task/documents
       knowledge: init-kset
       basePrompt: basePrompt
-      prompt: analysisPrompt
       title: analysisTitle
 
-  # 7) Add Results to Workspace
+  # 6) Add Results to Workspace
   add-to-workspace:
     input:
       workspace: task/workspace
@@ -110,8 +104,6 @@ functions:
         type: document
       basePrompt:
         type: text
-      prompt:
-        type: text
       knowledge:
         type: knowledge-set
       title:
@@ -132,35 +124,39 @@ functions:
         input:
           themeTag: function/themeTag
           topicTag: function/topicTag
+          basePrompt: function/basePrompt
         tool: echo
         message: |
-          # SOP Theme: {{themeTag.name}} - Topic: {{topicTag.name}}
-          
-          You are analyzing the "{{themeTag.name}}" section under the "{{topicTag.name}}" category of the safety compliance questionnaire. Your task is to review each numbered question below and provide your analysis in a Markdown table format.
-          
+          # SOP Theme: {{themeTag.name}} - Topic: {{topicTag.name}} Analysis
+
+          {{basePrompt.text}}
+
+          You are analyzing the "{{themeTag.name}}" section under the "{{topicTag.name}}" topic using the provided document snippets. Your task is to review each numbered question below and provide your analysis in a Markdown table format based *only* on the snippets provided.
+
           The table should have the following columns:
-          1.  **Section Number**: The number of the question (e.g., "Question 1").
-          2.  **LLM Response**: Your analysis including:
-              *   A clear **YES/NO** determination.
-              *   A brief **Explanation** supporting your determination.
-              *   If the answer is NO, a specific **Recommendation** for corrective action. Use line breaks (`<br>`) within the cell for readability.
-          3.  **Source Snippet**: The exact snippet of text from the provided documents that you used to determine the answer. Add emphasis (***bold and italics***) to the key part(s) of the snippet that directly support your answer. If no specific snippet directly supports the answer (e.g., the requirement is missing entirely), state "N/A".
-          
+          1.  **Question Number**: The number of the question (e.g., "1").
+          2.  **Determination**: Your **YES**, **NO**, or **MAYBE** assessment based on the snippets.
+          3.  **Confidence**: Your **High** or **Medium** confidence level.
+          4.  **Citation / Explanation**: The exact snippet of text from the provided documents that supports your determination, with the key part(s) emphasized using ***bold and italics***. If the information is missing, state "N/A - Requirement not found in provided snippets". Use line breaks (`<br>`) for readability if needed, especially if combining Determination/Confidence/Citation into one cell later.
+
           Please ensure:
-          *   You only answer the questions listed under the "{{themeTag.name}}" heading and "{{topicTag.name}}" subheading for the current task.
+          *   You only answer the questions listed under the specific "{{themeTag.name}}" / "{{topicTag.name}}" combination for the current task.
+          *   Base your answers *strictly* on the provided snippets. Do not infer information not present.
           *   Number your rows corresponding to the question numbers.
           *   Format the table correctly using Markdown syntax.
-          
-          Here is the table structure:
-          
+
+          Here is the table structure example:
+
           ```markdown
-          | Section Number | LLM Response | Source Snippet |
-          |---|---|---|
-          | **Question X** | **Answer**: [YES/NO]<br>**Explanation**: [Explanation text]<br>**Recommendation**: [Recommendation text, if applicable] | ***[Relevant snippet text with emphasis]*** |
-          | ... | ... | ... |
+          | Question Number | Determination | Confidence | Citation / Explanation |
+          |---|---|---|---|
+          | **1** | YES | High | ***[Relevant snippet text with emphasis]*** |
+          | **2** | MAYBE | Medium | The document mentions ***[partially relevant text]***, but does not fully address the requirement. |
+          | **3** | NO | High | N/A - Requirement not found in provided snippets |
+          | ... | ... | ... | ... |
           ```
-          
-          ## Questionnaire Questions:
+
+          ## Questionnaire Questions for "{{themeTag.name}}" / "{{topicTag.name}}":
 
           {% if themeTag.name == "Advanced and Basic Rigger Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
           1. Does the training and qualification for Advanced and Basic Riggers comply with the requirement to be conducted by a third party possessing a certification from a nationally recognized accreditation organization or accredited Business Function training program?
@@ -451,7 +447,8 @@ functions:
           5. If equipment is found to need repair, defective, or unsafe, is it taken out of service until restored to safe operating condition by an Authorized Person?
           6. Is a legible manufacturer's manual readily accessible for all material handling equipment when in use?
           7. Are preventive maintenance tasks performed by a skilled maintenance person to keep the equipment in safe operating condition?
-          8. Are inspection records kept for a period of 5 years?
+          8. Are records kept of preventive maintenance tasks as well as any repairs made?
+          9. Are inspection records kept for a period of 5 years?
           {% endif %}
 
           {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
@@ -778,22 +775,26 @@ functions:
       run-prompt:
         input:
           snippets: get-theme-topic-snippets
-          basePrompt: function/basePrompt
           instructionPrompt: get-instruction-prompt-for-tag
-          prompt: function/prompt
           themeTag: function/themeTag
           topicTag: function/topicTag
         tool: llm
         skipIfEmpty: snippets
         prompt: |
           {{instructionPrompt.text}}
-          {{prompt.text}}
-          
-          ## Questions for SOP Theme "{{themeTag.name}}" and Topic "{{topicTag.name}}"
-          
+
+          ## Document Snippets for Analysis:
+          ```text
           {% for s in snippets %}
+          --- Snippet Start ---
           {{s.text}}
+          --- Snippet End ---
+          {% else %}
+          No relevant snippets found for these tags.
           {% endfor %}
+          ```
+
+          Please generate the Markdown table based on the instructions and the snippets above.
 
       create-insight:
         input:
@@ -806,20 +807,12 @@ functions:
         tool: insight
         text: |
           # {{themeTag.name}} - {{topicTag.name}} Compliance Assessment Table
-          
-          {{summary.text}} 
-          
+
+          {{summary.text}}
+
           ## Summary Notes
-          
-          The table above provides a detailed assessment for each question within the "{{themeTag.name}}" theme and "{{topicTag.name}}" topic. Review any "NO" responses and their corresponding recommendations and source snippets for compliance gaps.
-        name: "{{title.text}} for {{themeTag.name}} - {{topicTag.name}}"
-        tags: [themeTag, topicTag]
-        attributes:
-          category: sop-compliance-assessment
-          theme: "{{themeTag.name}}"
-          topic: "{{topicTag.name}}"
-        relations:
-          derived-from: [snippets]
+
+          The table above provides a detailed assessment for each question within the "{{themeTag.name}}" theme and "{{topicTag.name}}" topic, based *only* on the provided document snippets. Review any "NO" or "MAYBE" responses and their corresponding citations for potential compliance gaps or areas needing clarification.
 
       add-insight:
         input:
@@ -827,6 +820,7 @@ functions:
           insight: create-insight
           snippets: get-theme-topic-snippets
         tool: knowledge-set
+        skipIfEmpty: insight
         operations:
           - op: set-nodes
             nodes: insight
