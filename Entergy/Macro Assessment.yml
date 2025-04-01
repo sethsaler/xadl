@@ -134,7 +134,7 @@ functions:
           You are analyzing the "{{themeTag.name}}" section under the "{{topicTag.name}}" topic using the provided document snippets. Your task is to review each numbered question below and provide your analysis in a Markdown table format based *only* on the snippets provided.
 
           The table should have the following columns:
-          1.  **Question Number**: The number of the question (e.g., "1").
+          1.  **Question**: The full text of the question being assessed.
           2.  **Determination**: Your **YES**, **NO**, or **MAYBE** assessment based on the snippets.
           3.  **Confidence**: Your **High** or **Medium** confidence level.
           4.  **Citation / Explanation**: The exact snippet of text from the provided documents that supports your determination, with the key part(s) emphasized using ***bold and italics***. If the information is missing, state "N/A - Requirement not found in provided snippets". Use line breaks (`<br>`) for readability if needed, especially if combining Determination/Confidence/Citation into one cell later.
@@ -142,17 +142,17 @@ functions:
           Please ensure:
           *   You only answer the questions listed under the specific "{{themeTag.name}}" / "{{topicTag.name}}" combination for the current task.
           *   Base your answers *strictly* on the provided snippets. Do not infer information not present.
-          *   Number your rows corresponding to the question numbers.
+          *   Include the full question text in the first column.
           *   Format the table correctly using Markdown syntax.
 
           Here is the table structure example:
 
           ```markdown
-          | Question Number | Determination | Confidence | Citation / Explanation |
+          | Question | Determination | Confidence | Citation / Explanation |
           |---|---|---|---|
-          | **1** | YES | High | ***[Relevant snippet text with emphasis]*** |
-          | **2** | MAYBE | Medium | The document mentions ***[partially relevant text]***, but does not fully address the requirement. |
-          | **3** | NO | High | N/A - Requirement not found in provided snippets |
+          | **Does the training and qualification for Advanced and Basic Riggers comply with the requirement to be conducted by a third party possessing a certification from a nationally recognized accreditation organization or accredited Business Function training program?** | YES | High | ***[Relevant snippet text with emphasis]*** |
+          | **Does the training for Basic Riggers comply with the requirement to enable them to inspect rigging before use?** | MAYBE | Medium | The document mentions ***[partially relevant text]***, but does not fully address the requirement. |
+          | **Does the training for Basic Riggers comply with the requirement to enable them to identify and attach rigging with basic knowledge of hitch configurations, capacities, and basic knots?** | NO | High | N/A - Requirement not found in provided snippets |
           | ... | ... | ... | ... |
           ```
 
