@@ -1,0 +1,234 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Existing Tag Collection for Agreement Information
+  get-agreementInformation-tags:
+    tool: find-tags
+    name: ["Credit", "Preamble"]
+  
+  # 2) NEW Tag Collection for "Counterparty Name"
+  get-documentCategory-tags:
+    tool: find-tags
+    category: "Counterparty Name"
+
+  # 3) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are in-house counsel at a major entertainment studio, responsible for assessing legal obligations, compliance risks, and business implications within talent agreements. Your objectives include:
+
+      1. Identifying all obligations, commitments, and representations the studio has made regarding screen credit for the talent.
+      2. Pinpointing potential risks or ambiguities, including any conditions or limitations on credit obligations, noting relevant union/guild requirements, deadlines, or other time-sensitive triggers.
+
+      When offering analysis or summarizing findings:
+      - Focus on clarity, precision, and direct relevance to studio obligations.
+      - Avoid unnecessary speculation; stick to explicit terms and established industry standards.
+      - Provide well-reasoned justifications for any concerns or potential adjustments.
+
+  # 4) Contract Analysis prompt
+  contractAnalysisPrompt:
+    tool: echo
+    message: |
+      {{basePrompt}}
+
+      Below is one or more summaries of agreements, including key terms of the deal and a summary of the credit obligations owed to the counterparty. As in-house counsel, you should:
+      - Thoroughly review the agreement key terms and credit summaries.
+      - Reorder the key terms and credit summaries in order of Effective Date.
+      - Analyze and understand the credit obligations for each agreement, with particular attention to any differences between agreements.
+      - Provide your analysis succinctly, focusing on the specific clauses below.
+
+      Relevant language from the agreement(s):
+
+  # 5) Section Titles
+  contractAnalysisTitle:
+    tool: echo
+    message: Credit Obligations Output Test
+
+  # 6) Initialize Knowledge Set for Agreement Information
+  init-kset:
+    input:
+      documents: task/documents
+      agreementInformationTags: get-agreementInformation-tags
+      documentCategoryTags: get-documentCategory-tags
+    tool: knowledge-set
+    knowledgeSetName: "Credit Obligations Summary"
+    operations:
+      - op: add-dimension
+        key: theme
+        name: Tags
+        nodes: agreementInformationTags
+        priority: 1
+      - op: add-dimension
+        key: document
+        name: Document
+        nodes: documentCategoryTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # 7) NEW - Analyze each "Agreement Tag" for each "Counterparty Name"
+  analyze-each-documentCategory-tag:
+    repeat:
+      function: analyze-for-tag
+      for: [tag, agreementTag]
+    input:
+      tag: get-documentCategory-tags
+      agreementTag: get-agreementInformation-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      prompt: contractAnalysisPrompt
+      title: contractAnalysisTitle
+
+  # 8) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      documentCategoryAnalysis: analyze-each-documentCategory-tag
+      knowledgeForDocuments: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeForDocuments
+
+functions:
+  analyze-for-tag:
+    input:
+      tag:
+        type: tag
+      agreementTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      get-instruction-prompt-for-tag:
+        type: text
+      prompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-snippets:
+        input:
+          tag: function/tag
+          agreementTag: function/agreementTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [tag, agreementTag]
+      
+      get-instruction-prompt-for-tag:
+        input:
+          agreementTag: function/agreementTag
+        tool: echo
+        message: |
+          {% if agreementTag.name == "Preamble" %}
+          PREAMBLE instructions:
+              OutputFormat: |
+                  Extract and format the following information in this exact format:
+                  **Talent Name:** [Name]
+                  **Talent Type:** [Category]
+                  **Role:** [Character Name]
+                  **Agreement Name:** [Title]
+                  **Effective Date:** [Date]
+                  **Project Name:** [Title]
+                  **Episode(s):** [Episode Numbers] (If no episode numbers, write "None specified")
+              
+              RequiredFields:
+                  - TalentName: "Name of individual or team members"
+                  - TalentType: "Role category (Writer, Director, Producer, Performer, Physical Producer, Lead Cast)"
+                  - Role: "Character/role name for acting talent (N/A if not applicable)"
+                  - AgreementName: "Formal agreement title"
+                  - EffectiveDate: "Defined effective date or latest signature date. If missing, use the date the agreement was executed and specify that"
+                  - ProjectName: "Project title or working title"
+                  - Episodes: "Episodes specified in the agreement, if any"
+          {% endif %}
+
+          {% if agreementTag.name == "Credit" %}
+          CREDIT instructions:
+              CreditDetails:
+                  SubjectMatter: "Summarizing the credit obligations in detail."
+                  InformationNeeded:
+                      - "All relevant deal points specifically mentioned in the provided text that are specifically relevant to credit and billing for a film or series, such as:"
+                      - "Main titles vs. end titles requirements"
+                      - "Special designations (e.g., guest star, special appearance)"
+                      - "Single card vs. shared card, and any position (first, second, etc.)"
+                      - "Type size or other format requirements"
+                      - "'No less favorable than…' or parity language"
+                      - "Producer or studio discretion over any of the above"
+                      - "Any mention of the specific episodes the talent will be providing services, and if credit is different for different episodes."
+                      - "Include any information about whether the credit is applicable only to a specific episode or episodes."
+                      - "Only include these items if they are explicitly mentioned; do not speculate on unmentioned conditions."
+                      - "Do not include any extraneous information, including compensation, bonuses, or dollar amounts."
+              OutputFormat: "Summarize all credit obligations in a single paragraph and DO NOT include extraneous language beyond the specific credit details required."
+              OverallGuidance:
+              - "Adhere Rigorously to the Output Format: Provide only the requested fields, in the exact format specified, with no additional text. Do not include any leading text, such as "Credit Obligations:" or "Main Titles:" or "Screen Credit:" before the response."
+              - "Avoid Irrelevant Content: Do not output commentary, explanations, or any information not explicitly requested."
+              - "Maintain Consistency: Ensure each section's format is consistent with these instructions."
+              - "Where there are multiple agreements, make sure to clarify which credit terms apply to specific episodes or, if there is a conflict across agreements, which credit terms govern. In the case of a direct amendment, the amended language governs. In the event credit language from Closed Deal Terms is superceded by a signed agreement (such as an Episodic Writer Agreement, Performer Agreement, or Services Agreement), then the signed agreement will govern. However, if the signed agreeemnt does not contain any credit information, include the information from the closed deal terms. In all cases where there is a discrepancy, include a note in the summary."
+              - "If there is no information in the provided text responsive to credit obligations, then write "No credit obligations specified."""
+
+          {% endif %}
+
+          {% assign roles = "Preamble,Credit" | split: "," %}
+
+          {% if roles contains agreementTag.name %}
+          {% else %}
+          GENERAL instructions for {{agreementTag.name}}
+          - Use your best judgment.
+          {% endif %}
+
+      run-prompt:
+        input:
+          snippets: get-snippets
+          basePrompt: function/basePrompt
+          instructionPrompt: get-instruction-prompt-for-tag
+          prompt: function/prompt
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+          {{prompt.text}}
+          {% for s in snippets %}
+          {{s.text}}
+          {% endfor %}
+
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-snippets
+          tag: function/tag
+          agreementTag: function/agreementTag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          {{summary.text}}
+        name: "{{title.text}} for {{tag.name}}"
+        tags: [tag, agreementTag]
+        attributes:
+          category: contract-analysis-insight
+        relations:
+          derived-from: [snippets]
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-snippets
+        tool: knowledge-set
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
