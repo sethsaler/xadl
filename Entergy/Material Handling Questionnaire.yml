@@ -1,0 +1,613 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collection for SOP Themes - will contain the Heading 1 values
+  get-sop-themes-tags:
+    tool: find-tags
+    category: "SOP Themes"
+    
+  # Get SOP Topics tags (Heading 2 values)
+  get-sop-topics-tags:
+    tool: find-tags
+    category: "SOP Topics"
+  
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a compliance and safety auditor responsible for assessing Standard Operating Procedures (SOPs) and safety protocols against a provided questionnaire. Your objective is to review each numbered question in the questionnaire and, based ONLY on the provided text snippets from the relevant documents, provide:
+
+      1. A clear determination: **YES**, **NO**, or **MAYBE**.
+          - **YES**: The document explicitly confirms the requirement is met. (Confidence: High)
+          - **MAYBE**: The document provides related information, but it's ambiguous, incomplete, or requires interpretation to fully answer the question. (Confidence: Medium)
+          - **NO**: The document explicitly contradicts the requirement, or the requirement is clearly absent from the relevant sections. (Confidence: High/Medium depending on whether it's explicitly contradicted vs. just absent)
+      2. A confidence level for your determination: **High** or **Medium**.
+          - **High**: Direct evidence supports the YES/NO determination.
+          - **Medium**: Evidence is indirect, ambiguous, or requires inference (likely leading to a MAYBE or a less certain NO).
+      3. A direct **Citation** from the provided document snippets that supports your determination.
+          - For **YES**, cite the text confirming compliance.
+          - For **MAYBE**, cite the text that causes ambiguity or partial alignment.
+          - For **NO**, cite text contradicting the requirement, or state "N/A - Requirement not found in provided snippets" if absent.
+          - **Emphasize** the key phrase(s) within the citation using ***bold and italics***.
+
+      Format your response as follows for each question:
+
+      **Question X**: [Question text here]
+      **Determination**: [YES/NO/MAYBE]
+      **Confidence**: [High/Medium]
+      **Citation**: [***Relevant snippet text with emphasis*** or "N/A - Requirement not found in provided snippets"]
+
+  # 3) Section Title
+  analysisTitle:
+    tool: echo
+    message: SOP Compliance Assessment
+
+  # 4) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      sopThemesTags: get-sop-themes-tags
+      sopTopicsTags: get-sop-topics-tags
+    tool: knowledge-set
+    knowledgeSetName: "SOP Compliance Assessment"
+    operations:
+      - op: add-dimension
+        key: theme
+        name: SOP Themes
+        nodes: sopThemesTags
+        priority: 1
+      - op: add-dimension
+        key: topic
+        name: SOP Topics
+        nodes: sopTopicsTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # 5) Analyze each SOP Theme tag with each SOP Topic tag
+  analyze-sop-themes-topics:
+    repeat:
+      function: analyze-for-tag
+      for: [themeTag, topicTag]
+    input:
+      themeTag: get-sop-themes-tags
+      topicTag: get-sop-topics-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      title: analysisTitle
+
+  # 6) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      sopThemesTopicsAnalysis: analyze-sop-themes-topics
+      knowledgeSet: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeSet
+
+functions:
+  analyze-for-tag:
+    input:
+      themeTag:
+        type: tag
+      topicTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-theme-topic-snippets:
+        input:
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [themeTag, topicTag]
+      
+      get-instruction-prompt-for-tag:
+        input:
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          basePrompt: function/basePrompt
+        tool: echo
+        message: |
+          # SOP Theme: {{themeTag.name}} - Topic: {{topicTag.name}} Analysis
+
+          {{basePrompt.text}}
+
+          You are analyzing the "{{themeTag.name}}" section under the "{{topicTag.name}}" topic using the provided document snippets. Your task is to review each numbered question below and provide your analysis in a Markdown table format based *only* on the snippets provided.
+
+          The table should have the following columns:
+          1.  **Question**: The full text of the question being assessed.
+          2.  **Determination**: Your **YES**, **NO**, or **MAYBE** assessment based on the snippets.
+          3.  **Confidence**: Your **High** or **Medium** confidence level.
+          4.  **Citation / Explanation**: The exact snippet of text from the provided documents that supports your determination, with the key part(s) emphasized using ***bold and italics***. If the information is missing, state "N/A - Requirement not found in provided snippets". Use line breaks (`<br>`) for readability if needed, especially if combining Determination/Confidence/Citation into one cell later.
+
+          Please ensure:
+          *   You only answer the questions listed under the specific "{{themeTag.name}}" / "{{topicTag.name}}" combination for the current task.
+          *   Base your answers *strictly* on the provided snippets. Do not infer information not present.
+          *   Include the full question text in the first column.
+          *   Format the table correctly using Markdown syntax.
+
+          Here is the table structure example:
+
+          ```markdown
+          | Question | Determination | Confidence | Citation / Explanation |
+          |---|---|---|---|
+          | **Does the training and qualification for Advanced and Basic Riggers comply with the requirement to be conducted by a third party possessing a certification from a nationally recognized accreditation organization or accredited Business Function training program?** | YES | High | ***[Relevant snippet text with emphasis]*** |
+          | **Does the training for Basic Riggers comply with the requirement to enable them to inspect rigging before use?** | MAYBE | Medium | The document mentions ***[partially relevant text]***, but does not fully address the requirement. |
+          | **Does the training for Basic Riggers comply with the requirement to enable them to identify and attach rigging with basic knowledge of hitch configurations, capacities, and basic knots?** | NO | High | N/A - Requirement not found in provided snippets |
+          | ... | ... | ... | ... |
+          ```
+
+          ## Questionnaire Questions for "{{themeTag.name}}" / "{{topicTag.name}}":
+
+          {% if themeTag.name == "Advanced and Basic Rigger Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the training and qualification for Advanced and Basic Riggers comply with the requirement to be conducted by a third party possessing a certification from a nationally recognized accreditation organization or accredited Business Function training program?
+          2. Does the training for Basic Riggers comply with the requirement to enable them to inspect rigging before use?
+          3. Does the training for Basic Riggers comply with the requirement to enable them to identify and attach rigging with basic knowledge of hitch configurations, capacities, and basic knots?
+          4. Does the training for Basic Riggers comply with the requirement to enable them to recognize associated hazards?
+          5. Does the training for Basic Riggers comply with the requirement to enable them to signal operations?
+          6. Does the training for Basic Riggers comply with the requirement to enable them to use various types of rigging equipment and basic hitches and their applications?
+          7. Does the training for Advanced Riggers comply with the requirement to enable them to perform rigging tasks unsupervised?
+          8. Does the training for Advanced Riggers comply with the requirement to enable them to select rigging components and procedures based on rigging capacity?
+          9. Does the training for Advanced Riggers comply with the requirement to enable them to estimate load weight and center of gravity?
+          10. Does the training for Advanced Riggers comply with the requirement to enable them to identify lift points?
+          11. Does the training for Advanced Riggers comply with the requirement to enable them to determine and select rigging based on loading?
+          12. Does the training for Advanced Riggers comply with the requirement to perform pre-use inspection of rigging and lift points?
+          13. Does the training for Advanced Riggers comply with the requirement to identify and attach rigging with knowledge of hitch configurations and load angle factors, rigging capacities, and load integrity?
+          14. Does the training for Advanced Riggers comply with the requirement to understand load dynamics and associated hazards?
+          15. Does the training for Riggers comply with the minimum requirement of 8 hours of instructional time, practical training, and evaluation of the Rigger's performance by a qualified individual?
+          16. Are Riggers required to pass a written examination and a practical rigging examination?
+          17. Is the evaluation cycle for Advanced Riggers and Basic Riggers every 3 years?
+          18. Is the evaluation conducted by a third party or an individual who has the knowledge, training, and experience necessary to assess rigging operations?
+          {% endif %}
+
+          {% if themeTag.name == "Crane Operations Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the entity responsible for crane operations ensure that all personnel associated with crane operations receive training?
+          2. Does the Signal Person, operator, and Lift Director contact each other prior to the operation when using non-standard hand signals?
+          3. Does each employee who may be exposed to fall hazards receive fall protection training in accordance with the Enterprise standard Working at Heights EHS-SOH-4.1.1.23?
+          4. Are lifting personnel trained on work area control to prevent employees from entering swing radius hazard areas?
+          5. Are employees trained in the procedure to be followed in the event of electrical contact with a power line?
+          {% endif %}
+
+          {% if themeTag.name == "Digger Derrick Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the operator follow all applicable manufacturer and Business Function-specific procedures for safe operation?
+          2. Does the operator and ground personnel know and be familiar with equipment operating procedures, inspection requirements, location and proper operation of all controls, lifting capacities, emergency procedures, and field maintenance requirements?
+          3. Is a pre-job brief/tailgate session conducted prior to operation?
+          4. Have the operators been trained to safely operate the equipment?
+          5. Are all safety signs, guards, and other safety features in place and in proper condition?
+          6. Is a Job Site Survey performed to check the slope and firmness of ground?
+          7. Is a Job Site Survey performed to check for ditches, drop offs, holes, and debris?
+          8. Is a Job Site Survey performed to check for grass or shrubs that could cause a fire hazard?
+          9. Is a Job Site Survey performed to check for underground utilities, electric, gas, telephone, etc.?
+          10. Is a Job Site Survey performed to check for overhead utility and power lines?
+          11. Is a Job Site Survey performed to check for potential boom interferences during operation?
+          {% endif %}
+
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Business Functions ensure all equipment operators are trained on the safe operation of the specific type of equipment before operating?
+          2. Is the training documented and does it consist of a combination of formal instruction, practical training, and evaluation of the operator's performance onsite by a Qualified Individual?
+          3. Are operators required to pass a written or oral examination and a practical operating examination unless they can furnish satisfactory evidence of qualifications and experience?
+          4. Is refresher training provided to the operator when they have been observed to operate the equipment in an unsafe manner?
+          5. Is refresher training provided to the operator when they have been involved in an accident or close call incident?
+          6. Is refresher training provided to the operator when an evaluation reveals that the operator is not operating the equipment safely?
+          7. Is an evaluation of each equipment operator's performance conducted and documented at least once every 3 years?
+          8. Does the Business Functions certify that powered industrial truck and digger derrick operators have been trained and evaluated?
+          9. Does the certification include the name of the operator, the date of the training, the date of the evaluation, and the identity of the person(s) performing the training or evaluation?
+          10. Are Contract Partners able to provide documentation that the training certifications have been met?
+          11. Are digger derrick operators required to possess a certification if the digger derrick is being used to auger holes for poles carrying electric or telecommunication lines?
+          12. Are digger derrick operators required to possess a certification if the digger derrick is being used to place or remove poles?
+          13. Are digger derrick operators required to possess a certification if the digger derrick is being used to handle associated materials to be installed on or removed from the poles?
+          14. Are digger derrick operators required to possess a certification if a non-auger digger derrick is being used to set underground equipment?
+          15. Does the Business Functions ensure that the instructor(s) have the necessary knowledge, training, and experience to train new equipment operators?
+          16. Do the qualifications of the instructor(s) include prior experience and training on the type of equipment to be trained?
+          17. Are hoist operators either basic or advanced-rigging qualified based on load weight, or do they work under the direction of an individual who is basic or advanced-rigging qualified?
+          18. Are employees operating non-powered industrial trucks trained to enable them to effectively perform their tasks?
+          {% endif %}
+
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the entity obtain approval by licensed professional engineers for ANY site Engineered Temporary Lift Assembly?
+          2. Does the entity ensure the design of the Engineered Temporary Lift Assembly is supported by detailed drawings, specifications, evaluations, or certifications?
+          3. Does the entity perform a load test of the assembly in ALL configurations for which it will be used?
+          4. Is the load test no less than 100 percent of the rated load of the crane or Hoist(s), or more than 125% of the rated load of the crane or hoist(s), whichever governs?
+          5. Does the entity prepare a written report of the load sustained during the test and the operations performed during the test?
+          6. Is the person performing the test responsible for preparing the report and filing the reports for retrievability?
+          7. Does the entity inspect ALL critical (load-bearing) welds by magnetic particle (MT) or liquid penetrant (PT) prior to use?
+          8. Does the entity ensure existing temporary lifting assemblies have the load rating permanently affixed prior to use?
+          9. If the device is serialized, does the entity ensure documentation supports the lift for which it will be used?
+          10. Does the entity perform a load test operation of the temporary assembly as outlined in the document?
+          11. Does the entity lift the test load a distance to assure that the load is supported by the crane and held by the hoist brake(s)?
+          12. Does the entity maintain the lifted load for a minimum of 10 minutes unless a specific time is listed in another controlling document?
+          13. Does the entity transport the test load by means of the trolley for the full length of the bridge?
+          14. Does the entity move the test load by means of the bridge for the full length of the runway in one direction with the trolley as close to the extreme right-hand end of the crane as practical, and in the other direction with the trolley as close to the left-hand end of the crane as practical?
+          15. Does the entity lower the test load to an intermediate position?
+          16. Does the entity stop and hold the test load with the brakes for at least 1 minute unless a specific time is listed in another controlling document?
+          17. Does the entity permanently attach the specified information to ALL site fabricated and vendor temporary hoisting assemblies used for lifting?
+          18. Does the entity develop a documented engineering response to address the evaluation of Critical and/or Complex Lifts for temporary hoisting assemblies if required?
+          19. If a documented engineering response is required, does it include acceptance of Contract Partner documents, verification of a third-party independent review of vendor calculations, and verification of appropriate code application?
+          20. Does the entity verify that 3D finite element analysis modeling is performed if a load test of no less than 110% of the rated load of the crane or hoists or 125% or more than the rated load of the crane or hoist(s), whichever governs, has not been performed?
+          21. Does the entity verify Load Testing per ASME B30.20, Below-the-Hook Lifting Devices?
+          22. Does the entity specify additional safety factors when load testing is not possible?
+          23. Does the entity examine critical welds post load test per the AWS D1.1 Structural Welding Code?
+          24. Does the entity verify installation?
+          25. Does the entity assess the lifting boundary area considering potential collateral damage or personnel injury that could be caused if the load dropped and/or lift rig were to fail?
+          26. Does the entity identify operating equipment that could be damaged due to the lift assembly failure?
+          {% endif %}
+
+          {% if themeTag.name == "Excavator Safe Operation (Lifting)" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Business Functions ensure load charts and lifting attachment points are used in accordance with the manufacturer's instructions?
+          2. Does the Business Functions make modifications or additions which affect the capacity or safe operation of the excavator without the manufacturer's written approval?
+          3. If modifications or changes are made, are the capacity, operation, and maintenance instruction plates, tags, or decals changed accordingly?
+          4. In no case is the original safety factor of the equipment reduced?
+          5. Is the equipment at least 5 feet from the edge of excavation when a lift with an excavator is taking place in close proximity to an open excavation?
+          6. Are all personnel not essential to the lift removed from the excavation when a lift with an excavator is taking place in close proximity to an open excavation?
+          7. Are Basic Riggers required for all lifting operations using an excavator?
+          {% endif %}
+
+          {% if themeTag.name == "General Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Material Handling process evaluate the needs in terms of weight, size, distance, and path of movement?
+          2. Does the Material Handling process follow the hierarchy for selecting a means for Material Handling?
+          3. Does the Material Handling process include the elimination of Material Handling needs via engineering solutions?
+          4. Does the Material Handling process involve movement by mechanical device (e.g., lift truck, Overhead Crane, or conveyor)?
+          5. Does the Material Handling process allow for movement by manual means with handling aid (e.g., dollie or cart)?
+          6. Does the Material Handling process utilize safe lifting techniques?
+          {% endif %}
+
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Business Functions ensure lifting boundaries or exclusion zones are established for all lifts prior to the lift being conducted?
+          2. Does the lifting boundary include lower levels for locations where multiple levels exist?
+          3. Is the lifting boundary large enough to encompass the area affected by the works and the load and lifting equipment being used?
+          4. Is the lifting boundary marked with appropriate flagging and signage?
+          5. Does the lifting boundary account for potential load swing, movement, or drop?
+          6. Does the size of the lifting boundary increase as the load is raised?
+          7. Are only employees essential to the operation permitted in the lifting boundaries?
+          8. Is an employee considered essential to the operation if they are conducting specific operations that cannot be performed from outside the lifting boundaries?
+          9. Is it required for the forklift/equipment operator to remain stationary until ground personnel are safely returned to the minimum safe distance?
+          10. Is a safe radius of at least 15 feet from the nearest point required to be maintained for personnel protection when actively loading, unloading, or moving a truck, tractor, or trailer?
+          11. Is the driver required to turn off the engine, apply the brakes, vacate the truck, and safely position themselves outside the exclusion zone before active unloading and loading can begin?
+          12. Are all ground personnel required to remain outside the exclusion zone until the active process is complete and the all clear is given by the forklift/equipment operator?
+          {% endif %}
+
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the user ensure that powered hoists winch attachments and anchorages are designed by a qualified person?
+          2. Does the installation of winches allow for proper rope spooling on the drums?
+          3. Are winches marked with the winch rating, rope diameter(s), and power requirement?
+          4. Are winches marked with the drum size consisting of barrel diameter, barrel length, and flange diameter?
+          5. Are winches marked with the rope speed in feet per minute (meters per second) at rated load on specified layer?
+          6. Are exposed moving parts that constitute a hazard guarded?
+          7. Are all controls used during the normal operation cycle located within easy reach of the operator's station?
+          8. Are electric-motor operated hoists provided with a device to disconnect all motors from the line upon power failure?
+          9. Are electric-motor operated hoists provided with an over speed preventive device where applicable?
+          10. Do remotely operated hoists stop when any control is ineffective?
+          11. Do all base-mounted drum hoists in use meet the applicable requirements for design, construction, installation, testing, inspection, maintenance, and operations as prescribed by the manufacturer?
+          12. Do remote-operated winches function so that if the control signal for any winch motion becomes ineffective, that winch motion stops?
+          13. Do all prime mover controls return to neutral when released?
+          14. Is each winch equipped with at least one brake capable of holding not less than 125% of the rated load at the point where the brake is applied?
+          15. Are remote-operated winches equipped with a self-setting brake?
+          16. Are foot-operated brakes constructed so that the operator's foot, when in position, will not slip off the pedal?
+          17. Do winches designed to allow simultaneous underwind and overwind have a brake capable of holding 125% of the rated load in those directions?
+          18. Is a means provided for controlling the drum speed when moving the load?
+          19. Do braking systems have provisions for adjustments where necessary to compensate for wear?
+          20. Are ropes of a size, minimum breaking force, and construction sufficient to withstand the loads imposed?
+          21. Are ropes of other materials used only with the winch and rope manufacturers of qualified person's recommendation?
+          {% endif %}
+
+          {% if themeTag.name == "Lift Director Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Lift Director hold an Advanced Rigger qualification?
+          2. Does the Lift Director oversee and manage Critical Lift activities?
+          3. Is the Lift Director able to perform nearly any Common, Complex, or Critical Lift activity?
+          4. Does site management designate Lift Directors that meet the qualifications stated in this Standard?
+          {% endif %}
+
+          {% if themeTag.name == "Material Handling Safety Observation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Business Functions ensure that safety observations of Material Handling activities of employees and Contract Partners are incorporated into their overall safety observation programs?
+          2. Does the Business Function representatives provide safety coaching or mentoring when areas of deficiency are identified?
+          3. Does the Business Functions analyze observations regularly?
+          4. Do Material Handling activity observations meet or exceed the content in Appendix F - Material Handling Observation Example?
+          5. Does the Business Functions use AirsWeb or Business Function safety observation programs to capture Contract Partner observations?
+          {% endif %}
+
+          {% if themeTag.name == "Mobile Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Business Function ensure the crane is inspected and its functionality verified per the requirements of section 4.3.10 of this standard before any lifting operation begins?
+          2. Are all personnel clear from the load path prior to moving and hoisting the load?
+          3. Is the crane cab equipped with an appropriate fire extinguisher?
+          4. Are the controls never left energized when the cab is unattended?
+          5. Is operation always stopped as soon as it is safe to do so in case of a problem?
+          6. Is more than one Spotter required when moving a mobile crane into a building, or if a Spotter is unable to keep full view of potential obstructions or overhead equipment hazards at any given time?
+          {% endif %}
+
+          {% if themeTag.name == "Mobile Crane Operation Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does each crane operator undergo training, certification/licensing, and evaluation before operating any Mobile Crane equipment?
+          2. Is the training and certification/licensing conducted by a third-party possessing a certification from a nationally recognized accreditation organization?
+          3. Is the training developed in accordance with specific requirements outlined in the document?
+          4. Is there a written test to determine that the individual knows the information necessary for safe operation of the specific type of equipment?
+          5. Does the written test cover the controls and operational/performance characteristics of the equipment?
+          6. Is the individual required to calculate load/capacity information on a variety of configurations of the equipment?
+          7. Must the individual know the procedures for preventing and responding to power line contact?
+          8. Is the individual required to have technical knowledge of the subject matter criteria listed in Appendix J?
+          9. Is the individual required to have technical knowledge applicable to the suitability of the supporting ground and surface to handle expected loads?
+          10. Must the individual be able to read and locate relevant information in the equipment manual and other materials?
+          11. Is there a practical test to determine that the individual has the skills necessary for safe operation of the equipment?
+          12. Is the individual required to inspect control mechanisms for maladjustments interfering with proper operation?
+          13. Must the individual inspect control and drive mechanisms for apparent excessive wear of components?
+          14. Is the individual required to inspect air, hydraulic, and other pressurized lines for deterioration or leakage?
+          15. Must the individual check the hydraulic system for proper fluid level?
+          16. Is the individual required to inspect hooks and latches for deformation, cracks, excessive wear, or damage?
+          17. Must the individual inspect wire rope reeving for compliance with the manufacturer's specifications?
+          18. Is the individual required to inspect wire rope in accordance with § 1926.1413(a)?
+          19. Must the individual check electrical apparatus for malfunctioning and signs of excessive deterioration?
+          20. Is the individual required to inspect tires (when in use) for proper inflation and condition?
+          21. Must the individual assess ground conditions around the equipment for proper support?
+          22. Is the equipment required to be in level position within the tolerances specified by the equipment manufacturer's recommendations?
+          23. Must operator cab windows be inspected for significant cracks, breaks, or other deficiencies?
+          24. Are safety devices and operational aids required to be inspected for proper operation?
+          25. Is the individual required to demonstrate operational and maneuvering skills?
+          26. Must the individual apply load chart information during operation?
+          27. Is the individual required to apply safe shut-down and securing procedures?
+          28. Is the accreditation for the training/certifying organization required to be reviewed by the nationally recognized accrediting agency every 3 years?
+          29. Are Crane Operator Certifications issued by an accredited organization valid for a period of five years?
+          30. Must Entergy Crane Operator Certification programs be audited to meet the accreditation requirements outlined in 29 CFR 1926.1427(e)?
+          31. Is the Business Unit required to provide a documented evaluation to determine that each operator is Qualified after training certification or licensing?
+          32. Must evaluations be conducted by Entergy or an agent of Entergy?
+          33. Is the evaluation required to contain the content in Attachment VI – Crane Operator Evaluation Checklist/Documentation?
+          34. Must the evaluation be conducted by an individual who has the knowledge, training, and experience necessary to assess equipment operators?
+          35. Is the evaluator required to be an Entergy employee or agent of Entergy?
+          36. Are contractors required to provide documentation that their evaluations have been conducted by qualified individuals?
+          37. For operators employed prior to December 10, 2018, can Business Units choose to rely on previous assessments in lieu of conducting a new evaluation?
+          38. Does the definition of "Qualified" apply to crane operators?
+          39. Can possession of a certificate or degree, by itself, cause a person to be qualified?
+          40. Is the crane operator evaluation required to ensure that the employee is capable of operating the specified equipment in a variety of workplace conditions?
+          {% endif %}
+
+          {% if themeTag.name == "Material Handling Equipment Inspection" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the material handling equipment operator conduct a documented pre-use inspection per manufacturer's instructions prior to operation?
+          2. Does the material handling equipment undergo documented inspections at least once a year?
+          3. Is a periodic inspection of all rigging equipment performed by a qualified person at least annually?
+          4. Are deficiencies documented during inspections and is the supervisor notified for corrective action?
+          5. If equipment is found to need repair, defective, or unsafe, is it taken out of service until restored to safe operating condition by an Authorized Person?
+          6. Is a legible manufacturer's manual readily accessible for all material handling equipment when in use?
+          7. Are preventive maintenance tasks performed by a skilled maintenance person to keep the equipment in safe operating condition?
+          8. Are records kept of preventive maintenance tasks as well as any repairs made?
+          9. Are inspection records kept for a period of 5 years?
+          {% endif %}
+
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the entity comply with the requirement to adhere to the safe operation guidelines for non-powered industrial trucks?
+          2. Does the entity ensure that four-wheel carts with a tongue-type pull handle are not used?
+          3. Does the entity inspect non-powered industrial trucks prior to use?
+          4. Does the entity refrain from manufacturing or modifying non-powered industrial trucks?
+          5. Does the entity use non-powered industrial trucks for their intended purpose and as designed for use?
+          6. Does the entity handle loads that do not exceed the capacity of the non-powered industrial trucks?
+          7. Does the entity use equipment designed specifically for the movement of barrels, drums, compressed gas cylinders, and dewar?
+          8. Does the entity push a non-powered industrial truck instead of pulling it, except when necessary for transitioning over doorway thresholds or up an incline?
+          9. Does the entity use load securing devices including straps, chains, bars, or pins as required considering the type of industrial truck and load being moved?
+          10. Does the entity ensure that load paths are clear and free of obstructions/interferences, uneven surfaces, inclines, declines, etc.?
+          11. Does the entity choose the non-powered industrial truck with the lowest profile to keep the center of gravity low?
+          12. Does the entity keep the load center of gravity three feet or less from the ground or floor for loads that weigh over 100 lbs.?
+          13. Does the entity refrain from using non-powered industrial trucks on stairs unless specific conditions are met?
+          14. Does the entity ensure that the device is specifically designed for use on stairs when using non-powered industrial trucks on stairs?
+          15. Does the entity ensure that entrances to the stairs are flagged or guarded so that others don't walk into the line of fire?
+          16. Does the entity secure loads when using non-powered industrial trucks on stairs?
+          17. Does the entity ensure that no personnel associated with the load movement are in the line of fire when using non-powered industrial trucks on stairs?
+          {% endif %}
+
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the powered industrial truck only operate per the manufacturer's instructions and for the conditions for which it is designed?
+          2. Is altering or eliminating any forklift parts or adding accessories such as additional counterweights or lifting attachments prohibited unless approved by the manufacturer in writing?
+          3. Is free rigging allowed without written approval from the forklift manufacturer or analysis and approval (in writing) by a qualified, registered professional engineer?
+          4. Are modifications and additions that affect capacity and safe operation prohibited without the manufacturer's prior written approval?
+          5. Shall capacity, operation, and maintenance instruction plates, tags, or decals be changed accordingly when modifications are made?
+          6. Shall only stable or safely arranged loads be handled?
+          7. Must unstable loads be secured to prevent falling?
+          8. Shall the operator slow down and sound the horn at cross aisles and other locations where vision is obstructed?
+          9. If the load obstructs forward view, must the operator travel with the load trailing and sound the horn prior to moving?
+          10. Shall spotter(s) be used if the driver's view is obstructed or has the potential to become obstructed while moving, whether loaded or unloaded?
+          11. When a loaded forklift is descending an incline, must the operator back down the incline?
+          12. When ascending an incline, must the operator drive forward up the incline?
+          13. Must sudden stops that might spill the load be avoided?
+          14. When operating forklifts with internal combustion engines in an enclosed area, must adequate ventilation be provided to prevent carbon monoxide buildup?
+          15. Shall forklifts always be operated at a safe speed, dictated by surrounding conditions?
+          16. When a forklift truck is moved, whether loaded or empty, must the forks be carried as low as possible but high enough to clear uneven surfaces?
+          17. Are forklifts prohibited from being used to lift employees unless designed to do so?
+          18. When forklifts are used in loading and unloading operations inside vans or trucks, must special precautions be exercised?
+          19. Must the van/truck be properly docked and parked with the wheels safety chocked when using forklifts?
+          20. When the forklift truck is not in use, must the forks be fully lowered, brakes set, and the unit turned to the "OFF" position?
+          21. Shall personnel not stand or pass beneath the elevated forks, whether loaded or empty?
+          22. Are forklift trucks prohibited from being used as a jack to lift vehicles?
+          23. Is riding on forklifts restricted to the driver only?
+          24. Is personnel riding on the load at any time prohibited?
+          25. In conjunction with the use of forklifts, must care be exercised with proper stacking of materials on pallets and storage racks?
+          26. Shall only loads that are securely and safely loaded and within the rated capacity of the Truck/Pallet Jack be handled?
+          27. Are forklifts prohibited from being used to load/unload poles in the pole rack "headache" position?
+          28. When a forklift is being refueled, must the engine be turned off?
+          {% endif %}
+
+          {% if themeTag.name == "Powered Industrial Truck Equipment Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the truck equipped with front-end attachments other than factory installed attachments identify the attachments and show the approximate weight of the truck and attachment combination at maximum elevation with load laterally centered?
+          2. Are all nameplates and markings kept in place and maintained in a legible condition?
+          3. Is the forklift equipped with rollover protection equipped with an approved seat belt that is always used by the operator?
+          4. Is each forklift equipped with an operable back-up alarm that is checked to ascertain that it is operable before each use?
+          5. Is the load rating clearly indicated on the forklifts/pallet jacks?
+          {% endif %}
+
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the crane operate only after meeting the inspection requirements of section 4.3.10 of this standard?
+          2. Are only qualified personnel permitted to operate overhead cranes covered by this standard?
+          3. Is the crane de-energized prior to allowing anyone to go on top of the crane or on the rails if operational procedures are not in place?
+          4. Are rated load markings plainly marked on each side of the overhead crane and clearly legible from the ground?
+          5. Are stops installed to limit the travel of the trolley and bridge?
+          6. Are all exposed moving parts and electrical equipment located, enclosed, or guarded to prevent accidental contact in accordance with OSHA Standards?
+          7. Is the controller operating handle located within convenient reach of the operator?
+          8. Is the lighting in the cab sufficient to enable the operator to see clearly enough to perform his or her work?
+          9. Is each crane equipped with a power travelling mechanism provided with an effective warning signal?
+          10. Is a fire extinguisher located in the cab?
+          11. Do mobile crane and overhead crane operators ensure that all overhead crane operations follow lifting boundary criteria as stated in section 4.2.2 of this standard?
+          12. Is the load attached to the load block hook by means of slings or other approved devices when moving a load with a mobile or overhead crane?
+          13. Is the load well secured and properly balanced in the sling or lifting device before it is lifted more than a few inches?
+          14. Are the brakes tested by raising the load a few inches and applying the brakes to ensure no load creep?
+          15. Is the hook brought over the load in such a manner as to prevent swinging?
+          16. Is there no sudden acceleration or deceleration of the moving load?
+          17. Does the load not contact any obstructions during lifting?
+          18. Does the load never pass over people?
+          19. Does the operator not leave his/her position at the controls while the load is suspended unless approved by the Business Unit senior management?
+          {% endif %}
+
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the equipment assembly/disassembly process determine if any part of the equipment, load line, or load has the potential to come within 20 feet of a power line?
+          2. Does the assembly/disassembly process comply with the requirements in Option (1), Option (2), or Option (3) of 29 CFR 1926.1407 if any part of the equipment, load line, or load comes within 20 feet of a power line?
+          3. Is the power line de-energized and visibly grounded at the worksite before assembly/disassembly?
+          4. Does the equipment, load line, or load maintain a clearance of at least 20 feet from the power line during assembly/disassembly?
+          5. Is a planning meeting conducted with the A/D director, operator, assembly/disassembly crew, and other workers to review the location of the power line(s)?
+          6. Are tag lines used during assembly/disassembly nonconductive?
+          7. Is at least one additional measure implemented to prevent encroachment when working near power lines?
+          8. Is there a dedicated spotter in continuous contact with the equipment operator during assembly/disassembly?
+          9. Is the dedicated spotter equipped with a visual aid to assist in identifying the minimum clearance distance?
+          10. Is the dedicated spotter positioned to effectively gauge the clearance distance?
+          11. Does the dedicated spotter have equipment that enables direct communication with the operator?
+          12. Does the dedicated spotter give timely information to the operator to maintain the required clearance distance?
+          13. Is a proximity alarm set to give the operator sufficient warning to prevent encroachment?
+          14. Is there a device that automatically warns the operator when to stop movement to prevent encroachment?
+          15. Is there an elevated warning line, barricade, or line of signs in view of the operator, equipped with flags or similar high-visibility markings?
+          16. Is the line's voltage and the minimum clearance distance permitted under Table A determined before beginning equipment operations?
+          17. Does the equipment, load line, or load maintain the minimum clearance distance permitted under Table A during operations?
+          18. Are hazard assessments performed and precautions taken inside the work zone before beginning equipment operations?
+          19. Is the work zone identified by demarcating boundaries or defining the area 360 degrees around the equipment?
+          20. Does the equipment, load line, or load maintain a distance of at least 20 feet from a power line when operated up to the equipment's maximum working radius in the work zone?
+          21. Do the requirements in Option (1), Option (2), or Option (3) of 29 CFR 1926.1408 apply if any part of the equipment, load line, or load comes within 20 feet of a power line?
+          22. Is the power line de-energized and visibly grounded at the worksite before operations under Option 1?
+          23. Does the equipment, load line, or load maintain a clearance of at least 20 feet from the power line during operations under Option 2?
+          24. Is the line's voltage and the minimum approach distance permitted under Table A determined during operations under Option 3?
+          25. Does the equipment, load line, or load maintain the minimum approach distance permitted under Table A during operations?
+          26. Do the requirements of §1926.1407 and §1926.1408 apply to power lines over 350 kV?
+          27. Is the distance of 50 feet substituted for the distance of 20 feet for power lines at or below 1000 kV?
+          28. Is the minimum clearance distance for power lines over 1000 kV established by the utility owner/operator or a registered professional engineer?
+          29. Is equipment operation closer than the minimum approach distance under Table A to an energized power line prohibited?
+          30. Are the specified clearances in Appendix C – Minimum Clearance Distances maintained for equipment traveling under or near a power line on a construction site with no load?
+          31. Are the effects of speed and terrain on equipment movement considered to maintain minimum clearance distances?
+          32. Is a dedicated spotter utilized anytime equipment is traveling near a power line?
+          33. Is a safe path of travel identified and used when traveling at night or in conditions of poor visibility near power lines?
+          34. Is compliance with §1926.959 deemed to be compliance with section 4.2.3 Powerline Safety for electrically qualified employees and contract partners engaged in 1926 Subpart V work?
+          {% endif %}
+
+          {% if themeTag.name == "Roles and Responsibilities" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does Senior Leadership support the implementation of Enterprise Environmental, Health, and Safety Standards?
+          2. Does the VP Enterprise Safety approve the Enterprise standard Material Handling Rigging and Lifting for publication and implementation?
+          3. Does the VP Enterprise Safety provide resources to the Business Functions for support and implementation of requirements of the Enterprise standard Material Handling Rigging and Lifting?
+          4. Does Enterprise Safety provide governance, oversight, and support to the Business Function implementation and adherence to the requirements of this Enterprise standard?
+          5. Does Enterprise Safety review the performance of the Material Handling Rigging and Lifting program through annual Enterprise management system reviews?
+          6. Do Functional Safety Directors / Sr. Managers / Managers ensure all processes, procedures, and controls are in place for managing hazards?
+          7. Do Functional Safety Directors / Sr. Managers / Managers provide resources necessary at the Function and site-levels for support and implementation of the requirements of this standard and supporting procedures?
+          8. Do Functional Safety Directors / Sr. Managers / Managers review the performance and adequacy of the Material Handling Rigging and Lifting program through annual Business Function management system reviews?
+          9. Do Functional Safety & Environmental Personnel understand and implement the requirements in this standard?
+          10. Do Functional Safety & Environmental Personnel conduct, review, and update hazard assessments as needed?
+          11. Do Functional Safety & Environmental Personnel ensure personnel are provided with the required training and tools needed to comply with the requirements of this standard?
+          12. Do Employees and Contract Partners understand and follow the requirements of this standard, as well as any other applicable regulations, requirements, and best practices?
+          13. Do Employees and Contract Partners immediately report any uncontrolled hazards?
+          14. Do Employees and Contract Partners complete all necessary required and assigned training?
+          {% endif %}
+
+          {% if themeTag.name == "Signal Person Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Signal Person meet the qualification requirements prior to giving any signals?
+          2. Does the Signal Person use a third-party evaluator or receive training/evaluation by the Business Function to meet the qualification requirements?
+          3. Does the Business Function ensure that the documentation of qualification is readily available, retrievable, or accessible at the worksite?
+          4. Is the documentation required to specify the types of signaling for which the Signal Person is qualified?
+          5. Does the Signal Person know and understand the type of signals used?
+          6. If hand signals are used, does the Signal Person know and understand the standard method for hand signals?
+          7. Is the Signal Person competent in the application of the type of signals used?
+          8. Does the Signal Person have a basic understanding of equipment operation and limitations, including crane dynamics involved in swinging and stopping loads and boom deflection from hoisting loads?
+          9. Does the Signal Person know and understand the relevant requirements of 29 CFR 1926.1419 through 1422 and 1926.1428?
+          10. Does the Signal Person demonstrate that he/she meets the requirements through an oral or written test, and through a practical test?
+          11. If actions by the Signal Person indicate that the individual does not meet the qualification requirements, is the individual not allowed to continue working as a Signal Person until re-training is provided and a re-assessment is made?
+          {% endif %}
+
+          {% if themeTag.name == "Spotter Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the Spotter employee comply with the training requirement to effectively perform their task?
+          2. Does the Dedicated Spotter for power lines comply with the training requirement in accordance with 29 CFR 1926.1428?
+          {% endif %}
+
+          {% if themeTag.name == "Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1. Does the entity perform documented inspections at a minimum yearly?
+          2. Does the rigging equipment have a periodic inspection performed by a qualified person annually at a minimum?
+          3. Are deficiencies documented during inspections and the supervisor notified for corrective action?
+          4. Is equipment taken out of service if it is found to need repair, be defective, or be unsafe?
+          5. Is a legible manufacturer's manual readily accessible for all material handling equipment when in use?
+          6. Are preventive maintenance tasks performed by a skilled maintenance person to keep the equipment in safe operating condition?
+          7. Are records kept of preventive maintenance tasks as well as any repairs made?
+          8. Are inspection records kept for a period of 5 years?
+          9. Does the Business Function develop, deliver, and/or manage training for all employees performing any material handling, lifting, or rigging activities?
+          10. Are the minimum training requirements met for Entergy employees and Contract Partners?
+          11. Do any additional training requirements added by Business Functions not diminish those described in this standard?
+          12. Is all training developed, delivered, and managed per the requirements of the Enterprise standard EHS Training EHS-GOV-3.2.1?
+          {% endif %}
+
+      run-prompt:
+        input:
+          snippets: get-theme-topic-snippets
+          instructionPrompt: get-instruction-prompt-for-tag
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+
+          ## Document Snippets for Analysis:
+          ```text
+          {% for s in snippets %}
+          --- Snippet Start ---
+          {{s.text}}
+          --- Snippet End ---
+          {% else %}
+          No relevant snippets found for these tags.
+          {% endfor %}
+          ```
+
+          Please generate the Markdown table based on the instructions and the snippets above.
+
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-theme-topic-snippets
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          # {{themeTag.name}} - {{topicTag.name}} Compliance Assessment Table
+
+          {{summary.text}}
+
+          ## Summary Notes
+
+          The table above provides a detailed assessment for each question within the "{{themeTag.name}}" theme and "{{topicTag.name}}" topic, based *only* on the provided document snippets. Review any "NO" or "MAYBE" responses and their corresponding citations for potential compliance gaps or areas needing clarification.
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-theme-topic-snippets
+        tool: knowledge-set
+        skipIfEmpty: insight
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets

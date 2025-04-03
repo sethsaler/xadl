@@ -1,0 +1,481 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collection for SOP Themes - will contain the Heading 1 values
+  get-sop-themes-tags:
+    tool: find-tags
+    category: "SOP Themes"
+    
+  # Get SOP Topics tags (Heading 2 values)
+  get-sop-topics-tags:
+    tool: find-tags
+    category: "SOP Topics"
+  
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a compliance and safety auditor responsible for assessing Standard Operating Procedures (SOPs) and safety protocols against a provided questionnaire. Your objective is to review each numbered question in the questionnaire and, based ONLY on the provided text snippets from the relevant documents, provide:
+
+      1. A clear determination: **YES**, **NO**, or **MAYBE**.
+          - **YES**: The document explicitly confirms the requirement is met. (Confidence: High)
+          - **MAYBE**: The document provides related information, but it's ambiguous, incomplete, or requires interpretation to fully answer the question. (Confidence: Medium)
+          - **NO**: The document explicitly contradicts the requirement, or the requirement is clearly absent from the relevant sections. (Confidence: High/Medium depending on whether it's explicitly contradicted vs. just absent)
+      2. A confidence level for your determination: **High** or **Medium**.
+          - **High**: Direct evidence supports the YES/NO determination.
+          - **Medium**: Evidence is indirect, ambiguous, or requires inference (likely leading to a MAYBE or a less certain NO).
+      3. A direct **Citation** from the provided document snippets that supports your determination.
+          - For **YES**, cite the text confirming compliance.
+          - For **MAYBE**, cite the text that causes ambiguity or partial alignment.
+          - For **NO**, cite text contradicting the requirement, or state "N/A - Requirement not found in provided snippets" if absent.
+          - **Emphasize** the key phrase(s) within the citation using ***bold and italics***.
+
+      Format your response as follows for each question:
+
+      **Question X**: [Question text here]
+      **Determination**: [YES/NO/MAYBE]
+      **Confidence**: [High/Medium]
+      **Citation**: [***Relevant snippet text with emphasis*** or "N/A - Requirement not found in provided snippets"]
+
+  # 3) Section Title
+  analysisTitle:
+    tool: echo
+    message: SOP Compliance Assessment
+
+  # 4) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      sopThemesTags: get-sop-themes-tags
+      sopTopicsTags: get-sop-topics-tags
+    tool: knowledge-set
+    knowledgeSetName: "SOP Compliance Assessment"
+    operations:
+      - op: add-dimension
+        key: theme
+        name: SOP Themes
+        nodes: sopThemesTags
+        priority: 1
+      - op: add-dimension
+        key: topic
+        name: SOP Topics
+        nodes: sopTopicsTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # 5) Check each theme for existence of *any* snippets
+  check-theme-existence:
+    repeat:
+      function: check-theme-for-snippets
+      for: themeTag
+    input:
+      themeTag: get-sop-themes-tags
+      documents: task/documents
+      knowledge: init-kset
+
+  # 6) Analyze each SOP Theme tag with each SOP Topic tag (using updated knowledge)
+  analyze-sop-themes-topics:
+    repeat:
+      function: analyze-for-tag
+      for: [themeTag, topicTag]
+    input:
+      themeTag: get-sop-themes-tags
+      topicTag: get-sop-topics-tags
+      documents: task/documents
+      knowledge: check-theme-existence
+      basePrompt: basePrompt
+      title: analysisTitle
+
+  # 7) Add Results (including potential 'missing' messages) to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      knowledgeSet: analyze-sop-themes-topics
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeSet
+
+functions:
+  # New function to check theme existence and add 'missing' insight if needed
+  check-theme-for-snippets:
+    input:
+      themeTag:
+        type: tag
+      documents:
+        type: document
+      knowledge:
+        type: knowledge-set
+    actions:
+      # Try to get *any* snippet for this theme
+      get-any-theme-snippet:
+        input:
+          themeTag: function/themeTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          tags: [themeTag]
+        
+
+      # Create an insight *only* if no snippets were found
+      create-missing-theme-insight:
+        input:
+          themeTag: function/themeTag
+          themeSnippets: get-any-theme-snippet
+        tool: insight
+        skipIfNotEmpty: themeSnippets
+        text: |
+          # Missing Theme: {{themeTag.name}}
+
+          No document snippets were found tagged with the theme "{{themeTag.name}}". Therefore, the questionnaire questions related to this theme cannot be assessed based on the provided documents.
+
+      # Add the 'missing' insight to the knowledge set if it was created
+      add-missing-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-missing-theme-insight
+        tool: knowledge-set
+        skipIfEmpty: insight
+        operations:
+          - op: set-nodes
+            nodes: insight
+
+  analyze-for-tag:
+    input:
+      themeTag:
+        type: tag
+      topicTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-theme-topic-snippets:
+        input:
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [themeTag, topicTag]
+      
+      get-instruction-prompt-for-tag:
+        input:
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          basePrompt: function/basePrompt
+        tool: echo
+        message: |
+          # SOP Theme: {{themeTag.name}} - Topic: {{topicTag.name}} Analysis
+
+          {{basePrompt.text}}
+
+          You are analyzing the "{{themeTag.name}}" section under the "{{topicTag.name}}" topic using the provided document snippets. Your task is to review each numbered question below and provide your analysis in a Markdown table format based *only* on the snippets provided.
+
+          The table should have the following columns:
+          1.  **Question**: The full text of the question being assessed.
+          2.  **Determination**: Your **YES**, **NO**, or **MAYBE** assessment based on the snippets.
+          3.  **Confidence**: Your **High** or **Medium** confidence level.
+          4.  **Citation / Explanation**: The exact snippet of text from the provided documents that supports your determination, with the key part(s) emphasized using ***bold and italics***. If the information is missing, state "N/A - Requirement not found in provided snippets". Use line breaks (`<br>`) for readability if needed, especially if combining Determination/Confidence/Citation into one cell later.
+
+          Please ensure:
+          *   You only answer the questions listed under the specific "{{themeTag.name}}" / "{{topicTag.name}}" combination for the current task.
+          *   Base your answers *strictly* on the provided snippets. Do not infer information not present.
+          *   Include the full question text in the first column.
+          *   Format the table correctly using Markdown syntax.
+
+          Here is the table structure example:
+
+          ```markdown
+          | Question | Determination | Confidence | Citation / Explanation |
+          |---|---|---|---|
+          | **Does the training and qualification for Advanced and Basic Riggers comply with the requirement to be conducted by a third party possessing a certification from a nationally recognized accreditation organization or accredited Business Function training program?** | YES | High | ***[Relevant snippet text with emphasis]*** |
+          | **Does the training for Basic Riggers comply with the requirement to enable them to inspect rigging before use?** | MAYBE | Medium | The document mentions ***[partially relevant text]***, but does not fully address the requirement. |
+          | **Does the training for Basic Riggers comply with the requirement to enable them to identify and attach rigging with basic knowledge of hitch configurations, capacities, and basic knots?** | NO | High | N/A - Requirement not found in provided snippets |
+          | ... | ... | ... | ... |
+          ```
+
+          ## Questionnaire Questions for "{{themeTag.name}}" / "{{topicTag.name}}":
+
+          {% if themeTag.name == "Confined Space Entry Procedure" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Function develop and establish a written confined space entry procedure per the requirements of 29 CFR 1910.146?
+          2. Does the written procedure include specific entry procedures, including communication of and review of known hazards and mitigations or control measures, and attendant requirements?
+          3. Is the written procedure in alignment with the requirements of the Enterprise standard Pre-Job Safety Planning EHS-SOH-4.1.1.11?
+          4. Are all of the following evaluated prior to entry: the initial space classification, work that will be performed within the confined or enclosed space, and activities being performed and conditions in adjacent or surrounding areas which could impact the confined space or entry activities?
+          5. Are appropriate barriers in place to manage the hazards presented by outside work or conditions prior to entry?
+          6. Are all unclassified confined spaces or spaces that cannot be confirmed as confined considered hazardous and to be permit-required confined spaces until a pre-entry assessment demonstrates otherwise?
+          7. Is any space not identified on the confined space inventory list entered until a qualified person can evaluate the space and classify it appropriately?
+          {% endif %}
+
+          {% if themeTag.name == "Atmospheric Testing" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Function ensure all necessary testing has been conducted for hazardous atmospheres prior to authorizing entry into a confined space?
+          2. Are test equipment and accessories approved or certified for use in hazardous areas and calibrated per the manufacturer's recommendations?
+          3. Is all atmospheric testing conducted by a Qualified Person?
+          4. Are employees or their authorized representatives provided an opportunity to observe the pre-entry testing?
+          5. Is testing conducted in a way that accurately represents the atmosphere in the confined space?
+          6. Do testing durations account for the capabilities of test equipment and manufacturer recommendations on sample pumps?
+          7. Is the frequency for routine testing defined to verify acceptable entry conditions for confined spaces?
+          8. Must verification testing be completed before first entry into permit-required confined spaces, with results recorded on the permit?
+          9. Is continuous monitoring required when any welding, cutting, or painting operations are being performed within the confined space?
+          10. Is testing conducted in the order of Oxygen, Combustible gases, and then Toxic gases and vapors if necessary?
+          {% endif %}
+
+          {% if themeTag.name == "Contract Partners Performing Confined Space Entry" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Functions establish a process for communicating the requirements of the Confined Space Entry Standard?
+          2. Does the Business Functions communicate the location of the confined spaces to the contract partners on site?
+          3. Does the Business Functions communicate all associated hazards to the contract partners on site?
+          4. Does the Contract Partner complete an Entergy confined space permit prior to entry into a permit-required confined space?
+          5. Does the Contract Partner obtain approval from an Entry Supervisor before entering a permit-required confined space?
+          6. Does the Contract Partner obtain approval from others designated by the business function before entering a permit-required confined space?
+          {% endif %}
+
+          {% if themeTag.name == "General Requirements" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the entity conduct Identification and Hazard Evaluation of Confined Spaces?
+          2. Does the entity have a Confined Space Entry Procedure for Permit Required and Non-Permit Required Confined Spaces?
+          3. Does the entity perform Atmospheric Testing?
+          4. Does the entity have a Rescue Plan in place?
+          5. Does the entity provide Training for personnel working in confined and enclosed spaces?
+          {% endif %}
+
+          {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Function conduct an initial survey of the workplace to identify all confined spaces required by this standard?
+          2. Does the workplace evaluation get conducted by a qualified person designated by the Business Function?
+          3. Does the Business Function conduct a confined space hazard assessment for each confined space or each type of confined space identified?
+          4. Does the confined space hazard assessment include a review of the current and past uses of the confined space?
+          5. Does the confined space hazard assessment include a review of the physical characteristics, configuration, location, and access and egress points of the confined space?
+          6. Does the confined space hazard assessment include a review of existing or potential atmospheric hazards?
+          7. Does the confined space hazard assessment include a review of biological hazards?
+          8. Does the confined space hazard assessment include a review of mechanical hazards?
+          9. Does the confined space hazard assessment include a review of electrical hazards?
+          10. Does the confined space hazard assessment include a review of physical hazards?
+          11. Does the confined space hazard assessment include a review of chemical hazards?
+          12. Does the confined space hazard assessment include a review of other serious safety hazards?
+          13. Does the Business Function classify the confined spaces identified as either a permit-required confined space, non-permit-required confined space, or enclosed space?
+          14. Does the Business Function maintain an inventoried list detailing the classification of each confined space?
+          15. Does the Business Function establish a process to manage the inventory of confined spaces?
+          16. Does the Business Function establish a frequency for and conduct periodic evaluations of permit-required, confined, and enclosed spaces?
+          17. Does the Business Function update the confined space inventory list if needed?
+          18. Does the Business Function post danger signs for permit-required confined spaces?
+          19. Does the sign for permit-required confined spaces read "DANGER—PERMIT-REQUIRED CONFINED SPACE, DO NOT ENTER" or similar language?
+          20. Are the signs for permit-required confined spaces legible and able to withstand the environmental conditions in which they are placed?
+          {% endif %}
+
+          {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Function demonstrate that non-permit required and enclosed spaces can be maintained in a safe condition?
+          2. Does the Business Function ensure all non-permit required confined space entry activities are in alignment with the Enterprise standard Pre-Job Safety Planning EHS-SOH-4.1.1.11?
+          3. Does the Business Function develop and establish a written procedure for entry into non-permit required confined spaces?
+          4. Does the written procedure include prohibited tasks within the space that could create a hazardous atmosphere?
+          5. Does the written procedure include allowable tasks within the confined space?
+          6. Does the written procedure include equipment needs for entry?
+          7. Does the written procedure include personal protective equipment requirements?
+          8. Does the written procedure include preparation to make the confined space safe for entry?
+          9. Does the written procedure include isolation of energy sources?
+          10. Does the written procedure include proper ventilation?
+          11. Does the written procedure include hot work safeguards?
+          12. Does the written procedure include rescue equipment requirements?
+          13. Does the work crew/supervisor confirm the space is listed on the inventory list and validated as a non-permit required confined space prior to any entry?
+          14. Does a qualified person determine whether atmospheric testing is required of the non-permit required confined space?
+          15. If atmospheric testing results indicate the atmospheric levels are not within acceptable limits, is entry into the non-permit required confined space not allowed to proceed?
+          16. Does the Business Function reevaluate the space before allowing entry whenever there are changes in the use or configuration of a confined space or other hazards may be present?
+          17. If a hazardous atmosphere is detected during entry into a non-permit required confined space, must personnel stop work immediately and secure the area?
+          18. Must the space be evaluated to determine how the hazardous atmosphere developed before allowing re-entry?
+          {% endif %}
+
+          {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Function develop and implement a written confined space procedure that complies with the requirements of 29 CFR 1910.146?
+          2. Does the written procedure for confined spaces remain readily available for use and inspection by employees and their authorized representatives?
+          3. Does the Business Function establish a permitting process for the review of hazards, mitigation measures, and authorization by the Qualified Person prior to entry into a permit-required space?
+          4. Does the permit system require the permit space to be entered?
+          5. Does the permit system require the purpose of the entry?
+          6. Does the permit system require the date and authorized duration/time of the entry permit?
+          7. Does the permit system require named personnel serving as attendants?
+          8. Does the permit system require a named individual serving as the entry supervisor, with space for signature or initial of the entry supervisor authorizing the entry?
+          9. Does the permit system require identification of hazards of the permit space to be entered?
+          10. Does the permit system require measures used to isolate the permit space and to eliminate or control hazards before entry?
+          11. Does the permit system require results of initial and periodic atmospheric tests, including date/time the tests were performed, and the names or initials of the qualified testers?
+          12. Does the permit system require information on rescue and emergency services available and how aid will be summoned in the event of an emergency?
+          13. Does the permit system require communication procedures used by authorized entrants and attendants for maintaining contact during the entry?
+          14. Does the permit system require equipment, such as PPE, testing equipment, communications, alarms, rescue equipment, etc., to be specified?
+          15. Does the permit system require reference to any additional permits, such as hot work?
+          16. Does the permit system require a reference number or unique identifier for each permit for tracking purposes?
+          17. Does the Business Function develop their own permit as long as it contains the minimum requirements listed above?
+          18. Does the confined space entry permit include approval by a Qualified Person appropriate to the scale, magnitude, scope, and complexity of the proposed work?
+          19. Is the permit posted on the job site for the duration of the job?
+          20. If any circumstances cause an interruption in the job or change the conditions to which the permit was originally approved, must the existing permit be cancelled, atmospheric testing conducted, and a new permit completed and approved before work can resume?
+          21. Does the Business Functions procedures for permit-required confined spaces include a requirement for an attendant(s) to be assigned and posted immediately outside designated entry points for the duration of the confined space entry?
+          22. Are other available entry points posted and flagged or barricaded to prevent unauthorized entry?
+          23. If conditions or work activities are outside of the scope as detailed on the approved permit or could introduce a new hazard not originally identified on the permit, must the permit be immediately revoked and all work stopped until another permit can be reviewed and approved?
+          24. Does the Business Functions ensure that all communication procedures and methods, such as radios and phones, are tested and verified to be working before entry is allowed?
+          {% endif %}
+
+          {% if themeTag.name == "Program Review and Evaluation" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Functions include a formal review of the Confined Space program as part of the management review process at least annually?
+          2. Does the program review include a review of cancelled permits, the confined space inventory list, and reclassified spaces?
+          3. Does Enterprise Safety review and update this standard no less than every three years?
+          {% endif %}
+
+          {% if themeTag.name == "Re-Classified Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Function allow a space currently classified as permit-required to be reclassified as a non-permit required confined space only under specified conditions?
+          2. Does the permitted space pose no actual or potential atmospheric hazards and are all hazards within the space eliminated without entry into the space for it to be reclassified as a non-permit confined space?
+          3. Is entry into the permitted space necessary to eliminate hazards?
+          4. Does testing and inspection during entry demonstrate that the hazards within the permitted space have been eliminated for it to be reclassified as a non-permit required confined space?
+          5. Does the Business Function document the basis for determining that all hazards in a permitted space have been eliminated through a certification?
+          6. Is the certification made available to each personnel entering the space or to the personnel's authorized representative?
+          7. If hazards arise within a permitted space that has been reclassified to a non-permit required space, must each personnel in the space exit the space?
+          8. Must the Business Function reevaluate the space and determine whether it must be reclassified to a permit-required space after hazards arise?
+          9. Are reclassifications temporary and applicable only to the entry and work evaluated?
+          10. Do reclassifications require verification that all atmospheric hazards and non-atmospheric serious hazards remain eliminated during the entry?
+          {% endif %}
+
+          {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Functions designate rescue and emergency services and establish procedures for summoning rescue and emergency services?
+          2. Does the Business Functions designate rescue and emergency services and establish procedures for rescuing entrants from permit-required confined spaces?
+          3. Does the Business Functions designate rescue and emergency services and establish procedures for providing necessary emergency services to rescued employees?
+          4. Does the Business Functions designate rescue and emergency services and establish procedures for preventing unauthorized personnel from attempting a rescue?
+          5. Does the Business Functions evaluate a prospective rescuer's ability to respond to a summons in a timely manner?
+          6. Does the Business Functions evaluate a prospective rescuer's ability and proficiency with rescue-related tasks and equipment?
+          7. Does the Business Functions ensure at least one member of the rescue services team has current training in basic first aid and cardio-pulmonary resuscitation (CPR)?
+          8. Does the Business Functions select a rescue team or service that has the capability to reach the victim within an appropriate time frame?
+          9. Does the Business Functions inform the rescue team or service of the hazards present?
+          10. Does the Business Functions provide the rescue team or service with access to all permit spaces or mock-ups with similar characteristics?
+          11. If rescue and emergency services are performed by Entergy personnel, does the Business Functions provide the affected employees with the appropriate equipment, training, and drills to support successful rescue response?
+          12. If rescue and emergency services are performed by contract partners, does the Business Functions ensure alignment with the requirements of the Enterprise standard Contractor S&OH Management EHS-GOV-4.3.1?
+          {% endif %}
+
+          {% if themeTag.name == "Roles and Responsibilities" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Senior Leadership support the implementation of Enterprise Environmental, Health, and Safety Standards?
+          2. Does the VP Enterprise Safety approve the Confined Space Entry Standard for publication and implementation?
+          3. Does the VP Enterprise Safety provide resources to the Business Functions for support and implementation of the requirements of the Confined Space Entry Standard?
+          4. Does Enterprise Safety provide governance, oversight, and support to the Business Function implementation and adherence to the requirements of the Confined Space Entry Standard?
+          5. Does Enterprise Safety review the Confined and Enclosed Space Entry standard annually?
+          6. Do Functional Safety Directors / Sr. Managers / Managers ensure all processes, procedures, and controls are in place for managing hazards related to confined and enclosed spaces?
+          7. Do Functional Safety Directors / Sr. Managers / Managers provide resources necessary at the Function and site-levels for support and implementation of the requirements of the Confined Space Entry Standard and supporting procedures?
+          8. Do Functional Safety Directors / Sr. Managers / Managers ensure the annual Confined Space program evaluation is completed?
+          9. Do Functional Safety Directors / Sr. Managers / Managers review and verify the performance and adequacy of the Confined Space program through annual Business Function management system reviews?
+          10. Do Functional Safety Personnel understand and implement the requirements in the Confined Space Entry Standard?
+          11. Do Functional Safety Personnel conduct, review, and update hazard assessments as needed?
+          12. Are personnel provided with the required training and tools needed to comply with the requirements of the Confined Space Entry Standard?
+          13. Do Functional Safety Personnel perform the annual business function or location Confined and Enclosed Space program evaluation as assigned?
+          14. Do employees understand and follow the requirements of the Confined Space Entry Standard, as well as any other applicable engineering controls and best practices?
+          15. Do employees immediately report any uncontrolled hazards?
+          16. Do employees complete all necessary required and assigned training?
+          17. Do Contract Partners comply with the requirements of the Confined Space Entry Standard and any further Function specific requirements?
+          18. Do Contract Partners immediately report any uncontrolled hazards to Entergy personnel?
+          {% endif %}
+
+          {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Function develop, deliver, and manage confined space training for all employees performing or supporting confined space entry activities?
+          2. Does the training establish employee proficiency in the duties required by the standard?
+          3. Does the training introduce new or revised procedures, as necessary, for compliance with the standard?
+          4. Does the Business Functions ensure all contract partners performing confined space entry activities are appropriately trained per the requirements of the Enterprise standard Contractor S&OH Management EHS-GOV-4.3.1?
+          5. Is the training delivered prior to entry or assignment of responsibility?
+          6. Is the training delivered annually thereafter?
+          7. Does the training cover the confined space entry procedures?
+          8. Does the training cover the difference in permit-required and non-permit required confined spaces and how to identify them?
+          9. Does the training cover the use of the confined space entry permit and the permitting process?
+          10. Does the Business Functions develop and deliver training needed to support the understanding, knowledge, and skills necessary for the safe performance of duties of entrants, attendants, entry supervisors, atmospheric testers, and rescue personnel?
+          11. Does training for entrants into a confined space include alerting the attendant whenever a warning sign or symptom of exposure to a dangerous situation is detected?
+          12. Does training for entrants require exiting the space immediately when an evacuation order is given by the attendant or entry supervisor, or when the entrant recognizes any warning sign or symptom of exposure to a dangerous situation or prohibitive condition?
+          13. Does training for entrants require exiting the space if an evacuation alarm is activated?
+          14. Does training for entrants require informing the attendant or entry supervisor of unusual circumstances?
+          15. Are attendants trained in the hazards that may be encountered during an entry?
+          16. Are attendants trained in the modes, signs, symptoms, and consequences of exposures, and are they aware of the behavioral effects of entrants to hazard exposures?
+          17. Are attendants required to continuously maintain an accurate count of entrants in the permitted space?
+          18. Are attendants required to remain outside the space until relieved by another trained attendant?
+          19. Are attendants required to communicate with entrants to monitor their status and to alert them of the need to evacuate the space?
+          20. Are attendants required to monitor the space to determine if it remains safe and to order evacuation if a prohibited condition is detected?
+          21. Are attendants required to summon rescue and emergency services as soon as it is determined it is needed?
+          22. Are attendants required to warn any unauthorized person to stay away from the confined space activity and advise them to immediately exit the area if needed?
+          23. Are attendants required to inform the entrant and entry supervisor if any unauthorized persons have entered the permit space?
+          24. Are attendants trained in non-entry rescue methods?
+          25. Are attendants required to refrain from performing any other duties that could interfere with attendant responsibilities?
+          26. Does the Entry Supervisor training include the hazards the entry team may face during an entry?
+          27. Does the Entry Supervisor training include the modes, signs, symptoms, and consequences of exposures?
+          28. Does the Entry Supervisor training include removing unauthorized persons?
+          29. Does the Entry Supervisor training include transferring of responsibility to another entry supervisor if needed?
+          30. Does the Entry Supervisor training include reviewing, approving, and cancelling the permit?
+          31. Are Atmospheric Testers trained in the means and methods of evaluating atmospheric hazards in permit spaces?
+          32. Are Atmospheric Testers trained in the knowledge and skills needed to calibrate, use, and interpret the results of test equipment?
+          33. Are Atmospheric Testers trained in the limitations of specific test equipment?
+          34. Are Atmospheric Testers trained in the reasons for testing atmospheric hazards in order: first of oxygen, next for flammable gases and vapors, and then for toxic atmospheric hazards?
+          35. Are rescue personnel trained in the rescue equipment to be used?
+          36. Are rescue personnel trained in basic first aid and CPR?
+          37. Is additional training delivered before there is a change in assigned duties?
+          38. Is additional training delivered whenever there is a change in permit space entry operations that presents a hazard about which an employee has not previously been trained?
+          39. Is additional training delivered whenever there is any evidence of a deviation from the permit space entry procedures required or if there are inadequacies in the employee's knowledge or use of these procedures?
+          40. Is all training developed, delivered, and managed per the requirements of the Enterprise standard EHS Training EHS-GOV-3.2.1?
+          {% endif %}
+
+          {% if themeTag.name == "Ventilation Requirements" and topicTag.name == "Confined and Enclosed Space Entry" %}
+          1. Does the Business Functions ensure that ventilation methods are selected and set-up or approved by a qualified person with knowledge of ventilation principles, hazards, and controls?
+          2. Does the Business Functions ensure that space remains ventilated until the atmosphere is tested to be within the acceptable limits?
+          3. Does the Business Functions ensure that ventilation is maintained during the entry activities if there is a potential for atmospheric conditions within to become unacceptable?
+          {% endif %}
+
+      run-prompt:
+        input:
+          snippets: get-theme-topic-snippets
+          instructionPrompt: get-instruction-prompt-for-tag
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+
+          ## Document Snippets for Analysis:
+          ```text
+          {% for s in snippets %}
+          --- Snippet Start ---
+          {{s.text}}
+          --- Snippet End ---
+          {% else %}
+          No relevant snippets found for these tags.
+          {% endfor %}
+          ```
+
+          Please generate the Markdown table based on the instructions and the snippets above.
+
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-theme-topic-snippets
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          # {{themeTag.name}} - {{topicTag.name}} Compliance Assessment Table
+
+          {{summary.text}}
+
+          ## Summary Notes
+
+          The table above provides a detailed assessment for each question within the "{{themeTag.name}}" theme and "{{topicTag.name}}" topic, based *only* on the provided document snippets. Review any "NO" or "MAYBE" responses and their corresponding citations for potential compliance gaps or areas needing clarification.
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-theme-topic-snippets
+        tool: knowledge-set
+        skipIfEmpty: insight
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
