@@ -5,9 +5,9 @@ input:
 
 actions:
   # 1) Existing Tag Collection for Agreement Information
-  get-butterfly-tags:
+  get-preamble-tags:
     tool: find-tags
-    name: "Butterfly"
+    name: "Preamble"
   
   get-credit-tags:
     tool: find-tags
@@ -19,10 +19,10 @@ actions:
   #   category: "Document Tags"
 
   # 3) Extract relevant snippets based on Agreement Information tags
-  get-butterfly-snippets:
+  get-preamble-snippets:
     input:
       documents: task/documents
-      tags: get-butterfly-tags
+      tags: get-preamble-tags
     tool: document-text
     textFilter:
       tags: tags
@@ -38,10 +38,10 @@ actions:
   # 4) Generate the consolidated summary using LLM
   generate-summary:
     input:
-      butterflySnippets: get-butterfly-snippets
+      preambleSnippets: get-preamble-snippets
       creditSnippets: get-credit-snippets
     tool: llm
-    skipIfEmpty: butterflySnippets # Use SkipIfEmpty as requested
+    skipIfEmpty: preambleSnippets # Use SkipIfEmpty as requested
     prompt: |
       You are in-house counsel at a major entertainment studio tasked with identifying credit obligations owed on a film or television series. Your objective is to locate and consolidate all obligations, commitments, and representations the studio has made regarding screen credits for talent or other parties, including but not limited to: performers, writers, producers, executive producers, and directors.
 
@@ -55,14 +55,14 @@ actions:
       You will receive text snippets extracted from talent agreement(s) relating to agreement metadata information and credit obligations. Your task is to consolidate this information into a structured summary document.
 
       # DEBUG INFORMATION
-      Butterfly snippets: {{butterflySnippets.size}}
+      Preamble snippets: {{preambleSnippets.size}}
       Credit snippets: {{creditSnippets.size}}
 
       {% assign agreements = "" | split: "" %}
       {% assign credits = "" | split: "" %}
       
-      # Process Butterfly snippets for agreement info
-      {% for snippet in butterflySnippets %}
+      # Process Preamble snippets for agreement info
+      {% for snippet in preambleSnippets %}
         {% capture agreementInfo %}
         ### Agreement Information
         Extract and format the following information if found in the text, using this exact format:
@@ -137,5 +137,5 @@ actions:
       {% endif %}
       
       {% else %}
-      No relevant information found in the provided text. Please ensure the document contains sections tagged with "Butterfly" for proper analysis.
+      No relevant information found in the provided text. Please ensure the document contains sections tagged with "Preamble" for proper analysis.
       {% endif %}
