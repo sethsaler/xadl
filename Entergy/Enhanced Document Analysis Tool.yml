@@ -1,0 +1,82 @@
+input:
+  documents:
+    type: document
+  user_question:
+    type: text
+    label: "Enter your question about the document's obligations or requirements"
+  evaluation_guidance:
+    type: text
+    label: "Provide guidance or criteria to help evaluate the question"
+  selected_tag:
+    type: tag
+    label: "Select the tag to search for relevant content"
+
+actions:
+  # 1) Extract relevant snippets based on selected tag
+  get-relevant-snippets:
+    input:
+      documents: task/documents
+      tags: task/selected_tag
+      question: task/user_question
+    tool: document-text
+    textFilter:
+      tags: tags
+
+  # 2) Base configuration for analysis prompt
+  basePrompt:
+    input:
+      question: task/user_question
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are an expert legal analyst specializing in document review and obligation assessment.
+      
+      The exact question to analyze is:
+      """
+      {{question.text}}
+      """
+      
+      Your task is to evaluate whether the document comprehensively addresses this exact question.
+      DO NOT analyze any other questions or requirements.
+      DO NOT substitute a different question.
+
+  # 3) Generate the analysis using LLM
+  generate-analysis:
+    input:
+      snippets: get-relevant-snippets
+      basePrompt: basePrompt
+      question: task/user_question
+    tool: llm
+    skipIfEmpty: snippets
+    prompt: |
+      {{basePrompt.text}}
+
+      # Relevant Text Snippets:
+      {% for s in snippets %}
+      --- Snippet Start ---
+      {{s.text}}
+      --- Snippet End ---
+      {% endfor %}
+
+      Format your response as follows:
+
+      **Original Question**: 
+      [Copy the exact question verbatim: "{{question.text}}"]
+
+      **Question Analysis**:
+      [Break down the specific requirements about Business Function process and Material Handling evaluation criteria]
+
+      **Question Components**:
+      [List only the components from the actual question about process and evaluation criteria]
+
+      **Determination**: 
+      [YES/NO/MAYBE responses ONLY about Business Function process and Material Handling evaluation]
+
+      **Citations**: 
+      [Only cite text relevant to process documentation and evaluation criteria]
+
+      **Gap Analysis**: 
+      [Only gaps related to process documentation and evaluation criteria]
+
+      **Recommended Language**: 
+      [Only if gaps exist in process documentation or evaluation criteria] 
