@@ -197,7 +197,7 @@ actions:
     tool: llm
     skipIfEmpty: snippets
     prompt: |
-      You are analyzing credit requirements to create a high-level summary. Focus on identifying the most important credit terms and obligations.
+      You are analyzing credit requirements to create a high-level summary. Focus on identifying the most important credit terms and obligations. Pay special attention to extracting and including any **terms of art** or **industry-specific phrases** related to credit obligations (e.g., *"favored nations"*, *"billing block"*, *"in perpetuity"*, *"so-called"*).
       
       {% if talentType %}
       Based on the preamble analysis, this agreement is for a {{talentType.text}}. Use this role terminology in your summary.
@@ -206,7 +206,7 @@ actions:
       Create a comprehensive paragraph that summarizes all key credit points. Use the following guidelines:
       1. Start with the most significant credit obligation
       2. Include exact quotes from the agreement using *italics*
-      3. Use **bold** for key terms and concepts
+      3. Use **bold** for key terms and concepts, including any identified industry terms/terms of art
       4. Maintain a logical flow from main credits to specific requirements
       5. Include any special conditions or exceptions
       6. End with any studio rights or discretion provisions
@@ -410,9 +410,9 @@ actions:
       You are tasked with combining the results of multiple analyses into a single, coherent summary.
       Use the following sections to create your response:
 
-      # Talent Agreement Analysis: Preamble and Credit Terms
+      # **Talent Agreement Analysis: Preamble and Credit Terms**
 
-      ## Agreement Details Analysis
+      ## **Agreement Details Analysis**
       {% if talentName %}
       {{talentName.text}}
       {% endif %}
@@ -435,12 +435,12 @@ actions:
       {{dates.text}}
       {% endif %}
 
-      ## Credit Requirements Analysis
+      ## **Credit Requirements Analysis**
       {% if creditSummary %}
       {{creditSummary.text}}
       {% endif %}
 
-      ### Detailed Credit Analysis
+      ### **Detailed Credit Analysis**
       {% if creditLocation %}
       {{creditLocation.text}}
       {% endif %}

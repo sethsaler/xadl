@@ -222,6 +222,36 @@ functions:
           Please analyze the text and answer these questions about credit requirements:
 
           {% if creditTag.name == "Credit" %}
+          What industry-specific terms or phrases are used? Look for:
+          - Specialized credit titles (e.g., "Created by", "Developed by", "Based on")
+          - Technical credit terms (e.g., "A Film By", "A Production of")
+          - Industry standard phrases (e.g., "in association with", "in conjunction with")
+          - Unique credit designations
+          - Any terms that appear to be industry-specific jargon
+          {% endif %}
+
+          {% if creditTag.name == "Credit" %}
+          What are the conditional credit requirements? Look for:
+          - Platform-specific conditions (e.g., "on [Platform] platform", "on [Platform] service")
+          - Timing-based conditions (e.g., "during initial release", "first 30 days")
+          - Location-based conditions (e.g., "in the United States", "in international territories")
+          - Distribution method conditions (e.g., "in theatrical release", "in streaming")
+          - Any "if/then" or "when" statements about credit requirements
+          - Explicit statements about when credits are NOT required
+          - Cross-references to other sections that might affect credit requirements
+          {% endif %}
+
+          {% if creditTag.name == "Credit" %}
+          What defined terms are used in the credit section? Look for:
+          - Terms in quotation marks followed by definitions
+          - Terms preceded by "hereinafter referred to as"
+          - Terms that appear to be defined elsewhere in the agreement
+          - Industry-specific terms that may need definition
+          - Terms that affect credit requirements or placement
+          - Terms that modify credit obligations
+          {% endif %}
+
+          {% if creditTag.name == "Credit" %}
           Where will the credit appear? Look for:
           - Main titles vs. end titles
           - Opening vs. closing credits
@@ -284,15 +314,26 @@ functions:
           IMPORTANT FORMATTING REQUIREMENTS:
           - Use **bold** for key terms (e.g., **main/opening credits**, **card placement**, etc.)
           - Use *italics* for EXACT VERBATIM credit language from the agreement (e.g., *"Executive Producer"*, *"in first position"*)
+          - Use `code formatting` for industry-specific terms and phrases (e.g., `"Created by"`, `"in association with"`)
+          - Use > blockquotes for conditional statements (e.g., >"if shown on [Platform]", >"when distributed internationally")
           - When referencing specific credit requirements, ALWAYS quote the exact language from the agreement
           - Do not paraphrase credit specifications - use the exact wording from the document
           - If no credit obligations are found, state "No credit obligations specified"
+
+          After the credit analysis, include a "Defined Terms" section that lists all relevant defined terms in this format:
+          **Term:** [exact term as used in agreement]
+          **Definition:** [exact definition from agreement]
+          **Relevance to Credits:** [brief explanation of how this term affects credit requirements]
 
           Important Guidelines:
           - Focus only on credit-related obligations
           - Exclude compensation, bonuses, exclusivity, or image/likeness terms
           - Exclude credit boilerplate terms about remedies, errors, or breach
           - ALWAYS use verbatim quotes for credit language and specifications
+          - Highlight and explain any industry-specific terms or phrases that may need clarification
+          - Explicitly note any conditions where credits are NOT required
+          - Pay special attention to platform-specific requirements and their exceptions
+          - Include all defined terms that could affect the interpretation of credit requirements
           {% endif %}
 
           Please analyze the snippets according to the instructions above.
