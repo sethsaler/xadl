@@ -1,0 +1,268 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collection for Agreement Analysis
+  get-preamble-tags:
+    tool: find-tags
+    name: "Preamble"
+    
+  get-credit-tags:
+    tool: find-tags
+    name: "Credit"
+  
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a media contract analyst responsible for reviewing talent agreements and extracting key information about agreement terms and credit obligations. Your objective is to systematically analyze each document section and provide structured output based on the content type:
+
+      1. For Preamble sections:
+         - Extract and format all agreement information
+         - Ensure all required fields are populated
+         - Note any missing required information
+         - Maintain exact formatting as specified
+      
+      2. For Credit sections:
+         - Extract only credit-specific obligations
+         - Focus on formatting, placement, and prominence requirements
+         - Exclude non-credit related terms
+         - Present in specified format
+
+      Format your responses according to the section type being analyzed.
+
+  # 3) Section Title
+  analysisTitle:
+    tool: echo
+    message: Talent Agreement Analysis
+
+  # 4) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      preambleTags: get-preamble-tags
+      creditTags: get-credit-tags
+    tool: knowledge-set
+    knowledgeSetName: "Talent Agreement Analysis"
+    operations:
+      - op: add-dimension
+        key: preamble
+        name: Preamble
+        nodes: preambleTags
+        priority: 1
+      - op: add-dimension
+        key: credit
+        name: Credit
+        nodes: creditTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # 5) Analyze each section
+  analyze-agreement-sections:
+    repeat:
+      function: analyze-for-tag
+      for: [preambleTag, creditTag]
+    input:
+      preambleTag: get-preamble-tags
+      creditTag: get-credit-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      title: analysisTitle
+
+  # 6) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      agreementAnalysis: analyze-agreement-sections
+      knowledgeSet: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeSet
+
+functions:
+  analyze-for-tag:
+    input:
+      preambleTag:
+        type: tag
+      creditTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-preamble-credit-snippets:
+        input:
+          preambleTag: function/preambleTag
+          creditTag: function/creditTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "or"
+          tags: [preambleTag, creditTag]
+      
+      get-instruction-prompt-for-tag:
+        input:
+          preambleTag: function/preambleTag
+          creditTag: function/creditTag
+          basePrompt: function/basePrompt
+        tool: echo
+        message: |
+          # Agreement Section: {{preambleTag.name}} / {{creditTag.name}} Analysis
+
+          {{basePrompt.text}}
+
+          {% if preambleTag.name == "Preamble" %}
+          # Process Preamble snippets for agreement info
+          {% for snippet in preambleSnippets %}
+            {% capture agreementInfo %}
+            ### Agreement Information
+            Extract and format the following information if found in the text, using this exact format:
+            {% assign lc_text = snippet.text | downcase %}
+            {% if lc_text contains "name" or lc_text contains "party" or lc_text contains "signature" %}
+            **Talent Name:** [Name]
+            {% endif %}
+            {% if lc_text contains "type" or lc_text contains "category" or lc_text contains "position" or lc_text contains "role" %}
+            **Talent Type:** [Category]
+            {% endif %}
+            {% if lc_text contains "character" or lc_text contains "role" or lc_text contains "part" or lc_text contains "portray" %}
+            **Role:** [Character Name]
+            {% endif %}
+            {% if lc_text contains "agreement" or lc_text contains "contract" or lc_text contains "deal" or lc_text contains "memorandum" %}
+            **Agreement Name:** [Title]
+            {% endif %}
+            {% if lc_text contains "date" or lc_text contains "effective" or lc_text contains "execution" or lc_text contains "signature" %}
+            **Effective Date:** [Date]
+            {% endif %}
+            {% if lc_text contains "project" or lc_text contains "production" or lc_text contains "show" or lc_text contains "series" or lc_text contains "picture" %}
+            **Project Name:** [Title]
+            {% endif %}
+            {% if lc_text contains "episode" or lc_text contains "season" or lc_text contains "number" or lc_text contains "installment" %}
+            **Episode(s):** [Episode number(s)] (if none, put "Not Specified")
+            {% endif %}
+
+            Required Field Definitions:
+
+            **Talent Name:** Name of individual or team (look for names, signatures, or references to "party").
+            **Talent Type:** Role category (e.g., Writer, Director, Producer, Performer, Physical Producer, Lead Cast).
+            **Role:** Character/role name (N/A if not applicable).
+            **Agreement Name:** Title of the formal agreement (look for "this Agreement", "the Contract").
+            **Effective Date:** Defined effective date or latest signature date (if missing, use execution date and note accordingly).
+            **Project Name:** Project title or working title (look for "Project", "Production", "Show").
+            **Episode(s):** Specify if applicable; otherwise, "Not Specified."
+
+            Relevant Text:
+            {{snippet.text}}
+            {% endcapture %}
+            {% assign agreements = agreements | push: agreementInfo %}
+          {% endfor %}
+          {% endif %}
+
+          {% if creditTag.name == "Credit" %}
+          # Process Credit snippets
+          {% for snippet in creditSnippets %}
+            {% capture creditInfo %}
+            ### Credit Obligations
+            Combine into a single paragraph only the contract language directly related to credit and billing. Maintain original wording — do not paraphrase. Focus on:
+            {% assign lc_text = snippet.text | downcase %}
+            {% if lc_text contains "title" or lc_text contains "main" or lc_text contains "opening" or lc_text contains "sequence" %}
+            - Main titles vs. end titles
+            {% endif %}
+            {% if lc_text contains "designation" or lc_text contains "special" or lc_text contains "guest" or lc_text contains "appearance" %}
+            - Special designations (e.g., "guest star," "special appearance")
+            {% endif %}
+            {% if lc_text contains "card" or lc_text contains "position" or lc_text contains "shared" or lc_text contains "placement" %}
+            - Single card vs. shared card, including card position (first, second, etc.)
+            {% endif %}
+            {% if lc_text contains "size" or lc_text contains "prominence" or lc_text contains "format" or lc_text contains "appearance" %}
+            - Type size, prominence, or other format requirements
+            {% endif %}
+            {% if lc_text contains "parity" or lc_text contains "favorable" or lc_text contains "equal" or lc_text contains "comparable" %}
+            - "No less favorable than..." or parity obligations
+            {% endif %}
+            {% if lc_text contains "rights" or lc_text contains "discretion" or lc_text contains "approval" or lc_text contains "determination" %}
+            - Any studio or producer discretion rights
+            {% endif %}
+            {% if lc_text contains "episode" or lc_text contains "specific" or lc_text contains "varied" or lc_text contains "particular" %}
+            - Specific episode credits (if applicable or varied)
+            {% endif %}
+            
+            Important:
+            - Include only credit-related obligations specific to providing credit on a series or film.
+            - Exclude information about compensation, bonuses, exclusivity, use of image or likeness, or any unrelated terms.
+            - Exclude credit boilerplate terms, including: remedies for failure to provide credit or for incorrect credit; errors and omissions relating to credit; efforts to correct errors; or what happens in the event of breach of contract.
+            - Strictly adhere to the format above without adding extra commentary.
+            - If the provided text does not contain any credit obligations, output "No credit obligations specified."
+
+            Relevant Text:
+            {{snippet.text}}
+            {% endcapture %}
+            {% assign credits = credits | push: creditInfo %}
+          {% endfor %}
+          {% endif %}
+
+      run-prompt:
+        input:
+          snippets: get-preamble-credit-snippets
+          instructionPrompt: get-instruction-prompt-for-tag
+          preambleTag: function/preambleTag
+          creditTag: function/creditTag
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+
+          ## Document Snippets for Analysis:
+          ```text
+          {% for s in snippets %}
+          --- Snippet Start ---
+          {{s.text}}
+          --- Snippet End ---
+          {% else %}
+          No relevant snippets found for these tags.
+          {% endfor %}
+          ```
+
+          Please analyze the snippets according to the instructions above.
+
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-preamble-credit-snippets
+          preambleTag: function/preambleTag
+          creditTag: function/creditTag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          # {{preambleTag.name}} - {{creditTag.name}} Agreement Analysis
+
+          {{summary.text}}
+
+          ## Analysis Notes
+          The above analysis provides structured extraction of key agreement information and credit obligations based solely on the provided document snippets. Review any missing required fields or unclear credit terms for follow-up.
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-preamble-credit-snippets
+        tool: knowledge-set
+        skipIfEmpty: insight
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets

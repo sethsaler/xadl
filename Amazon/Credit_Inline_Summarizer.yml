@@ -4,138 +4,86 @@ input:
   # Removed workspace and knowledgeset inputs
 
 actions:
-  # 1) Existing Tag Collection for Agreement Information
-  get-preamble-tags:
+  # 1) Tag Collection for Agreement Information
+  get-tags:
     tool: find-tags
-    name: "Preamble"
+    name: ["Preamble", "Credit"]
   
-  get-credit-tags:
-    tool: find-tags
-    name: "Credit"
-  
-  # 2) REMOVED Tag Collection for "Document Tags"
-  # get-documentCategory-tags:
-  #   tool: find-tags
-  #   category: "Document Tags"
-
-  # 3) Extract relevant snippets based on Agreement Information tags
-  get-preamble-snippets:
+  # 2) Extract relevant snippets based on Agreement Information tags
+  get-snippets:
     input:
       documents: task/documents
-      tags: get-preamble-tags
-    tool: document-text
-    textFilter:
-      tags: tags
-  
-  get-credit-snippets:
-    input:
-      documents: task/documents
-      tags: get-credit-tags
+      tags: get-tags
     tool: document-text
     textFilter:
       tags: tags
 
-  # 4) Generate the consolidated summary using LLM
+  # 3) Generate the consolidated summary using LLM
   generate-summary:
     input:
-      preambleSnippets: get-preamble-snippets
-      creditSnippets: get-credit-snippets
+      snippets: get-snippets
+      tags: get-tags
     tool: llm
-    skipIfEmpty: preambleSnippets # Use SkipIfEmpty as requested
+    skipIfEmpty: snippets
     prompt: |
-      You are in-house counsel at a major entertainment studio tasked with identifying credit obligations owed on a film or television series. Your objective is to locate and consolidate all obligations, commitments, and representations the studio has made regarding screen credits for talent or other parties, including but not limited to: performers, writers, producers, executive producers, and directors.
+      You are in-house counsel at a major entertainment studio tasked with identifying credit obligations owed on a film or television series. Your objective is to locate and consolidate all obligations, commitments, and representations the studio has made regarding screen credits for talent or other parties.
 
-      When providing findings:
-      - Do NOT paraphrase any credit language. Extract and present the relevant contract or document language verbatim, combining it into a single paragraph.
-      - Do not reformat into a bullet list.
-      - Focus on clarity, precision, and strict relevance to studio obligations.
-      - Avoid speculation; limit your analysis to explicit terms and established industry standards.
+      # Analysis Instructions
+      For each snippet, check its tag and process according to these rules:
 
-      # Analysis Task
-      You will receive text snippets extracted from talent agreement(s) relating to agreement metadata information and credit obligations. Your task is to consolidate this information into a structured summary document.
+      {% if tags contains "Preamble" %}
+      ## For Snippets Tagged as "Preamble":
+      Search for and extract these specific pieces of information:
+      - If snippet contains talent name information: Extract as "Talent: [Name]"
+      - If snippet contains role category: Extract as "Type: [Category]"
+      - If snippet contains character/role name: Extract as "Role: [Name/N/A]"
+      - If snippet contains agreement title: Extract as "Agreement: [Title]"
+      - If snippet contains effective date: Extract as "Date: [Date]"
+      - If snippet contains project title: Extract as "Project: [Title]"
+      - If snippet contains episode info: Extract as "Episodes: [Numbers/Not Specified]"
 
-      # DEBUG INFORMATION
-      Preamble snippets: {{preambleSnippets.size}}
-      Credit snippets: {{creditSnippets.size}}
-
-      {% assign agreements = "" | split: "" %}
-      {% assign credits = "" | split: "" %}
-      
-      # Process Preamble snippets for agreement info
-      {% for snippet in preambleSnippets %}
-        {% capture agreementInfo %}
-        ### Agreement Information
-        Extract and format the following information if found in the text, using this exact format:
-        **Talent Name:** [Name]
-        **Talent Type:** [Category]
-        **Role:** [Character Name]
-        **Agreement Name:** [Title]
-        **Effective Date:** [Date]
-        **Project Name:** [Title]
-        **Episode(s):** [Episode number(s)] (if none, put "Not Specified")
-
-        Required Field Definitions:
-
-        **Talent Name:** Name of individual or team.
-        **Talent Type:** Role category (e.g., Writer, Director, Producer, Performer, Physical Producer, Lead Cast).
-        **Role:** Character/role name (N/A if not applicable).
-        **Agreement Name:** Title of the formal agreement.
-        **Effective Date:** Defined effective date or latest signature date (if missing, use execution date and note accordingly).
-        **Project Name:** Project title or working title.
-        **Episode(s):** Specify if applicable; otherwise, "Not Specified."
-
-        Relevant Text:
-        {{snippet.text}}
-        {% endcapture %}
-        {% assign agreements = agreements | push: agreementInfo %}
-      {% endfor %}
-      
-      # Process Credit snippets
-      {% for snippet in creditSnippets %}
-        {% capture creditInfo %}
-        ### Credit Obligations
-        Combine into a single paragraph only the contract language directly related to credit and billing. Maintain original wording — do not paraphrase. Focus on:
-        - Main titles vs. end titles
-        - Special designations (e.g., "guest star," "special appearance")
-        - Single card vs. shared card, including card position (first, second, etc.)
-        - Type size, prominence, or other format requirements
-        - "No less favorable than..." or parity obligations
-        - Any studio or producer discretion rights
-        - Specific episode credits (if applicable or varied)
-        
-        Important:
-        - Include only credit-related obligations specific to providing credit on a series or film.
-        - Exclude information about compensation, bonuses, exclusivity, use of image or likeness, or any unrelated terms.
-        - Exclude credit boilerplate terms, including:  remedies for failure to provide credit or for incorrect credit; errors and ommissions relating to credit; efforts to correct errors; or what happens in the event of breach of contract.
-        - Strictly adhere to the format above without adding extra commentary.
-        - If the provided text does not contain any credit obligations, output "No credit obligations specified."
-
-        Relevant Text:
-        {{snippet.text}}
-        {% endcapture %}
-        {% assign credits = credits | push: creditInfo %}
-      {% endfor %}
-
-      # Final Stats
-      Found {{agreements.size}} agreement(s) and {{credits.size}} credit(s)
-
-      # Combine all structured outputs
-      {% if agreements.size > 0 %}
-      ## Document Information and Credit Obligations
-
-      {% for agreement in agreements %}
-      {{agreement}}
-      {% endfor %}
-
-      {% if credits.size > 0 %}
-      {% for credit in credits %}
-      {{credit}}
-      {% endfor %}
-      {% else %}
-      ### Credit Obligations
-      No credit obligations specified.
+      Format each found item as a bullet point in the Preamble section.
+      If an item is not found, do not include it in the output.
       {% endif %}
-      
-      {% else %}
-      No relevant information found in the provided text. Please ensure the document contains sections tagged with "Preamble" for proper analysis.
+
+      {% if tags contains "Credit" %}
+      ## For Snippets Tagged as "Credit":
+      Search for and emphasize these specific credit elements:
+      - If snippet mentions main/opening titles: Bold as "***main title***"
+      - If snippet mentions end/closing credits: Bold as "***end credits***"
+      - If snippet specifies special designations: Bold as "***[designation type]***"
+      - If snippet details card position: Bold as "***[position details]***"
+      - If snippet mentions size/prominence: Bold as "***[size/prominence details]***"
+      - If snippet includes parity requirements: Bold as "***[parity terms]***"
+      - If snippet mentions studio rights: Bold as "***[rights details]***"
+      - If snippet has episode-specific credits: Bold as "***[episode credit details]***"
+
+      Combine all credit terms into a single flowing paragraph, maintaining original contract language.
       {% endif %}
+
+      # Snippets to Process
+      {% for snippet in snippets %}
+      --- Snippet {{forloop.index}} ---
+      {{snippet.text}}
+      {% endfor %}
+
+      # Required Output Format
+      Your response must follow this exact structure:
+
+      ## Agreement Details
+      [If Preamble tags found, list each item as a bullet point]
+      • Talent: [Name]
+      • Type: [Category]
+      • Role: [Name/N/A]
+      • Agreement: [Title]
+      • Date: [Date]
+      • Project: [Title]
+      • Episodes: [Numbers/Not Specified]
+
+      ## Credit Requirements
+      [If Credit tags found, provide a single paragraph with emphasized terms]
+      [All credit obligations combined into one paragraph with ***bold emphasis*** on key terms]
+
+      If no information is found for a section, output:
+      - For Preamble section: "No agreement details found in tagged sections."
+      - For Credit section: "No credit obligations specified in tagged sections."
