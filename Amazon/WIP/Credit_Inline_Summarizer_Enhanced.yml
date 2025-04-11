@@ -1,0 +1,419 @@
+input:
+  documents:
+    type: document
+
+actions:
+  # 1) Tag Collection for Agreement Information
+  get-preamble-tags:
+    tool: find-tags
+    name: "Preamble"
+    
+  get-credit-tags:
+    tool: find-tags
+    name: "Credit"
+  
+  # 2) Extract relevant snippets based on Agreement Information tags
+  get-snippets:
+    input:
+      documents: task/documents
+      preambleTags: get-preamble-tags
+      creditTags: get-credit-tags
+    tool: document-text
+    textFilter:
+      operator: "or"
+      tags: [preambleTags, creditTags]
+
+  # 3) Process individual Preamble questions
+  process-talent-name:
+    input:
+      snippets: get-snippets
+      preambleTags: get-preamble-tags
+    tool: llm
+    skipIfEmpty: snippets
+    prompt: |
+      You are analyzing a talent agreement. Focus ONLY on identifying the talent's name.
+      Look for:
+      - Names of individuals or parties
+      - References to "Talent", "Artist", or similar terms
+      - Signature blocks or party definitions
+
+      Format your response as:
+      **Talent Name:** [Answer]
+
+      {% for snippet in snippets %}
+      --- Snippet {{forloop.index}} ---
+      {{snippet.text}}
+      {% endfor %}
+
+  process-talent-type:
+    input:
+      snippets: get-snippets
+      preambleTags: get-preamble-tags
+    tool: llm
+    skipIfEmpty: snippets
+    prompt: |
+      You are analyzing a talent agreement. Focus ONLY on identifying the talent's type/role category.
+      Consider:
+      - Their professional category or role
+      - Whether they are a writer, director, producer, performer, etc.
+      - Any specific position or title mentioned
+
+      Format your response as:
+      **Talent Type:** [Answer]
+
+      {% for snippet in snippets %}
+      --- Snippet {{forloop.index}} ---
+      {{snippet.text}}
+      {% endfor %}
+
+  process-role:
+    input:
+      snippets: get-snippets
+      preambleTags: get-preamble-tags
+    tool: llm
+    skipIfEmpty: snippets
+    prompt: |
+      You are analyzing a talent agreement. Focus ONLY on identifying the specific role or character.
+      Look for:
+      - Character names or descriptions
+      - Role definitions or responsibilities
+      - Part or portrayal details
+
+      Format your response as:
+      **Role:** [Answer]
+
+      {% for snippet in snippets %}
+      --- Snippet {{forloop.index}} ---
+      {{snippet.text}}
+      {% endfor %}
+
+  process-agreement-name:
+    input:
+      snippets: get-snippets
+      preambleTags: get-preamble-tags
+    tool: llm
+    skipIfEmpty: snippets
+    prompt: |
+      You are analyzing a talent agreement. Focus ONLY on identifying the agreement name.
+      Consider:
+      - References to "this Agreement" or "the Contract"
+      - Document titles or memorandum names
+      - Deal terms or arrangement descriptions
+
+      Format your response as:
+      **Agreement Name:** [Answer]
+
+      {% for snippet in snippets %}
+      --- Snippet {{forloop.index}} ---
+      {{snippet.text}}
+      {% endfor %}
+
+  process-dates:
+    input:
+      snippets: get-snippets
+      preambleTags: get-preamble-tags
+    tool: llm
+    skipIfEmpty: snippets
+    prompt: |
+      You are analyzing a talent agreement. Focus ONLY on identifying all relevant dates.
+      Look for:
+      - Effective dates
+      - Execution dates
+      - Signature dates
+      - Commencement dates
+      - Start dates or term beginning dates
+      - End dates or term completion dates
+      - Production dates or shooting schedules
+      - Option exercise dates
+      - Payment commencement dates
+      - Contract duration or term length
+      - Season start/end dates
+      - Series premiere dates
+      - First rehearsal or production dates
+
+      Format your response as:
+      **Effective Date:** [Primary Date]
+      **Alternative Dates Found:**
+      - Start Date: [if found]
+      - End Date: [if found]
+      - Production Date: [if found]
+      - Other Relevant Dates: [specify type and date]
+
+      {% for snippet in snippets %}
+      --- Snippet {{forloop.index}} ---
+      {{snippet.text}}
+      {% endfor %}
+
+  process-project:
+    input:
+      snippets: get-snippets
+      preambleTags: get-preamble-tags
+    tool: llm
+    skipIfEmpty: snippets
+    prompt: |
+      You are analyzing a talent agreement. Focus ONLY on identifying the project information.
+      Consider:
+      - Project titles
+      - Production names
+      - Show or series titles
+      - Working titles
+
+      Format your response as:
+      **Project Name:** [Answer]
+
+      {% for snippet in snippets %}
+      --- Snippet {{forloop.index}} ---
+      {{snippet.text}}
+      {% endfor %}
+
+  process-episodes:
+    input:
+      snippets: get-snippets
+      preambleTags: get-preamble-tags
+    tool: llm
+    skipIfEmpty: snippets
+    prompt: |
+      You are analyzing a talent agreement. Focus ONLY on identifying episode information.
+      Look for:
+      - Episode numbers
+      - Season information
+      - Installment details
+      - Series specifications
+
+      Format your response as:
+      **Episode(s):** [Answer] (if none, put "Not Specified")
+
+      {% for snippet in snippets %}
+      --- Snippet {{forloop.index}} ---
+      {{snippet.text}}
+      {% endfor %}
+
+  # 4) Process Credit sections
+  process-credit-location:
+    input:
+      snippets: get-snippets
+      creditTags: get-credit-tags
+    tool: llm
+    skipIfEmpty: snippets
+    prompt: |
+      You are analyzing credit requirements. Focus ONLY on where credits will appear.
+      Look for:
+      - Main titles vs. end titles
+      - Opening vs. closing credits
+      - Sequence placement
+      - Specific timing requirements
+
+      Format your response using **bold** for key terms and *italics* for exact quotes.
+      Example: The credit shall appear in the **main titles** as *"Executive Producer"*.
+
+      {% for snippet in snippets %}
+      --- Snippet {{forloop.index}} ---
+      {{snippet.text}}
+      {% endfor %}
+
+  process-credit-designations:
+    input:
+      snippets: get-snippets
+      creditTags: get-credit-tags
+    tool: llm
+    skipIfEmpty: snippets
+    prompt: |
+      You are analyzing credit requirements. Focus ONLY on special designations.
+      Look for:
+      - Guest star credits
+      - Special appearance credits
+      - Unique credit treatments
+      - Specific billing requirements
+
+      Format your response using **bold** for key terms and *italics* for exact quotes.
+      Example: The credit shall include the **special designation** of *"Guest Star"*.
+
+      {% for snippet in snippets %}
+      --- Snippet {{forloop.index}} ---
+      {{snippet.text}}
+      {% endfor %}
+
+  process-credit-placement:
+    input:
+      snippets: get-snippets
+      creditTags: get-credit-tags
+    tool: llm
+    skipIfEmpty: snippets
+    prompt: |
+      You are analyzing credit requirements. Focus ONLY on card placement requirements.
+      Look for:
+      - Single card vs. shared card specifications
+      - Position requirements (first, second, etc.)
+      - Card order or hierarchy
+      - Specific placement rules
+
+      Format your response using **bold** for key terms and *italics* for exact quotes.
+      Example: The credit shall appear on a **single card** in *"first position"*.
+
+      {% for snippet in snippets %}
+      --- Snippet {{forloop.index}} ---
+      {{snippet.text}}
+      {% endfor %}
+
+  process-credit-format:
+    input:
+      snippets: get-snippets
+      creditTags: get-credit-tags
+    tool: llm
+    skipIfEmpty: snippets
+    prompt: |
+      You are analyzing credit requirements. Focus ONLY on format specifications.
+      Look for:
+      - Type size specifications
+      - Prominence requirements
+      - Formatting details
+      - Font or style requirements
+
+      Format your response using **bold** for key terms and *italics* for exact quotes.
+      Example: The credit shall be in **14-point type** with *"equal prominence"*.
+
+      {% for snippet in snippets %}
+      --- Snippet {{forloop.index}} ---
+      {{snippet.text}}
+      {% endfor %}
+
+  process-credit-parity:
+    input:
+      snippets: get-snippets
+      creditTags: get-credit-tags
+    tool: llm
+    skipIfEmpty: snippets
+    prompt: |
+      You are analyzing credit requirements. Focus ONLY on parity obligations.
+      Look for:
+      - "No less favorable than" clauses
+      - Equal treatment requirements
+      - Comparable credit provisions
+      - Specific comparison requirements
+
+      Format your response using **bold** for key terms and *italics* for exact quotes.
+      Example: The credit shall be **no less favorable** than *"any other producer credit"*.
+
+      {% for snippet in snippets %}
+      --- Snippet {{forloop.index}} ---
+      {{snippet.text}}
+      {% endfor %}
+
+  process-credit-rights:
+    input:
+      snippets: get-snippets
+      creditTags: get-credit-tags
+    tool: llm
+    skipIfEmpty: snippets
+    prompt: |
+      You are analyzing credit requirements. Focus ONLY on discretion rights.
+      Look for:
+      - Studio or producer rights
+      - Approval requirements
+      - Determination authority
+      - Decision-making processes
+
+      Format your response using **bold** for key terms and *italics* for exact quotes.
+      Example: The Studio shall have the **sole discretion** to *"determine final credit"*.
+
+      {% for snippet in snippets %}
+      --- Snippet {{forloop.index}} ---
+      {{snippet.text}}
+      {% endfor %}
+
+  process-credit-episodes:
+    input:
+      snippets: get-snippets
+      creditTags: get-credit-tags
+    tool: llm
+    skipIfEmpty: snippets
+    prompt: |
+      You are analyzing credit requirements. Focus ONLY on episode-specific requirements.
+      Look for:
+      - Per-episode variations
+      - Specific episode credits
+      - Different credit treatments
+      - Episode-dependent conditions
+
+      Format your response using **bold** for key terms and *italics* for exact quotes.
+      Example: The credit shall appear **only in episodes** where *"the Artist performs"*.
+
+      {% for snippet in snippets %}
+      --- Snippet {{forloop.index}} ---
+      {{snippet.text}}
+      {% endfor %}
+
+  # 5) Combine all results into final summary
+  generate-summary:
+    input:
+      talentName: process-talent-name
+      talentType: process-talent-type
+      role: process-role
+      agreementName: process-agreement-name
+      dates: process-dates
+      project: process-project
+      episodes: process-episodes
+      creditLocation: process-credit-location
+      creditDesignations: process-credit-designations
+      creditPlacement: process-credit-placement
+      creditFormat: process-credit-format
+      creditParity: process-credit-parity
+      creditRights: process-credit-rights
+      creditEpisodes: process-credit-episodes
+    tool: llm
+    prompt: |
+      You are tasked with combining the results of multiple analyses into a single, coherent summary.
+      Use the following sections to create your response:
+
+      # Talent Agreement Analysis: Preamble and Credit Terms
+
+      ## Agreement Details Analysis
+      {% if talentName %}
+      {{talentName.text}}
+      {% endif %}
+      {% if talentType %}
+      {{talentType.text}}
+      {% endif %}
+      {% if role %}
+      {{role.text}}
+      {% endif %}
+      {% if agreementName %}
+      {{agreementName.text}}
+      {% endif %}
+      {% if project %}
+      {{project.text}}
+      {% endif %}
+      {% if episodes %}
+      {{episodes.text}}
+      {% endif %}
+      {% if dates %}
+      {{dates.text}}
+      {% endif %}
+
+      ## Credit Requirements Analysis
+      Credit Analysis: 
+      {% if creditLocation %}
+      {{creditLocation.text}}
+      {% endif %}
+      {% if creditDesignations %}
+      {{creditDesignations.text}}
+      {% endif %}
+      {% if creditPlacement %}
+      {{creditPlacement.text}}
+      {% endif %}
+      {% if creditFormat %}
+      {{creditFormat.text}}
+      {% endif %}
+      {% if creditParity %}
+      {{creditParity.text}}
+      {% endif %}
+      {% if creditRights %}
+      {{creditRights.text}}
+      {% endif %}
+      {% if creditEpisodes %}
+      {{creditEpisodes.text}}
+      {% endif %}
+
+      If no information is found for a section, output:
+      - For Preamble section: "No agreement details found in tagged sections."
+      - For Credit section: "No credit obligations specified in tagged sections." 
