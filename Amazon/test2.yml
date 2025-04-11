@@ -1,0 +1,348 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collection for Agreement Analysis
+  get-preamble-tags:
+    tool: find-tags
+    name: "Preamble"
+    
+  get-credit-tags:
+    tool: find-tags
+    name: "Credit"
+  
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a media contract analyst responsible for reviewing talent agreements and extracting key information about agreement terms and credit obligations. Your objective is to systematically analyze each document section and provide structured output based on the content type:
+
+      1. For Preamble sections:
+         - Extract and format all agreement information
+         - Ensure all required fields are populated
+         - Note any missing required information
+         - Maintain exact formatting as specified
+      
+      2. For Credit sections:
+         - Extract only credit-specific obligations
+         - Focus on formatting, placement, and prominence requirements
+         - Exclude non-credit related terms
+         - Present in specified format
+
+      Format your responses according to the section type being analyzed.
+
+  # 3) Section Title
+  analysisTitle:
+    tool: echo
+    message: Talent Agreement Analysis
+
+  # 4) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      preambleTags: get-preamble-tags
+      creditTags: get-credit-tags
+    tool: knowledge-set
+    knowledgeSetName: "Talent Agreement Analysis"
+    operations:
+      - op: add-dimension
+        key: preamble
+        name: Preamble
+        nodes: preambleTags
+        priority: 1
+      - op: add-dimension
+        key: credit
+        name: Credit
+        nodes: creditTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # 5) Analyze each section
+  analyze-agreement-sections:
+    repeat:
+      function: analyze-for-tag
+      for: [preambleTag, creditTag]
+    input:
+      preambleTag: get-preamble-tags
+      creditTag: get-credit-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      title: analysisTitle
+
+  # 6) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      agreementAnalysis: analyze-agreement-sections
+      knowledgeSet: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeSet
+
+functions:
+  analyze-for-tag:
+    input:
+      preambleTag:
+        type: tag
+      creditTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-preamble-credit-snippets:
+        input:
+          preambleTag: function/preambleTag
+          creditTag: function/creditTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "or"
+          tags: [preambleTag, creditTag]
+      
+      get-instruction-prompt-for-tag:
+        input:
+          preambleTag: function/preambleTag
+          creditTag: function/creditTag
+          basePrompt: function/basePrompt
+        tool: echo
+        message: |
+          # Agreement Section: {{preambleTag.name}} / {{creditTag.name}} Analysis
+
+          {{basePrompt.text}}
+
+          {% if preambleTag.name == "Preamble" %}
+          Please analyze the following text and answer these questions about agreement information:
+
+          {% if preambleTag.name == "Preamble" %}
+          Who is the talent/individual entering into this agreement? Look for:
+          - Names of individuals or parties
+          - References to "Talent", "Artist", or similar terms
+          - Signature blocks or party definitions
+          {% endif %}
+
+          {% if preambleTag.name == "Preamble" %}
+          What type of talent is this person? Consider:
+          - Their professional category or role
+          - Whether they are a writer, director, producer, performer, etc.
+          - Any specific position or title mentioned
+          {% endif %}
+
+          {% if preambleTag.name == "Preamble" %}
+          What specific role or character will they portray? Look for:
+          - Character names or descriptions
+          - Role definitions or responsibilities
+          - Part or portrayal details
+          {% endif %}
+
+          {% if preambleTag.name == "Preamble" %}
+          What is the formal name of this agreement? Consider:
+          - References to "this Agreement" or "the Contract"
+          - Document titles or memorandum names
+          - Deal terms or arrangement descriptions
+          {% endif %}
+
+          {% if preambleTag.name == "Preamble" %}
+          When does this agreement take effect? Look for:
+          - Effective dates
+          - Execution dates
+          - Signature dates
+          - Commencement dates
+          - Start dates or term beginning dates
+          - End dates or term completion dates
+          - Production dates or shooting schedules
+          - Option exercise dates
+          - Payment commencement dates
+          - Contract duration or term length
+          - Season start/end dates
+          - Series premiere dates
+          - First rehearsal or production dates
+          - Any other relevant timing references
+
+          Format your answers using this structure:
+          **Talent Name:** [Answer]
+          **Talent Type:** [Answer]
+          **Role:** [Answer]
+          **Agreement Name:** [Answer]
+          **Project Name:** [Answer]
+          **Episode(s):** [Answer] (if none, put "Not Specified")
+          **Effective Date:** [Answer]
+          **Alternative Dates Found:**
+          - Start Date: [if found]
+          - End Date: [if found]
+          - Production Date: [if found]
+          - Other Relevant Dates: [specify type and date]
+          {% endif %}
+
+          {% if preambleTag.name == "Preamble" %}
+          What project is this agreement for? Consider:
+          - Project titles
+          - Production names
+          - Show or series titles
+          - Working titles
+          {% endif %}
+
+          {% if preambleTag.name == "Preamble" %}
+          Which specific episodes are covered? Look for:
+          - Episode numbers
+          - Season information
+          - Installment details
+          - Series specifications
+          {% endif %}
+
+          Format your answers using this structure:
+          **Talent Name:** [Answer]
+          **Talent Type:** [Answer]
+          **Role:** [Answer]
+          **Agreement Name:** [Answer]
+          **Project Name:** [Answer]
+          **Episode(s):** [Answer] (if none, put "Not Specified")
+          **Effective Date:** [Answer]
+          **Alternative Dates Found:**
+          - Start Date: [if found]
+          - End Date: [if found]
+          - Production Date: [if found]
+          - Other Relevant Dates: [specify type and date]
+          {% endif %}
+
+          {% if creditTag.name == "Credit" %}
+          Please analyze the text and answer these questions about credit requirements:
+
+          {% if creditTag.name == "Credit" %}
+          Where will the credit appear? Look for:
+          - Main titles vs. end titles
+          - Opening vs. closing credits
+          - Sequence placement
+          - Specific timing requirements
+          {% endif %}
+
+          {% if creditTag.name == "Credit" %}
+          What special designations are specified? Look for:
+          - Guest star credits
+          - Special appearance credits
+          - Unique credit treatments
+          - Specific billing requirements
+          {% endif %}
+
+          {% if creditTag.name == "Credit" %}
+          What are the card placement requirements? Look for:
+          - Single card vs. shared card specifications
+          - Position requirements (first, second, etc.)
+          - Card order or hierarchy
+          - Specific placement rules
+          {% endif %}
+
+          {% if creditTag.name == "Credit" %}
+          What format specifications are required? Look for:
+          - Type size specifications
+          - Prominence requirements
+          - Formatting details
+          - Font or style requirements
+          {% endif %}
+
+          {% if creditTag.name == "Credit" %}
+          What parity obligations exist? Look for:
+          - "No less favorable than" clauses
+          - Equal treatment requirements
+          - Comparable credit provisions
+          - Specific comparison requirements
+          {% endif %}
+
+          {% if creditTag.name == "Credit" %}
+          What discretion rights are specified? Look for:
+          - Studio or producer rights
+          - Approval requirements
+          - Determination authority
+          - Decision-making processes
+          {% endif %}
+
+          {% if creditTag.name == "Credit" %}
+          What episode-specific requirements exist? Look for:
+          - Per-episode variations
+          - Specific episode credits
+          - Different credit treatments
+          - Episode-dependent conditions
+          {% endif %}
+
+          After answering these questions, provide your response in the following format:
+
+          Begin with "Credit Analysis: " followed by a single comprehensive paragraph that incorporates all findings. 
+          
+          IMPORTANT FORMATTING REQUIREMENTS:
+          - Use **bold** for key terms (e.g., **main/opening credits**, **card placement**, etc.)
+          - Use *italics* for EXACT VERBATIM credit language from the agreement (e.g., *"Executive Producer"*, *"in first position"*)
+          - When referencing specific credit requirements, ALWAYS quote the exact language from the agreement
+          - Do not paraphrase credit specifications - use the exact wording from the document
+          - If no credit obligations are found, state "No credit obligations specified"
+
+          Important Guidelines:
+          - Focus only on credit-related obligations
+          - Exclude compensation, bonuses, exclusivity, or image/likeness terms
+          - Exclude credit boilerplate terms about remedies, errors, or breach
+          - ALWAYS use verbatim quotes for credit language and specifications
+          {% endif %}
+
+          Please analyze the snippets according to the instructions above.
+
+      run-prompt:
+        input:
+          snippets: get-preamble-credit-snippets
+          instructionPrompt: get-instruction-prompt-for-tag
+          preambleTag: function/preambleTag
+          creditTag: function/creditTag
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+
+          ## Document Snippets for Analysis:
+          ```text
+          {% for s in snippets %}
+          --- Snippet Start ---
+          {{s.text}}
+          --- Snippet End ---
+          {% else %}
+          No relevant snippets found for these tags.
+          {% endfor %}
+          ```
+
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-preamble-credit-snippets
+          preambleTag: function/preambleTag
+          creditTag: function/creditTag
+          title: function/title
+          documents: function/documents
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          # Talent Agreement Analysis: {{preambleTag.name}} and {{creditTag.name}} Terms
+
+          {{summary.text}}
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-preamble-credit-snippets
+        tool: knowledge-set
+        skipIfEmpty: insight
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
