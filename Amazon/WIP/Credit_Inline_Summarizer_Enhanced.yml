@@ -34,7 +34,7 @@ actions:
       You are analyzing a talent agreement. Focus ONLY on identifying the talent's name.
       Look for:
       - Names of individuals or parties
-      - References to "Talent", "Artist", or similar terms
+      - References to "Talent", "Artist", "Writer", "Director", "Producer", or similar terms
       - Signature blocks or party definitions
 
       Format your response as:
@@ -189,6 +189,50 @@ actions:
       {% endfor %}
 
   # 4) Process Credit sections
+  process-credit-summary:
+    input:
+      snippets: get-snippets
+      creditTags: get-credit-tags
+      talentType: process-talent-type
+    tool: llm
+    skipIfEmpty: snippets
+    prompt: |
+      You are analyzing credit requirements to create a high-level summary. Focus on identifying the most important credit terms and obligations.
+      
+      {% if talentType %}
+      Based on the preamble analysis, this agreement is for a {{talentType.text}}. Use this role terminology in your summary.
+      {% endif %}
+      
+      Create a comprehensive paragraph that summarizes all key credit points. Use the following guidelines:
+      1. Start with the most significant credit obligation
+      2. Include exact quotes from the agreement using *italics*
+      3. Use **bold** for key terms and concepts
+      4. Maintain a logical flow from main credits to specific requirements
+      5. Include any special conditions or exceptions
+      6. End with any studio rights or discretion provisions
+      7. Use the correct role terminology (e.g., "Writer", "Director", "Producer", "Artist", etc.) based on the talent type
+
+      Format your response as:
+      **Credit Summary:** [Your comprehensive paragraph]
+
+      Example formats:
+      For a Writer:
+      **Credit Summary:** The Writer shall receive **main title credit** as *"Written by"* in the opening credits of each episode. The credit shall appear on a **single card** in *"first position"* with **equal prominence** to other writing credits. The credit shall be in **14-point type** and shall appear **only in episodes** where *"the Writer receives credit"*. The Studio shall have the **sole discretion** to *"determine final credit"*.
+
+      For a Producer:
+      **Credit Summary:** The Producer shall receive **main title credit** as *"Executive Producer"* in the opening credits of each episode. The credit shall appear on a **single card** in *"first position"* with **equal prominence** to other producer credits. The credit shall be in **14-point type** and shall appear **only in episodes** where *"the Producer performs services"*. The Studio shall have the **sole discretion** to *"determine final credit"*.
+
+      For a Director:
+      **Credit Summary:** The Director shall receive **main title credit** as *"Directed by"* in the opening credits of each episode. The credit shall appear on a **single card** in *"first position"* with **equal prominence** to other directing credits. The credit shall be in **14-point type** and shall appear **only in episodes** where *"the Director directs"*. The Studio shall have the **sole discretion** to *"determine final credit"*.
+
+      For a Performer:
+      **Credit Summary:** The Artist shall receive **main title credit** as *"Starring"* in the opening credits of each episode. The credit shall appear on a **single card** in *"first position"* with **equal prominence** to other starring credits. The credit shall be in **14-point type** and shall appear **only in episodes** where *"the Artist performs"*. The Studio shall have the **sole discretion** to *"determine final credit"*.
+
+      {% for snippet in snippets %}
+      --- Snippet {{forloop.index}} ---
+      {{snippet.text}}
+      {% endfor %}
+
   process-credit-location:
     input:
       snippets: get-snippets
@@ -204,7 +248,7 @@ actions:
       - Specific timing requirements
 
       Format your response using **bold** for key terms and *italics* for exact quotes.
-      Example: The credit shall appear in the **main titles** as *"Executive Producer"*.
+      Example: The credit shall appear in the **main titles** as *"Executive Producer"*. (Note: This example shows the required formatting; adapt the sentence structure based on the source text.)
 
       {% for snippet in snippets %}
       --- Snippet {{forloop.index}} ---
@@ -226,7 +270,7 @@ actions:
       - Specific billing requirements
 
       Format your response using **bold** for key terms and *italics* for exact quotes.
-      Example: The credit shall include the **special designation** of *"Guest Star"*.
+      Example: The credit shall include the **special designation** of *"Guest Star"*. (Note: This example shows the required formatting; adapt the sentence structure based on the source text.)
 
       {% for snippet in snippets %}
       --- Snippet {{forloop.index}} ---
@@ -248,7 +292,7 @@ actions:
       - Specific placement rules
 
       Format your response using **bold** for key terms and *italics* for exact quotes.
-      Example: The credit shall appear on a **single card** in *"first position"*.
+      Example: The credit shall appear on a **single card** in *"first position"*. (Note: This example shows the required formatting; adapt the sentence structure based on the source text.)
 
       {% for snippet in snippets %}
       --- Snippet {{forloop.index}} ---
@@ -270,7 +314,7 @@ actions:
       - Font or style requirements
 
       Format your response using **bold** for key terms and *italics* for exact quotes.
-      Example: The credit shall be in **14-point type** with *"equal prominence"*.
+      Example: The credit shall be in **14-point type** with *"equal prominence"*. (Note: This example shows the required formatting; adapt the sentence structure based on the source text.)
 
       {% for snippet in snippets %}
       --- Snippet {{forloop.index}} ---
@@ -292,7 +336,7 @@ actions:
       - Specific comparison requirements
 
       Format your response using **bold** for key terms and *italics* for exact quotes.
-      Example: The credit shall be **no less favorable** than *"any other producer credit"*.
+      Example: The credit shall be **no less favorable** than *"any other producer credit"*. (Note: This example shows the required formatting; adapt the sentence structure based on the source text.)
 
       {% for snippet in snippets %}
       --- Snippet {{forloop.index}} ---
@@ -314,7 +358,7 @@ actions:
       - Decision-making processes
 
       Format your response using **bold** for key terms and *italics* for exact quotes.
-      Example: The Studio shall have the **sole discretion** to *"determine final credit"*.
+      Example: The Studio shall have the **sole discretion** to *"determine final credit"*. (Note: This example shows the required formatting; adapt the sentence structure based on the source text.)
 
       {% for snippet in snippets %}
       --- Snippet {{forloop.index}} ---
@@ -336,7 +380,7 @@ actions:
       - Episode-dependent conditions
 
       Format your response using **bold** for key terms and *italics* for exact quotes.
-      Example: The credit shall appear **only in episodes** where *"the Artist performs"*.
+      Example: The credit shall appear **only in episodes** where *"the Artist performs"*. (Note: This example shows the required formatting; adapt the sentence structure based on the source text.)
 
       {% for snippet in snippets %}
       --- Snippet {{forloop.index}} ---
@@ -353,6 +397,7 @@ actions:
       dates: process-dates
       project: process-project
       episodes: process-episodes
+      creditSummary: process-credit-summary
       creditLocation: process-credit-location
       creditDesignations: process-credit-designations
       creditPlacement: process-credit-placement
@@ -391,7 +436,11 @@ actions:
       {% endif %}
 
       ## Credit Requirements Analysis
-      Credit Analysis: 
+      {% if creditSummary %}
+      {{creditSummary.text}}
+      {% endif %}
+
+      ### Detailed Credit Analysis
       {% if creditLocation %}
       {{creditLocation.text}}
       {% endif %}
