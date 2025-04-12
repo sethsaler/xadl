@@ -1171,10 +1171,6 @@ functions:
 
           {{summary.text}}
 
-          ## Summary Notes
-
-          The table above provides a detailed assessment for each question within the {{themeTag.name}} theme and {{topicTag.name}} topic, based *only* on the provided document snippets. Review any "NO" or "MAYBE" responses and their corresponding citations for potential compliance gaps or areas needing clarification.
-
       add-insight:
         input:
           knowledge: function/knowledge

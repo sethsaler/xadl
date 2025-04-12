@@ -1,0 +1,1196 @@
+input:
+  documents:
+    type: document
+  workspace:
+    type: workspace
+
+actions:
+  # 1) Tag Collection for SOP Themes - will contain the Heading 1 values
+  get-sop-themes-tags:
+    tool: find-tags
+    category: "SOP Themes"
+    
+  # Get SOP Topics tags (Heading 2 values)
+  get-sop-topics-tags:
+    tool: find-tags
+    category: "SOP Topics"
+  
+  # 2) Base configuration for shared prompt elements
+  basePrompt:
+    tool: echo
+    message: |
+      # Role and Context Setup
+      You are a compliance and safety auditor responsible for assessing Standard Operating Procedures (SOPs) and safety protocols against a provided questionnaire. Your objective is to review each numbered question in the questionnaire and, based ONLY on the provided text snippets from the relevant documents, provide:
+
+      1. A clear determination: **YES**, **NO**, or **MAYBE**.
+          - **YES**: The document explicitly confirms the requirement is met. (Confidence: High)
+          - **MAYBE**: The document provides related information, but it's ambiguous, incomplete, or requires interpretation to fully answer the question. (Confidence: Medium)
+          - **NO**: The document explicitly contradicts the requirement, or the requirement is clearly absent from the relevant sections. (Confidence: High/Medium depending on whether it's explicitly contradicted vs. just absent)
+      2. A confidence level for your determination: **High** or **Medium**.
+          - **High**: Direct evidence supports the YES/NO determination.
+          - **Medium**: Evidence is indirect, ambiguous, or requires inference (likely leading to a MAYBE or a less certain NO).
+      3. A direct **Citation** from the provided document snippets that supports your determination.
+          - For **YES**, cite the text confirming compliance.
+          - For **MAYBE**, cite the text that causes ambiguity or partial alignment.
+          - For **NO**, cite text contradicting the requirement, or state "N/A - Requirement not found in provided snippets" if absent.
+          - **Emphasize** the key phrase(s) within the citation using ***bold and italics***.
+
+      Format your response as follows for each question:
+
+      **Question X**: [Question text here]
+      **Determination**: [YES/NO/MAYBE]
+      **Confidence**: [High/Medium]
+      **Citation**: [***Relevant snippet text with emphasis*** or "N/A - Requirement not found in provided snippets"]
+
+  # 3) Section Title
+  analysisTitle:
+    tool: echo
+    message: SOP Compliance Assessment
+
+  # 4) Initialize Knowledge Set
+  init-kset:
+    input:
+      documents: task/documents
+      sopThemesTags: get-sop-themes-tags
+      sopTopicsTags: get-sop-topics-tags
+    tool: knowledge-set
+    knowledgeSetName: "SOP Compliance Assessment"
+    operations:
+      - op: add-dimension
+        key: theme
+        name: SOP Themes
+        nodes: sopThemesTags
+        priority: 1
+      - op: add-dimension
+        key: topic
+        name: SOP Topics
+        nodes: sopTopicsTags
+        priority: 2
+      - op: set-nodes
+        nodes: documents
+
+  # 5) Analyze each SOP Theme tag with each SOP Topic tag
+  analyze-sop-themes-topics:
+    repeat:
+      function: analyze-for-tag
+      for: [themeTag, topicTag]
+    input:
+      themeTag: get-sop-themes-tags
+      topicTag: get-sop-topics-tags
+      documents: task/documents
+      knowledge: init-kset
+      basePrompt: basePrompt
+      title: analysisTitle
+
+  # 6) Add Results to Workspace
+  add-to-workspace:
+    input:
+      workspace: task/workspace
+      sopThemesTopicsAnalysis: analyze-sop-themes-topics
+      knowledgeSet: init-kset
+    tool: workspace
+    operations:
+      - op: add-items
+        items: knowledgeSet
+
+functions:
+  analyze-for-tag:
+    input:
+      themeTag:
+        type: tag
+      topicTag:
+        type: tag
+      documents:
+        type: document
+      basePrompt:
+        type: text
+      knowledge:
+        type: knowledge-set
+      title:
+        type: text
+
+    actions:
+      get-theme-topic-snippets:
+        input:
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          documents: function/documents
+        tool: document-text
+        textFilter:
+          operator: "and"
+          tags: [themeTag, topicTag]
+      
+      get-instruction-prompt-for-tag:
+        input:
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          basePrompt: function/basePrompt
+        tool: echo
+        message: |
+          # SOP Theme: {{themeTag.name}} - Topic: {{topicTag.name}} Analysis
+
+          {{basePrompt.text}}
+
+          You are analyzing the {{themeTag.name}} section under the {{topicTag.name}} topic using the provided document snippets. Your task is to review each numbered question below and provide your analysis in paragraph format based *only* on the snippets provided.
+
+          For each question, please provide the following elements in paragraph format:
+
+          1.  **Question**: Start with the full text of the question being assessed.
+          2.  **Determination**: State your **YES**, **NO**, or **MAYBE** assessment based on the snippets.
+          3.  **Confidence**: Indicate your **High** or **Medium** confidence level.
+          4.  **Citation / Explanation**: Provide the exact snippet of text from the provided documents that supports your determination, with the key part(s) emphasized using ***bold and italics***. If the information is missing, state "N/A - Requirement not found in provided snippets".
+          5.  **Corrective Action**: If the Determination is **NO** or **MAYBE**, explain what needs to change in the source document(s) to achieve a YES determination and suggest which role or department (e.g., "Procedure Owner", "Safety Department", "Training Department") is likely responsible for making the change. If the Determination is **YES**, state "N/A".
+          6.  **Recommended Language**: If the Determination is **NO** or **MAYBE**, provide specific, actionable text that could be added to or replace existing text in the source document(s) to satisfy the requirement and achieve a YES determination. This language should be ready to be copied and pasted. If the Determination is **YES**, state "N/A".
+
+          Please ensure:
+          *   You only answer the questions listed under the specific {{themeTag.name}} / {{topicTag.name}} combination for the current task.
+          *   Base your answers *strictly* on the provided snippets. Do not infer information not present.
+          *   Include the full question text for each question.
+          *   Provide "N/A" for "Corrective Action" and "Recommended Language" when the Determination is "YES".
+
+          Here is a paragraph structure example:
+
+          **Question:** Does the training and qualification for Advanced and Basic Riggers comply with the requirement to be conducted by a third party possessing a certification from a nationally recognized accreditation organization or accredited Business Function training program?
+          **Determination:** YES
+          **Confidence:** High
+          **Citation / Explanation:** The procedure states, "***All Rigger training and qualification, whether Basic or Advanced, must be performed by an entity certified by a nationally recognized accreditation body or an internally accredited Business Function training program.***"
+          **Corrective Action:** N/A
+          **Recommended Language:** N/A
+
+          **Question:** Does the training for Basic Riggers comply with the requirement to enable them to inspect rigging before use?
+          **Determination:** MAYBE
+          **Confidence:** Medium
+          **Citation / Explanation:** The document mentions ***Basic Riggers receive training on hazard recognition and equipment use***, but does not explicitly state inspection is covered.
+          **Corrective Action:** The training material for Basic Riggers needs to be updated by the Training Department to explicitly include instruction and practical exercises on pre-use inspection of rigging equipment.
+          **Recommended Language:** Add the following sentence to the Basic Rigger training curriculum description: "The training includes dedicated modules on performing pre-use inspections of all common rigging components, identifying defects, and understanding removal-from-service criteria."
+
+          **Question:** Does the training for Basic Riggers comply with the requirement to enable them to identify and attach rigging with basic knowledge of hitch configurations, capacities, and basic knots?
+          **Determination:** NO
+          **Confidence:** High
+          **Citation / Explanation:** N/A - Requirement not found in provided snippets.
+          **Corrective Action:** The Basic Rigger training program, managed by the Training Department, must be revised to incorporate modules covering hitch configurations, load capacities, and essential knot tying/identification relevant to basic rigging tasks.
+          **Recommended Language:** Insert the following paragraph into the section detailing Basic Rigger training content: "Basic Rigger training shall cover the identification and application of common hitch configurations (e.g., choker, basket, vertical), understanding rigging load capacities based on equipment markings and configuration, and the tying and inspection of basic knots essential for rigging tasks."
+
+          ... (Continue for all questions in paragraph format)
+
+          ## Questionnaire Questions for {{themeTag.name}} / {{topicTag.name}}:
+
+          {% if themeTag.name == "General Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that the Material Handling needs are evaluated in terms of weight, size, distance, and path of movement whenever material is to be moved?  Review how the Business Function evaluates the material handling needs in its operations by reviewing the weight and sized of materials to be handled, the distance the material is to be moved, and path the movement will take. 
+          {% endif %}
+          {% if themeTag.name == "General Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function apply the following hierarchy when selecting a means for Material Handling: Review how the Business Function evaluates the need for material handling and the means of movement, considering the following four elements in order: 
+          {% endif %}
+          {% if themeTag.name == "General Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Elimination of Material Handling via engineering solutions? Review how the Business Function evaluates the need for material handling and the means of movement, considering first eliminating the need for handling the material through engineering solutions. 
+          {% endif %}
+          {% if themeTag.name == "General Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  Movement by mechanical device?  Review how the Business Function evaluates the need for material handling and the means of movement, considering secondly movement by using a mechanical device (e.g., lift truck, Overhead Crane, or conveyor).
+          {% endif %}
+          {% if themeTag.name == "General Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  Movement by manual means with handling aid? Review how the Business Function evaluates the need for material handling and the means of movement, considering thirdly movement by using manual means with physical aid, such as a dollie or cart .
+          {% endif %}
+          {% if themeTag.name == "General Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          d.  Movement using safe lifting techniques?  Review how the Business Function evaluates the need for material handling and the means of movement, considering lastly movement using safe lifting techniques, such as joint/two-person lifts where possible, using proper foot positioning, securing the load close to the body, and using good posture throughout the movement. See NIOSH, "Work Practices Guide for Manual Lifting."
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have established processes to ensure a lift plan is developed accordingly for each lift? Review how the Business Function verifies that a lift plan is developed for each lift to appropriately manage the risks associated with the material handling activity. 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function's lift plan process include the requirement that each lift is categorized as a Critical Lift, a Complex Lift, or a Common Lift per the criteria listed in Appendix B Lifting Flow Chart? Identify if the Business Function requires that each lift be categorized as Critical, Complex or Common.  The classification criteria must meet those included in Appendix B of this standard. 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that a  Critical Lift plan is completed unless equivalent details have been incorporated into job-specific procedures or work instructions before a Critical Lift is completed?  Review how the Business Function verifies that a Critical Lift plan is completed unless the necessary details for risk assessment and planning are included in job-specific procedures or work instructions applicable to the task.  Review how the Business Function reviews and verifies that the job-specific procedures or work instructions meet the necessary requirements.
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that Critical Lifts are conducted under the direction of a Lift Director?  Review how the Business Function verifies that all Critical Lift activities are conducted under the direct supervision of a qualified Lift Director.  The Lift Director is defined as a designated individual with crane operator and rigging experience responsible for overseeing the preparation and safe execution of Critical Lift lifting and rigging operations, and Complex Lifts when applicable. 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Has the Business Function developed a critical lift plan that includes the following at a minimum:  Review the Business Function's process and requirements for the Critical Lift Plan, including templates or forms used for completion.  Refer to Appendix E Lifting Plan Example for an example of a Critical Lift plan which may be used.  
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Crane configuration and position? Verify the Business Function's templates or forms used for the Critical Lift Plan includes the requirement for a description of the crane configuration and position. 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  Environmental and ground conditions? Verify the Business Function's templates or forms used for the Critical Lift Plan includes the requirement for a description of the environmental and ground conditions. 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  Load radius, size, and weight? Verify the Business Function's templates or forms used for the Critical Lift Plan includes the requirement for a description of the radius, size, and weight of the load to be moved/handled. 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          d.  Personnel involved in the lift and their qualifications? Verify the Business Function's templates or forms used for the Critical Lift Plan includes the requirement for a description of the personnel involved in the lift and their individual qualifications to support their assigned role in the lift. 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          e.  Plans for hoisting personnel and rig? Verify the Business Function's templates or forms used for the Critical Lift Plan includes the requirement for a description of any plans for hoisting personnel and rig.
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          f.  Procedures for communication and inspection? Verify the Business Function's templates or forms used for the Critical Lift Plan includes the requirement for a description of any procedures for communication and inspection. 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          g.  Weather conditions that would halt any Critical Lift? Verify the Business Function's templates or forms used for the Critical Lift Plan includes the requirement for a description of any weather conditions that could stop any Critical Lift, including lightning, high winds, etc. 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          h.  Sketches  that help workers visualize the required procedure, and include the following:  Verify the Business Function's templates or forms used for the Critical Lift Plan includes the requirement for sketches/diagrams/schematic that will help personnel visually understand the required procedures, including the following three elements: 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          i.  Rigging Sketch:  Identifies important facts related to the rig? Verify the Business Function's templates or forms used for the Critical Lift Plan includes the requirement for sketches/diagrams/schematic that will help personnel visually understand the required procedures, including the rigging sketch to identify important facts related to the rig.  This includes accessories, attachment methods, equipment capacities, lift point identification, and load vectors.
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          ii.  Load-Path Sketch: Shows Loads' path and height? Verify the Business Function's templates or forms used for the Critical Lift Plan includes the requirement for sketches/diagrams/schematic that will help personnel visually understand the required procedures, including the load-path sketch showing the loads path, direction of travel, and height of the lift.
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          iii.  Other: If not included on load-path sketch, a separate sketch showing lifting and speed limitations, shall be prepared? Verify the Business Function's templates or forms used for the Critical Lift Plan includes the requirement for sketches/diagrams/schematic that will help personnel visually understand the required procedures, including the other sketches to show lift and speed limitations based on the conditions present and the load. 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          i.  Equipment Inspections, including dates of completion and names of Competent People who completed them? Verify the Business Function's templates or forms used for the Critical Lift Plan includes the requirement for equipment inspections, including the dates of the inspections and names of the Competent people who conducted the inspections. Refer to Appendix I for Material Handling Equipment Inspection Examples
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          j.  Non-crew personnel present during the Critical Lift  Verify the Business Function's templates or forms used for the Critical Lift Plan includes the requirement for the listing of names of non-crew personnel present during the Critical Lift.   (e.g., local security control)
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          k.  Proximity to power lines? Verify the Business Function's templates or forms used for the Critical Lift Plan includes the requirement for a description of the lift's proximity to power lines.  
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that each critical lift plan includes a sign-off sheet to verify the plan has been reviewed, inspections are current, and proper tests were conducted? Review how the Business Function verifies that the critical lift plan includes a sign-off/approval sheet in order to verify the plan has been reviewed, inspections are complete and current, and the appropriate tests were conducted. 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that workers involved in the Critical Lift sign off on the plan, including the Lift Director, Crane Operator, Advanced Rigger, and Signal Person? Review how the Business Function verifies that all personnel involved in the Critical Lift sign off on the Critical Lift Plan, including the Lift Director, Crane Operator, Advanced Rigger, and Signal Person of the Critical Lift. 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure Critical Lift plans are reviewed by an Entergy employee or agent of Entergy to ensure that the Critical Lift plan meets or exceeds the planning level shown in Appendix E Lifting Plan Example? Review how the Business Function verifies that the Critical Lift Plans are reviewed by Entergy, including a direct employee of Entergy or an authorized agent of Entergy, in order to verify the Critical Lift plan meets or exceeds the planning level in Appendix E of this standard. An agent of Entergy is a Subject Matter Expert hired to perform the review of Critical Lift plan.
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure an agent of Entergy is not an employee of the company performing the critical lift?  If the Business Function uses or allows for an agent of Entergy to review and verify the Critical Lift plan meets or exceeds the planning level in Appendix E of this standard, review how the Business Function verifies that the agent is separate and independent from the company performing the Critical Lift.  
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure a professional engineer reviews and approves Critical Lift plans for all lifts that require any of the following: Review how the Business Function verifies that a professional engineer reviews the Critical Lift plans and verify he/she reviews the Critical Lift plans for the following four instances:
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  The use of a custom designed "below-the-hook" lifting device, a device being used outside of its manufacturer intended use/design or a custom designed for a specific application? Review how the Business Function verifies that a professional engineer reviews the Critical Lift plans and verify he/she reviews the Critical Lift plan when a custom designed "below-the-hook" lifting device, a device being used outside of its manufacturer intended use/design or a custom designed for a specific application is being used. 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  Any lifting device without a certified load rating name plate affixed to the device? Review how the Business Function verifies that a professional engineer reviews the Critical Lift plans and verify he/she reviews the Critical Lift plan when any lifting device without a certified load rating name plate affixed to the device is being used. 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  Specially designed temporary lifting device? Review how the Business Function verifies that a professional engineer reviews the Critical Lift plans and verify he/she reviews the Critical Lift plan when any specially designed temporary lifting devices is being used. 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          d.  Any lifting device that cannot be load tested? Review how the Business Function verifies that a professional engineer reviews the Critical Lift plans and verify he/she reviews the Critical Lift plan when any  lifting device that cannot be load tested is being used. 
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have process to ensure that a documented Lift plan is completed, unless equivalent details have been incorporated into job-specific procedures, work instructions, and/or a JHA before a Complex Lift is conducted?  Review how the Business Function verifies that a lift plan has been completed and documented, unless the same details are captured in job-specific procedures, work instructions, or JHA before a Complex Lift is conducted.  Review how the Business Function reviews and verifies the details exist elsewhere and meets these requirements. See Appendix E Lifting Plan Example for an example of a Complex Lift Plan.
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure Complex Lifts are conducted under the direction of an Advanced Rigger? Review how the Business Function verifies that Complex Lift activities are performed under the direct supervision of an Advanced Rigger.  An Advanced Rigger is defined as an individual who knows and can demonstrate Basic Rigger knowledge and skills and can select rigging components and procedures based on rigging capacity.  This individual is qualified to perform Common, Complex, and Critical Lifts unsupervised, and may also be referred to as Rigger II.
+          {% endif %}
+          {% if themeTag.name == "Lift Plans" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that the details of the Common lift are incorporated into a documented job briefing and completed under the direction of the lead Basic Rigger on the job before a Common Lift is conducted?  Review how the Business Function verifies that the plan for the Common Lift are included in a documented job briefing and completed under the direct supervision of the Lead Basic Rigger.  The job briefing examples include JHA, JSA, or tailboard meeting. The Basic Rigger is defined as an individual who is qualified to perform Common Lifts unsupervised and may perform Complex and Critical Lifts under the supervision of an Advanced Rigger, and may also be referred to as Rigger I.
+          {% endif %}
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure lifting boundaries or exclusion zones are established for all lifts prior to the lift being conducted? Review how the Business Function verifies that lifting boundaries or exclusion zones (i.e. lift zones, cone of protection) are established for all lift activity before the lift can occur.  The lifting boundary should include where the lift will occur, and factor in the movement/swing of the load, the path to be taken, and any additional buffer area needed to protect personnel from falling hazards. 
+          {% endif %}
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the boundary is established to let personnel know a lift is taking place and to keep other work groups out of the area? Review how the Business Function verifies that the lifting boundary is established and in place, and communicated to personnel in the area to restrict their access to the area. 
+          {% endif %}
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the following factors are required for establishing the lifting boundaries: Review how the Business Function verifies the following three factors are considered when establishing the lifting boundary for all lift activities. 
+          {% endif %}
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Lifting boundaries include lower levels for locations where multiple levels exist?  Review how the Business Function verifies the lifting boundary includes lower levels for locations where multiple levels may exist, such as plants. 
+          {% endif %}
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  The boundary is large enough to  encompass the area affected by the works and the load and lifting equipment being used and marked with appropriate flagging and signage? Review how the Business Function verifies the lifting boundary is large enough to cover/account for the entire area affected by the lift, including the load equipment being used.  Review how the Business Function verifies the lifting boundary is appropriately marked or flagged with signage to alert personnel of the boundary area(e.g. danger barricade tape, chain and signage).
+          {% endif %}
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  The boundary accounts for potential load swing, movement or drop, including the higher the load is raised, the larger the area will be? Review how the Business Function verifies the lifting boundary takes into account the load swing, movement, height of the lift and drop of the load.  The higher the load is raised, the larger the lifting boundary will need to be to account for the drop, impact, and debris hazard. 
+          {% endif %}
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that only employees essential to the operation are permitted in the lifting boundaries, but not under the load?   Review how the Business Function verifies that only those personnel who are essential to the lifting activity are allowed within the established lifting boundary, but not allowed under the load itself. 
+          {% endif %}
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure an employee essential to the operation is only if the employee is conducting one of the following operations and it can be demonstrated that it is not feasible for the employee to perform that operation from outside the lifting boundaries: Review how the Business Function verifies that personnel essential to the lift include only those personnel conducting one of the following three activities: 
+          {% endif %}
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Physically guide the load with tag lines or poles?  Review how the Business Function verifies that personnel essential to the lift include those personnel physically guiding the load throughout the lift with tag lines or poles. 
+          {% endif %}
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  Closely monitor and give instructions regarding the load's movement? Review how the Business Function verifies that personnel essential to the lift include those personnel who are closely monitoring the lift activity and are giving instructions during the lift regarding the load's movement and direction. 
+          {% endif %}
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  Connect, disconnect or adjust rigging?  Review how the Business Function verifies that personnel essential to the lift include those personnel who are connecting, disconnecting, or adjusting rigging devices necessary for the lift activity.
+          {% endif %}
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that a safe radius of at least 15 feet from the nearest point is maintained for personnel protection when actively loading, unloading, or moving a truck, tractor, or trailer of any kind? Review how the Business Function verifies that while loading, unloading, or moving a truck, tractor, or trailer that a radius of at least 15 feet is established as an exclusion zone for personnel protection. 
+          {% endif %}
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that only the forklift/equipment operator is allowed within the exclusion zone while actively loading, unloading, or moving? Review how the Business Function verifies that only the operator of the forklift or equipment is allowed within the exclusion zone (of at least a 15 foot radius) while loading, unloading, or moving a truck, tractor, or trailer. 
+          {% endif %}
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that the forklift/equipment operator remains stationary until ground personnel are safety returned to the minimum safe distance (at least 15 feet) if a spotter or hands on task is required?  Review how the Business Function verifies that the forklift or equipment operator keeps the equipment still/stationary until all personnel on the ground have returned to at least the 15 foot radius if a spotter or hands on task is required during the loading, unloading, or moving activity from a truck, tractor, or trailer.  A hands on task may include cribbing poles, removing boards, etc. 
+          {% endif %}
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that the driver turns off the engine, applies, the brakes, vacates, the truck, and is safely positioned outside the exclusion zone before active unloading and loading of a truck not located at a dock can begin?  Review how the Business Function verifies that the driver of the truck, tractor, or trailer being loaded, unloaded, or moved turns off the engine, applying all necessary brakes, leaves the vehicle/equipment, and is safely outside the exclusion zone before the forklift or equipment operator begins the loading, unloading, or moving activity. 
+          {% endif %}
+          {% if themeTag.name == "Lifting Boundaries / Exclusion Zones" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that all ground personnel remain outside the exclusion zone until the active process is complete and the all clear given by the forklift/equipment operator? Review how the Business Function verifies that any personnel on the ground remain outside the established exclusion zone (at least a 15 foot radius) until the loading, unloading, or moving activity is complete and the forklift or equipment operator signals all clear. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to determine if any part of the equipment, load line, or load (including rigging and lifting accessories) has the potential to  come within 20 feet to a power line during the assembly/disassembly process before assembling or disassembling equipment near power lines (up to 350kV)? Review how the Business Function determines if any part of the lifting equipment, load line, or load itself, including rigging and lifting accessories, has the potential to come within 20 feet of a power line during the assembly/disassembly of the lift.  Verify this determination occurs before the assembly/disassembly of the lift occurs t allow for proper planning and hazard control as described in this section. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          If determined to have the potential to come within 20 feet to a power line during the assembly/disassembly process, does the Business Function have a process to ensure one of the following options are met: If the Business Function determines the assembly/disassembly of the load process includes the potential to come within 20 feet of a power line, review how the Business Function verifies that at least one of the following options are met before the assembly/disassembly is allowed to begin. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Option 1 - De-energize and ground:  Confirm from the utility owner/operator that the power line has been de-energized and visibly grounded at the worksite? If the Business Function determines the assembly/disassembly of the load process includes the potential to come within 20 feet of a power line, review how the Business Function verifies that the powerline has been de-energized and visibly grounded at the worksite where the lift is to occur. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  Option 2 - 20 foot clearance:  Ensure that no part of the equipment, load line or load (including rigging and lifting accessories), gets closer than 20 feet to the power line by implementing the following measures: If the Business Function determines the assembly/disassembly of the load process includes the potential to come within 20 feet of a power line, review how the Business Function verifies that no part of the lifting equipment, load line, or load, including the rigging and lifting accessories, comes any closer than 20 feet of the power.  This includes implementing the following controls: 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          i.  Conduct a planning meeting with the Assembly/Disassembly director (A/D director), operator, assembly/disassembly crew and the other workers who will be in the assembly/disassembly area to review the location of the power line(s) and the steps that will be implemented to prevent encroachment/electrocution? Review how the Business Function verifies that no part of the lifting equipment, load line, or load, including the rigging and lifting accessories, comes any closer than 20 feet of the power, including conducting a meeting with the A/D Director, operator, A/D crew, and other personnel in the area to plan, review the location of the energized power line, and the necessary steps needed to prevent electrocution or encroachment during the lift. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          ii.  If tag lines are used, they must be nonconductive? Review how the Business Function verifies that no part of the lifting equipment, load line, or load, including the rigging and lifting accessories, comes any closer than 20 feet of the power, including using nonconductive tag lines if tag lines are being used. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          iii.  At least one of the following measures must be in place and be effective in preventing encroachment:  Review how the Business Function verifies that no part of the lifting equipment, load line, or load, including the rigging and lifting accessories, comes any closer than 20 feet of the power, including preventing encroachment through one of the following measures:  
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          1.  Use a dedicated spotter who is in continuous contact with the equipment operator?  Review how the Business Function verifies that no part of the lifting equipment, load line, or load, including the rigging and lifting accessories, comes any closer than 20 feet of the power, including preventing encroachment by using a dedicated spotter for the lift who is in continuous/uninterrupted contact with the equipment operator.   
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          2.  The dedicated spotter must be equipped with a visual aid to assist in identifying the minimum clearance distance? Review how the Business Function verifies that no part of the lifting equipment, load line, or load, including the rigging and lifting accessories, comes any closer than 20 feet of the power, including preventing encroachment by using a dedicated spotter for the lift who is equipped with visual aids necessary to help in identifying the minimum clearance distances needed for the lift.
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Examples of a visual aid include, but are not limited to: A clearly visible line painted on the ground; a clearly visible line of stanchions; a set of clearly visible line-of-sight landmarks (such as a fence post behind the dedicated spotter and a building corner ahead of the dedicated spotter)
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          3. The dedicated spotter must be positioned to effectively gauge the clearance distance? Review how the Business Function verifies that no part of the lifting equipment, load line, or load, including the rigging and lifting accessories, comes any closer than 20 feet of the power, including preventing encroachment by using a dedicated spotter who is physically positioned in such a way that they can effectively and accurately determine the clearance distance. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          4.  The dedicated spotter uses equipment that enables communication directly with the operator when necessary?  Review how the Business Function verifies that no part of the lifting equipment, load line, or load, including the rigging and lifting accessories, comes any closer than 20 feet of the power, including preventing encroachment by using a dedicated spotter who uses communication devices for direct communication with the operator when necessary.  This includes devices like  a two-way radio. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          5.  The dedicated spotter gives timely information to the operator so that the clearance distance can be maintained?  Review how the Business Function verifies that no part of the lifting equipment, load line, or load, including the rigging and lifting accessories, comes any closer than 20 feet of the power, including preventing encroachment by using a dedicated spotter who relays information to the operator in a timely manner so that the clearance distance can be maintained. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          iv.  Set a proximity alarm to give the operator sufficient warning to prevent encroachment? Review how the Business Function verifies that no part of the lifting equipment, load line, or load, including the rigging and lifting accessories, comes any closer than 20 feet of the power, including setting an alarm (audible or visual) to give the operator enough warning to take action to prevent encroachment. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          v.  Set a device that automatically warns the operator when to stop movement, such as a range control warning device that must be set to give the operator sufficient warning to prevent encroachment?  Review how the Business Function verifies that no part of the lifting equipment, load line, or load, including the rigging and lifting accessories, comes any closer than 20 feet of the power, including setting a device to automatically warn the operator to stop movement. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          vi.  Set a device that automatically limits range of movement to prevent encroachment? Review how the Business Function verifies that no part of the lifting equipment, load line, or load, including the rigging and lifting accessories, comes any closer than 20 feet of the power, including setting a device to limit the range of the movement to prevent encroachment. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          vii.  Have an elevated warning line, barricade, or line of signs, in view of the operator, equipped with flags or similar high-visibility markings?  Review how the Business Function verifies that no part of the lifting equipment, load line, or load, including the rigging and lifting accessories, comes any closer than 20 feet of the power, including having an elevated warning line, barricade, or signs that are visible to the operator with flags or high-vis markings. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  Option 3 - Table A Clearance:  Determine the line's voltage and the minimum clearance distance permitted under Table A in Appendix C, determine if Determine if any part of the equipment, load line, or load (including rigging and lifting accessories) could get closer than the minimum clearance distance to the power line permitted under Table A in Appendix C, and if so follow the requirements of §1926.1407(b) to ensure that no part of the equipment, load line, or load (including rigging and lifting accessories), gets closer to the line than the minimum clearance distance? If the Business Function determines the assembly/disassembly of the load process includes the potential to come within 20 feet of a power line, review how the Business Function verifies that the minimum clearance has been determined, established, and communicated per the requirements of Appendix C of this standard. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the requirements of §1926.1407 and §1926.1408 apply to the power lines over 350 kV except: Review how the Business Function verifies the requirements of §1926.1407 Power line safety (up to 350 kV) - assembly and disassembly and §1926.1408 Power line safety (up to 350 kV) - equipment operations apply and are met for power lines over 350 kV, except where the following two instances occur: 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  For power lines at or below 1000 kV, wherever the distance 20 feet is specific, the distance "50 feet" shall be substituted? Review how the Business Function verifies the requirements of §1926.1407 Power line safety (up to 350 kV) - assembly and disassembly and §1926.1408 Power line safety (up to 350 kV) - equipment operations apply and are met for power lines over 350 kV, except where for power lines between 350 kV and 1000 kV, the distance of 50 feet shall be applied as the minimum clearance distance.
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  For power lines over 1000 kV, the minimum clearance distance shall be established by the utility owner/operator or registered professional engineer who is a qualified person with respect to electrical power transmission and distribution? Review how the Business Function verifies the requirements of §1926.1407 Power line safety (up to 350 kV) - assembly and disassembly and §1926.1408 Power line safety (up to 350 kV) - equipment operations apply and are met for power lines over 350 kV, except where for power lines over 1000 kV, the minimum clearance distance will be determined by the utility owner/operator or professional engineer with qualifications to support electrical power generation and distribution. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that Equipment operations in which any part of the equipment, load line, or load (including rigging and lifting accessories) is closer than the minimum approach distance under Table A of Appendix C to an energized power line is prohibited, except where it can be demonstrated that all of the requirements of 29 CFR 1926.1410(a) through (m) are met? Review how the Business Function verifies that the minimum approach distances are maintained during the lift activity close to an energized power line according to the approach distances included in Appendix C of this standard.  Review how the Business Function reviews the requirements of 29 CFR 1926.1410(a) through (m) and verifies conditions meet these requirements for an allowable exception. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the following criteria are met for equipment traveling under or near a construction site with no load:  Review how the Business Function verifies the following five criteria are met when equipment is travelling under or near a construction site with no load: 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  The boom/mast and boom/mast support system are lowered sufficiently to meet the requirements of this paragraph? Review how the Business Function verifies that when equipment is travelling under or near a construction site with no load, the boom/mast and boom/mast support system are lowered enough to meet the requirements of this section. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  The clearances specified in Appendix C of this section are maintained? Review how the Business Function verifies that when equipment is travelling under or near a construction site with no load, the clearances as listed in Appendix C for the minimum approach distance are maintained. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  The effects of speed and terrain on equipment movement (including movement of the boom/mast) are considered so that those effects do not cause the minimum clearance distances specified in Appendix C of this section to be reached? Review how the Business Function verifies that when equipment is travelling under or near a construction site with no load, the effect of the speed of the movement and the terrain on which the equipment is moving is considered and do not affect the minimum approach distances as listed in Appendix C. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          d.  Dedicated Spotter shall be utilized anytime equipment is travelling near a power line? Review how the Business Function verifies that when equipment is travelling under or near a construction site with no load, the Dedicated Spotter is in place and used anytime the equipment is moving near a power line. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          e.  When travelling at night, or in conditions of poor visibility, a safe path of travel is identified and used and the power lines is illuminated, or another means of identifying the location of the lines is used? Review how the Business Function verifies that when equipment is travelling under or near a construction site with no load at night or in poor visibility conditions, a safe path of travel is identified and used, and that the power line is illuminated for increased visibility, or another means of identifying the location of the lines is used. 
+          {% endif %}
+          {% if themeTag.name == "Powerline Safety" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that electrically Qualified employees and Contract Partners who are engaged in 1926 Subpart V work, Construction of electric power transmission and distribution lines and equipment, compliance with §1926.959 is deemed to be compliance with this section 4.2.3 Powerline Safety? Review how the Business Function verifies that any electrically Qualified personnel, including contractors, who are performing work covered by 29 CFR 1926 Subpart V - Electric power transmission and distribution in compliance with §1926.959 Mechanical equipment meet the requirements of this section 4.2.3 Powerline Safety of this standard. 
+          {% endif %}
+          {% if themeTag.name == "Material Handling Safety Observation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Do the Business Functions have a process to ensure that safety observations of Material Handling activities of employees and Contract Partners are incorporated into the overall safety observation programs? Validate the Business Function's overall safety observation programs include observations made of material handling activities, including those performed by Entergy employees and contractors. 
+          {% endif %}
+          {% if themeTag.name == "Material Handling Safety Observation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function ensure that when areas of deficiency are identified, the appropriate Business Function representatives provide safety coaching or mentoring in order to correct the actions and behaviors observed and improve overall safety culture? Review how the Business Function addresses deficiencies identified as a result of observations.  Corrective actions should include coaching or mentoring on safe behaviors, risk awareness, hazard identification, or procedures in order to address and correct the unsafe act/behavior and improve the overall safety culture of the Business Function. 
+          {% endif %}
+          {% if themeTag.name == "Material Handling Safety Observation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to analyze observations regularly? Review how the Business Function reviews and analyzes the material handling observation data.  The data should be reviewed regularly, or at set routine intervals, to allow for relevant discussions or corrective action if needed to address the issue. 
+          {% endif %}
+          {% if themeTag.name == "Material Handling Safety Observation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure Material Handling activity observations shall meet or exceed the content in Appendix F Material Handling Observation Template? Review how the Business Function verifies the material handling observations meet at a minimum the content requirements of Appendix F of this standard.  The Business Function may develop its own observation template or use Appendix F as provided. 
+          {% endif %}
+          {% if themeTag.name == "Material Handling Safety Observation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function ensure AirsWeb or Business Function safety observation programs are used to capture Contract Partner observations? Review how the Business Function verifies that material handling observations of its contractors is included and entered into its safety observation programs (AirsWeb or other document/recordkeeping systems). 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the crane is inspected and its functionality verified per the requirements of section 4.3.10 of this standard before any lifting operation begins?  Review how the Business Function verifies the crane is inspected before use, and that the crane's functionality is verified per the requirements of section 4.3.10 of this standard - Material Handling Equipment Inspection.  
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that all personnel are clear from the load path prior to moving and hoisting the load? Review how the Business Function verifies that all personnel are clear and away from the load path of the equipment prior to the equipment being used to move or hoist the load. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the crane cab is equipped with an appropriate fire extinguisher? Review how the Business Function verifies the cab of the crane has a functioning and compliant fire extinguisher available for use. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the controls are never left  energized when the cab is unattended? Review how the Business Function verifies the controls of the crane are left de-energized when the operator is not in the cab. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that in case of a problem, the operation is always stopped as soon as it is safe to do so?  Review how the Business Function verifies that the lift is stopped as soon as it safely can when a problem occurs. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that more than one Spotter is required when moving a mobile crane into a building, or if Spotter is unable to keep full view of potential obstructions or overhead equipment hazards at any given time? Review how the Business Function verifies that multiple (more than one) Spotters are required and used when moving a crane into a building, or if a single Spotter is unable to maintain full view of potential obstructions or hazards at any given time. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure  that no cranes are operated unless they have met the inspection requirements of section 4.3.10 of this standard?  Review how the Business Function verifies that cranes are not allowed to be operated/in use unless they meet the inspection requirements of section 4.3.10 of this standard - Material Handling Equipment Inspections. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that only  qualified personnel are permitted to operate overhead cranes covered by this standard? Review how the Business Function verifies that only qualified personnel are allowed to operate overhead cranes. Qualified is defined as one who, by possession of a recognized degree, certificate, or professional standing, or who by extensive knowledge, training and experience, has successfully demonstrated his or her ability to solve or resolve problems relating to the subject matter, the work, or the project.   
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that unless operational procedures are in place for working on top of the crane or the rails, the crane is de-energized prior to allowing anyone to go on top of the crane or on the rails, and personnel are clear prior to re-energizing the crane? Review how the Business Function verifies that the crane is de-energized before anyone is allowed on top of the rails and that all personnel are clear prior to re-energizing unless the proper operational procedures are in place for working on top of the crane or rails.  Validate how the Business Function reviews operational procedures to verify they are adequate to allow for working on top of the crane or rails. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that rated load markings are plainly marked on each side of the overhead crane and be clearly legible from the ground? Review how the Business Function verifies that rated load markings are marked and clearly displayed on each side of the overhead crane and can be clearly read from the ground level. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that stops are installed to limit the travel of the trolley and bridge? Review how the Business Function verifies that stops are installed and functioning to be able to limit the travel of the trolley and bridge if needed. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure all exposed moving parts and electrical equipment are located, enclosed, or guarded to prevent accidental contact in accordance with OSHA Standards? Review how the Business Function verifies that all exposed moving parts and electrical equipment are identified and located, enclosed, or otherwise guarded/protected to prevent accidental contact.  Review how the Business Function verifies that any enclosure and/or guarding meets applicable OSHA regulations and standards. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the controller operating handle is located within convenient reach of the operator? Review how the Business Function verifies the controller operating handles is located within reach of the operator to be convenient and accessible. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure lighting in the cab is sufficient to enable the operator to see clearly enough to perform his or her work? Review how the Business Function verifies that lighting in the crane cabin is sufficient enough to allow the operator to clearly see to perform his/her work. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure each crane equipped with a power travelling mechanism is provided with an effective warning signal by means of manually operated gong, strobe light, rotating beacon, and/or power-operated bell, siren, or horn? Review how the Business Function verifies that each crane that has a power travelling mechanism has an effective warning signal.  The warning signal may include a gong, flashing strobe light, rotating beacon light, audible bell, sire, or horn to alert others of its movement. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that a fire extinguisher is located in the cab? Review how the Business Function verifies that a functioning and compliant fire extinguisher in located in the cab. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the mobile crane and overhead crane operators ensure that all overhead crane operations follow lifting boundary criteria as stated in section 4.2.2 of this standard? Review how the Business Function verifies that mobile and overhead crane operators and overhead crane operations adhere to the lifting boundary requirements of section 4.2.2 of this standard - Lifting Boundaries / Exclusion Zones. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the following provisions are followed when moving a load with a mobile or overhead crane:  Review how the Business Function verifies the following are met when a load is moved with a mobile or overhead crane: 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  The load is attached to the load block hook by means of slings or other approved devices? Review how the Business Function verifies that when a load is moved with a mobile or overhead crane, the load is attached to the load block hook with slings or other approved devices. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  The load is well secured and properly balanced in the sling or lifting device before it is lifted more than a few inches? Review how the Business Function verifies that when a load is moved with a mobile or overhead crane, the load is well secured, positioned, and properly balanced in the sling or lifting device before being lifted more than a few inches at most. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  The brakes are tested by raising the load a few inches and applying the brakes to ensure no load creep? Review how the Business Function verifies that when a load is moved with a mobile or overhead crane, the brakes of the crane are tested by raising the load slightly (no more than a few inches) and applying the brakes to ensure no load creep or additional slippage. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          d.  The hook is brought over the load in such a manner as to prevent swinging? Review how the Business Function verifies that when a load is moved with a mobile or overhead crane, the hook is brought to load so that it does not swing. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          e.  No sudden acceleration or decelerations of the moving load occur? Review how the Business Function verifies that when a load is moved with a mobile or overhead crane, no sudden acceleration or decelerations of the moving load occur during the lift. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          f.  The load does not contact any obstructions? Review how the Business Function verifies that when a load is moved with a mobile or overhead crane, the load does not come into contact with any obstructions. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          g.  The load never passes over people?  Review how the Business Function verifies that when a load is moved with a mobile or overhead crane, the load never passes over people. 
+          {% endif %}
+          {% if themeTag.name == "Overhead Crane Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          h.  The operator does not leave his/her position at the controls while the load is suspended unless approved by the Business Unit senior management? Review how the Business Function verifies that when a load is moved with a mobile or overhead crane, the crane operator does not leave his/her position at the controls while the load is suspended unless approved by the Business Function's senior management.  Review the Business Function's process for gaining senior management approval for the crane operator to leave the controls while the load is suspended. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure approval is obtained by a licensed professional engineer for ANY site Engineered Temporary Lift Assembly? Review how the Business Function verifies that receives approval from a licenses professional engineer for any site Engineered Temporary Lift Assembly.  Review how the Business Function identifies licensed professional engineers available for review and approval as needed. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Does the Business Function have a process to ensure the design is supported by detailed drawings, specifications, evaluations, or certifications? Review how the Business Function validates the design for the engineered temporary lift assembly includes drawings, specs, evaluations, or certifications necessary as support. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure a load test of the assembly is performed in ALL configurations for which it will be used? Review how the Business Function verifies that a load test of the assembly has been conducted for all configurations for which it will be used.  Configurations include positions of travel, bridging, trolleying and the hoist.  
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Does the Business Function have a process to ensure the load test is no less than 100 percent of the rated load of the crane or Hoist(s), or more that 125% of the rated load of the crane or hoist(s), whichever governs? Review how the Business Function verifies the load test conducted is not less than 100% of the rated load of the crane or hoist, or more than 125% of the rated load, whichever is applicable. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure a written report is prepared for the load sustained during the test and the operations performed during the test?  Review how the Business Function verifies a written report is developed and documented for the load sustained during the load test and a description of the operations performed during the load test. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Does the Business Function have a process to ensure the person performing the test prepares the report and files the reports for retrievability? Review how the Business Function verifies the person performing the load test prepares, documents, and files the report so that it can be retrieved and accessible at a later time if needed.  This process should follow the requirements of the Enterprise standard EHS-GOV-3.4.1 EHS Record Management & Document Control. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure all critical welds by magnetic particle (MT) or liquid penetrant (PT) are inspected prior to use for  detectable changes in weld characteristics or distortion? Review how the Business Function verifies that all critical welds using MT or PT are inspected before use.  The inspection should look for any detectable changes in the weld characteristics, distortion, or other issue which may impact its integrity. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure existing temporary lifting assemblies have the load rating permanently affixed prior to use? Review how the Business Function confirms that existing temporary lifting assemblies have the load rating permanently affixed prior to it being used. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure documentation supports the lift for which it will be used if the devices is serialized?  Review how the Business Function verifies that if the device is serialized, documentation exists to support the lift. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the load test operation of the temporary assembly is performed as follows:  Review how the Business Function verifies the load test of the temporary assembly is performed in the following order: 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Lift the test load a distance to assure that the load is supported by the crane and held by the hoist brake(s)? Review how the Business Function verifies the load test of the temporary assembly first lifts the test load a distance to  assure the load is supported by the crane and held by the hoist brake. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  Maintain the lifted load for a minimum of 10 minutes unless a specific time is listed in another controlling document? Review how the Business Function verifies the load test of the temporary assembly then maintains the lifted load for at least 10 minutes time unless another specific time is listed in another relevant controlling document. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  Transport the test load by means of the trolley for the full length of the bridge? Review how the Business Function verifies the load test of the temporary assembly then moves the test load by using the trolley for the full length of the bridge. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          d.  Move the test load by means of the bridge for the full length of the runway in one direction with the trolley as close to the extreme right-hand end of the crane as practical, and in the other direction with the trolley as close to the left-hand end of the crane as practical? Review how the Business Function verifies the load test of the temporary assembly then moves the test load by using the bridge for the full length of the runway in one direction, with the trolley as close as possible to the far right-end of the crane, then testes to the far left-end of the crane as possible.  
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          e.  Lower the test load to an intermediate position?  Review how the Business Function verifies the load test of the temporary assembly then lowering the test load to an intermediate position (lower than the previous lift, but higher than rested on ground level).  
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          f.  Stop and hold the test load with the brakes for at least 1 minute unless a specific time is listed in another controlling document? Review how the Business Function verifies the load test of the temporary assembly lastly stops and holds the test load with the brakes for at least 1 minutes time unless another specific time is listed in another relevant controlling document. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the following information is attached to ALL site fabricated and vendor temporary hoisting assemblies used for lifting, including frames and spreader beams, etc.:  Review how the Business Function verifies that all of the following information is attached to all site-fabricated and vendor temporary hoisting assemblies used for lifting.  This includes frames and spreader beams. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Manufacturer name and address? Review how the Business Function verifies that all site-fabricated and vendor temporary hoisting assemblies used for lifting includes the manufacturer name and address in its information. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  Serial number / Design document number?  Review how the Business Function verifies that all site-fabricated and vendor temporary hoisting assemblies used for lifting includes the serial number or design document number in its information. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  Lifter weight, if over 100 lbs. rated load? Review how the Business Function verifies that all site-fabricated and vendor temporary hoisting assemblies used for lifting includes the lifter weight, if greater than 100 lbs. rated load,  in its information. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          d.  Rated load?  Review how the Business Function verifies that all site-fabricated and vendor temporary hoisting assemblies used for lifting includes the rated load in its information. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure a documented engineering response is developed, if not previously performed, to address the evaluation of Critical and/or Complex Lifts for temporary hoisting assemblies if:  Review how the Business Function verifies an engineering response is developed and documented, if not previously performed, in order to address Critical and/or Complex Lifts for temporary hoisting assemblies if any of the following three are true: 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Specially designed temporary hoisting / lifting devices is being used?  Review how the Business Function verifies an engineering response is developed and documented, if not previously performed, in order to address Critical and/or Complex Lifts for temporary hoisting assemblies if specially designed temporary hoisting/lifting devices are being used. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  Any temporary hoisting / lifting device that cannot be load tested? Review how the Business Function verifies an engineering response is developed and documented, if not previously performed, in order to address Critical and/or Complex Lifts for temporary hoisting assemblies if any temporary hoisting/lifting devices cannot be load tested.  
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  Any temporary hoisting / lifting device without a certified load rating name plate affixed to it? Review how the Business Function verifies an engineering response is developed and documented, if not previously performed, in order to address Critical and/or Complex Lifts for temporary hoisting assemblies if any temporary hoisting/lifting is being used that does not have a certified load rating name plate affixed to it. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that if an engineering response is required, it includes the following:  Review how the Business Function verifies that if an engineering response is required per the conditions above, it includes the following information: 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Acceptance of Contract Partner documents, documenting the structural acceptance and testing of the assembly? Review how the Business Function verifies that if an engineering response is required per the conditions above, it includes the acceptance of any Contractor documents, documenting the structural acceptance and testing of the assembly. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  Verification of a third-party independent review of vendor calculations? Review how the Business Function verifies that if an engineering response is required per the conditions above, it includes verification of third-party independent reviews of vendor calculations. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  Verification of appropriate code application including application of appropriate safety factors? Review how the Business Function verifies that if an engineering response is required per the conditions above, it includes verification that the appropriate codes are being applied, including the application of appropriate safety factors/measures. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          d.  Verification of 3D finite element analysis modeling is performed, if a load test of no less than 110% of the rated load of the crane or hoists or 125% or more than the rated load of the crane or hoist(s), whichever governs, has not been performed, the site Engineering will approve the results of this verification? Review how the Business Function verifies that if an engineering response is required per the conditions above, it includes verification of 3D finite element analysis modeling is performed, if a load test of no less than 110% of the rated load of the crane or hoists or 125% or more than the rated load of the crane or hoist(s), whichever governs, has not been performed, the site Engineering will approve the results of this verification.
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to verify Load Testing per ASME B30.20, Below-the-Hook Lifting Devices? Review how the Business Function validates that load testing is conducted per the requirements of ASME B30.20, Below-the-Hook Lifting Devices.
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to specify additional safety factors when load testing is not possible?  Review how the Business Function identifies any additional safety factors needed when/if load testing is not possible. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to examine critical welds post load test per the AWS D1.1 Structural Welding Code? Review how the Business Function validates that critical welds after the load test per the requirements of the AWS D1.1 Structural Welding Code.
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to verify the installation?  Review how the Business Function validates the installation of the engineered temporary lift assembly. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to assess lifting boundary area considering potential collateral damage or personnel injury that could be caused if the load dropped and/or lift rig were to fail? Review how the Business Function reviews the lifting boundary areas considering any potential collateral damage or personal injury that could be caused if the load were dropped, and/or the lift rig were to fail. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Does the Business Function have a process to discuss the path to exit lifting boundary in an emergent condition?  Review how the Business Function communicates how to exit the lifting boundary in the case of an emergency. 
+          {% endif %}
+          {% if themeTag.name == "Engineered Temporary Lift Assembly" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  Does the Business Function have a process to identify operating equipment that could be damaged due to the lift assembly failure? Review how the Business Function identifies any other operating equipment in the area that could be damaged if the lift assembly failed. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure powered industrial trucks are used per the manufacturer's instructions and for the conditions for which they are designed? See Appendix G - Powered Industrial Trucks for examples of different Powered Industrial Trucks
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure forklift parts are not altered or eliminated, or any accessories added such as additional counterweights or lifting attachments unless approved by the manufacturer in writing?  Review how the Business Function verifies that forklift parts are not altered or eliminated/removed, or any other accessories added unless approved by the manufacturer in writing.  Review the process the Business Function uses for requesting an approval from the manufacturer. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure free rigging is not allowed without written approval from the forklift manufacturer or analysis and approval (in writing) by a qualified, registered professional engineer? Review how the Business Function verifies that free rigging is prohibited unless written approval from the forklift manufacturer or analysis and approval from an qualified registered professional engineer is obtained.  Free rigging is defined as the direct attachment of rigging onto the forks of a forklift for a "below the forks" lift.
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure modifications and additions that affect capacity and safe operation are not performed without manufacturer's prior written approval? Review how the Business Function verifies that any modifications or additions to the equipment that could impact capacity or safe operation are prohibited unless the manufacturer's written approval is obtained. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Does the Business Function have a process to ensure capacity operation, and maintenance instruction plates, tags, or decals are changed accordingly? Review how the Business Function verifies the capacity operation, maintenance instruction plates, tags, or decals are changed appropriately after any modifications or additions. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that only stable or safely arranged loads are handled? Review how the Business Function verifies that only loads which are stable or safely arranged are handled or lifted.  For example, forklift grapples shall be considered when handling long loads such as poles or long sections of pipe.
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure unstable loads are secured to prevent falling? Review how the Business Function verifies that any unstable loads are properly secured to prevent falling hazards. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the operator slows down and sounds the horn at cross aisles and other locations where vision is obstructed? Review how the Business Function verifies the operator of the powered industrial truck slows down and sounds the truck's horn at all cross aisles and other locations where vision may be obstructed. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Does the Business Function have a process to ensure that if the load obstructs forward view, the operator travels with the load trailing and sounds the horn prior to moving? Review how the Business Function verifies that if the load is obstructing the forward view of the operator, the operator then travels with the load trailing and uses the horn to alert prior to moving. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure spotter(s) are used if the driver's view is obstructed or has the potential to become obstructed while moving, whether loaded or unloaded? Review how the Business Function verifies that spotters are used during lifts if the driver's view is obstructed or has the potential to become obstructed while moving, either loaded or unloaded. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that when a loaded forklift is descending an incline, the operator backs down the incline, and when ascending an incline, the operator drives forward up the incline? Review how the Business Function verifies that when a forklift is loaded is descending down an incline, the operator will back down the incline. Review how the Business Function verifies that when a forklift is loaded and is ascending up the incline, the operator drives forward up the incline. . 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that sudden stops that could spill the load are avoided? Review how the Business Function verifies that sudden stops are avoided that could spill the load. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that when operating forklifts with internal combustion engines in an enclosed area, adequate ventilation is provided to prevent carbon monoxide buildup? Review how the Business Function verifies that when using forklifts with internal combustion engines in an enclosed area, that adequate ventilation is provided to prevent carbon monoxide buildup and adverse impacts from exposure.
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that forklifts are always operated at a safe speed, dictated by surrounding conditions? Review how the Business Function verifies that forklifts are operated at a safe speed that is appropriate for surrounding conditions.  Congested surroundings or high personnel traffic should result in lower speeds being used. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that when a forklift truck is moved, whether loaded or empty, forks are carried as low as possible but high enough to clear uneven surfaces? Review how the Business Function verifies that when a forklift truck is moved, whether carrying the load or while empty, the forks are in the lowest possible position to clear uneven surfaces.  
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure forklifts are not used to lift employees unless designed to do so? Review how the Business Function verifies that forklifts are not used to lift personnel unless the forklift and rigging apparatus are designed to do so.  
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that when forklifts are used in loading and unloading operations inside vans or trucks, special precautions are exercised? Review how the Business Function verifies that when forklifts are being used to load or unload inside the van or truck compartments, that additional special precautions are used. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Does the Business Function have a process to ensure the van/truck is properly docked and parked with the wheels safety chocked? Review how the Business Function verifies that the van or truck being loaded or unloaded is properly docked (including in a good position for access), and in a parked state with the wheels chocked. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that when the forklift truck is not in use, the forks are fully lowered, brakes set, and the unit turned to the "OFF" position? Review how the Business Function verifies that when a forklift is not being used, the forklift has the forks in the fully lowered position, its brakes are applied, and forklift is turned to the OFF position. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure personnel do not stand or pass beneath the elevated forks, whether loaded or empty? Review how the Business Function verifies that personnel do not stand on elevated forks and do not pass underneath elevated forks at any times.  
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that forklift trucks are not used as a jack to lift vehicles?  Review how the Business Function verifies that the forklift is not used as a jacking device to lift other vehicles. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that riding on the forklifts is restricted to the driver only?  Review how the Business Function verifies that additional personnel are prohibited from riding on the forklift and the forklift is restricted to its driver only. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure personnel are not permitted to ride on the load at any time? Review how the Business Function verifies that personnel are prohibited from riding on the load on the forklift at any time. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that in conjunction with the use of forklifts, care is exercised with proper stacking of materials on pallets and storage racks?  Review how the Business Function verifies that personnel loading, unloading, and preparing materials on pallets and storage racks use care to ensure proper product placement in order to mitigate falling hazards. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that only loads that are securely and safely loaded and within the rated capacity of the truck/pallet jack are handled?  Review how the Business Function verifies that loads are securely and safety loaded and are within the rated capacity for the truck/pallet jack being used.  
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that forklifts are not used to load/unload poles in the pole rack "headache" position? Review how the Business Function verifies that forklifts are only used to load/unload poles in pole racks into their proper position in the rack. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure when a forklift is being refueled, the engine is turned off? Review how the Business Function verifies that when the forklift is being refueled, the engine is turned completely off during the fueling activity.  
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Equipment Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that if the truck is equipped with front-end attachments other than factory installed attachments, the truck is marked to identify the attachments and show the approximate weight of the truck and attachment combination at maximum elevation with load laterally centered? Review how the Business Function verifies that if the truck has front-end attachments other than its factory installed attachments, that the truck is then marked to identify the attachments and it shows the he approximate weight of the truck and attachment combination at maximum elevation with load laterally centered.
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Equipment Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure all nameplates and markings are kept in place and maintained in a legible condition? Review how the Business Function verifies that all nameplates and markings are secured in place and maintained in a way so the information remains legible. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Equipment Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that forklifts with rollover protection are equipped with an approved seat belt, which shall always be used by the operator? Review how the Business Function verifies that forklifts with rollover protection are equipped with an approved seat belt, which are to always be used by the operator while the equipment is in use. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Equipment Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure all forklifts are equipped with an operable back-up alarm and shall be checked to ascertain that it is operable before each use? Review how the Business Function verifies that forklifts are equipped with a functioning back-up alarm and that the alarm is checked to verify it is functioning before each use of the equipment. 
+          {% endif %}
+          {% if themeTag.name == "Powered Industrial Truck Equipment Requirements" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the load rating is clearly indicated on the forklifts/pallet jacks?  Review how the Business Function verifies the load rating is marked clearly on the forklifts/pallet jacks. 
+          {% endif %}
+          {% if themeTag.name == "Digger Derrick Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that operators follow all applicable manufacturer and Business Function-specific procedures for safe operation? Review how the Business Function verifies that operators follow applicable equipment procedures from the manufacturer and the Business Function for safe operation.  Review how the Business Function makes available manufacturer and Business Function-specific procedures for use and reference. 
+          {% endif %}
+          {% if themeTag.name == "Digger Derrick Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the operator and ground personnel know and are familiar with equipment operating procedures, inspection requirements, location and proper operation of all controls, lifting capacities, emergency procedures, and field maintenance requirements? Review how the Business Function verifies that the operator and ground personnel know the equipment operating procedures, associated inspection requirements, location and proper operation of all controls, lifting capacities, emergency procedures, and field maintenance requirements.
+          {% endif %}
+          {% if themeTag.name == "Digger Derrick Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure a pre-job brief/tailgate session is conducted prior to operation?  Review how the Business Function verifies that a pre-job safety briefing or tailgate session is conducted with the work crew prior to operation.
+          {% endif %}
+          {% if themeTag.name == "Digger Derrick Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure operators have been trained to safely operate the equipment? Review how the Business Function verifies that operators are appropriately trained and meet all necessary qualifications to operate the equipment being used. 
+          {% endif %}
+          {% if themeTag.name == "Digger Derrick Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure all safety signs, guards, and other safety features are in place and in proper condition? Review how the Business Function verifies that all safety signs, guards, and other safety features are in place and in proper condition.
+          {% endif %}
+          {% if themeTag.name == "Digger Derrick Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the job site survey is performed to check the following:  Review how the Business Function verifies that a job site survey is conducted to identify the following: 
+          {% endif %}
+          {% if themeTag.name == "Digger Derrick Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Slope and firmness of ground?  Review how the Business Function verifies that a job site survey is conducted to identify slope and firmness of the ground of the worksite where the equipment is being used.  
+          {% endif %}
+          {% if themeTag.name == "Digger Derrick Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  Ditches, drop offs, holes and debris? Review how the Business Function verifies that a job site survey is conducted to identify any ditches, drop offs, holes, or debris which could be a hazard to the activity. 
+          {% endif %}
+          {% if themeTag.name == "Digger Derrick Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  Grass or shrubs that could cause a fire hazard? Review how the Business Function verifies that a job site survey is conducted to identify any grass or shrubs that could cause a fire hazard. 
+          {% endif %}
+          {% if themeTag.name == "Digger Derrick Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          d.  Underground utilities, electric, gas, telephone, etc.? Review how the Business Function verifies that a job site survey is conducted to identify any underground utilities, electric lines, gas lines, telephone lines, etc. which may be encountered. 
+          {% endif %}
+          {% if themeTag.name == "Digger Derrick Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          e.  Overhead utility and power lines?  Review how the Business Function verifies that a job site survey is conducted to identify any overhead utility and power lines in the area. 
+          {% endif %}
+          {% if themeTag.name == "Digger Derrick Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          f.  Potential boom interferences during operation?  Review how the Business Function verifies that a job site survey is conducted to identify any other potential interferences with the boom during equipment operation. 
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure powered hoists winch attachments and anchorages are the responsibility of the user and are designed by a qualified person? Review how the Business Function verifies that the user is responsible for powered hoists winch attachments and anchorages.  Review how the Business Function verifies that powered hoists winch attachments and anchorages are designed by a qualified person. 
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure winches are installed in a manner that allows proper rope spooling on the drums? Review how the Business Function verifies that winches are installed in such as way that allows proper rope spooling on the drum 
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure winches are marked with the following identifications for each drum: Review how the Business Function verifies that winches are marked with the following three identifications for each drum:
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Winch rating, rope diameter(s), and power requirement?  Review how the Business Function verifies that winches are marked with the winch rating, rope diameter(s), and power requirements for each drum.
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  Drum size consisting of barrel diameter, barrel length, and flange diameter? Review how the Business Function verifies that winches are marked with the drum size consisting of barrel diameter, barrel length, and flange diameter for each drum.
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  Rope speed in feet per minute (meters per second) at rated load on specified layer? Review how the Business Function verifies that winches are marked with the rope speed in feet per minute (meters per second) at rated load on specified layer for each drum.
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure exposed moving parts such as gears, projecting screws, setscrews, chain cables, chain sprockets, and reciprocating or rotating parts, which constitute a hazard, are guarded? Review how the Business Function verifies that exposed moving parts such as gears, projecting screws, setscrews, chain cables, chain sprockets, and reciprocating or rotating parts, which constitute a hazard, are properly guarded to protect personnel. 
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure all controls used during the normal operation cycle shall be located within easy reach of the operator's station? Review how the Business Function verifies that all controls used during the normal operation cycle are located within easy reach of the operator's station.
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure electric-motor operated hoists are provided with the following:  Review how the Business Function verifies that hoists using an electric-motor are provided with the following three devices: 
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  A device to disconnect all motors from the line upon power failure and not permit any motor to be restarted until the controller handle is brought to the "OFF" position? Review how the Business Function verifies that hoists using an electric-motor are provided with a device to disconnect all motors from the line upon power failure and not permit any motor to be restarted until the controller handle is brought to the "OFF" position.
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  An over speed preventive device where applicable?  Review how the Business Function verifies that hoists using an electric-motor are provided with an over speed device where needed. 
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  A means whereby remotely operated hoists stop when any control is ineffective? Review how the Business Function verifies that hoists using an electric-motor are provided with a device to remotely operate hoists stops when any control is deemed ineffective. 
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure all base-mounted drum hoists in use meet the applicable requirements for design, construction, installation, testing, inspection, maintenance, and operations, as prescribed by the manufacturer? Review how the Business Function verifies that all base-mounted drum hoists being used meet the applicable requirements for design, construction, installation, testing, inspection, maintenance, and operations, as prescribed by the manufacturer. Review how the Business Function makes available manufacturer requirements/procedures for use and reference. 
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure remote-operated winches function so that if the control signal for any winch motion becomes ineffective, that winch motion will stop? Review how the Business Function verifies that remote-operated winches work in a way so that if the control signal for any winch motion becomes ineffective, that winch motion will stop.
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure all prime mover controls return to neutral when released? Review how the Business Function verifies that all prime mover controls return to neutral when the control is released.
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure each winch is equipped with at least one brake capable of holding not less than 125% of the rated load at the point where the brake is applied? Review how the Business Function verifies that each winch is equipped with at least one brake that is capable of holding at least 125% of the rated load at the point where the brake is applied.
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure remote-operated winches are equipped with a self-setting brake? Review how the Business Function verifies that remote-operated winches are equipped with a self-setting brake.
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure foot-operated brakes, if provided, are constructed so that the operator's foot, when in position, will not slip off the pedal? Review how the Business Function verifies that any foot-operated brakes provided, are constructed so that the operator's foot, when in position, will not slip off the pedal.
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure winches designed to allow simultaneous underwind and overwind  have a brake capable of holding 125% of the rated load in those directions? Review how the Business Function verifies that winches are designed to allow simultaneous underwind and overwind  have a brake capable of holding 125% of the rated load in those directions.
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure a means is provided for controlling the drum speed when moving the load? Review how the Business Function verifies that some sort of means/mechanism is provided for controlling the drum speed when load is being moved.
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure braking systems have provision for adjustments where necessary to  compensate for wear? Review how the Business Function verifies that braking systems have a provision for adjustments where necessary to  compensate for wear over time and with use.
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure ropes are of a size, minimum breaking force, and construction to withstand the loads imposed? Review how the Business Function verifies that ropes are of a size, minimum breaking force, and construction to withstand the loads imposed.
+          {% endif %}
+          {% if themeTag.name == "Hoist Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure ropes of other materials are used only with the winch and rope manufacturers of qualified person's recommendation? Review how the Business Function verifies that ropes of any other materials are used only with the winch and rope manufacturers of qualified person's recommendation.
+          {% endif %}
+          {% if themeTag.name == "Excavator Safe Operation (Lifting)" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure load charts and lifting attachment points are used in accordance with the manufacturer's instructions? Review how the Business Function verifies that the load charts and lifting attachment points are used in accordance with the manufacturer's instructions.  Review how the Business Function makes available the manufacturer's instructions for use and reference. 
+          {% endif %}
+          {% if themeTag.name == "Excavator Safe Operation (Lifting)" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that no modifications or additions which affect the capacity or safe operation of the excavator are made without the manufacturer's written approval? Review how the Business Function verifies that no modifications or additions which could affect the capacity or safe operation of the excavator are made without the manufacturer's written approval. 
+          {% endif %}
+          {% if themeTag.name == "Excavator Safe Operation (Lifting)" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that if such modifications or changes are made, the capacity, operation, and maintenance instruction plates, tags, or decals are changed accordingly, and in no case will the original safety factor of the equipment be reduced? Review how the Business Function verifies that if such modifications or changes are made which could affect the capacity or safe operation of the excavator, the capacity, operation, and maintenance instruction plates, tags, or decals are changed accordingly, and in no case will the original safety factor of the equipment be reduced.
+          {% endif %}
+          {% if themeTag.name == "Excavator Safe Operation (Lifting)" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that if a lift with an excavator is taking place in close proximity to an open excavation, at a minimum the following safe measures are considered: Review how the Business Function verifies that if a lift with an excavator is taking place in close proximity to an open excavation, at a minimum the following safe measures are considered:
+          {% endif %}
+          {% if themeTag.name == "Excavator Safe Operation (Lifting)" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          - Equipment at least 5 feet from the edge of the excavation; and - Equipment is at least 5 feet from the edge of the excavation; and
+          {% endif %}
+          {% if themeTag.name == "Excavator Safe Operation (Lifting)" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          - All personnel not essential to the lift removed from the excavation?  - All personnel not essential to the lift are removed from the excavation.
+          {% endif %}
+          {% if themeTag.name == "Excavator Safe Operation (Lifting)" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that at a minimum, Basic Riggers are required for all lifting operations using an excavator?  Review how the Business Function verifies that at a minimum, Basic Riggers are required to be used for all lifting operations using an excavator. 
+          {% endif %}
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that when operating non-powered industrial trucks, four-wheel carts with a tongue-type pull handle are not used? Review how the Business Function verifies that four-wheel carts with a tongue-type pull handle are not used when operating non-powered industrial trucks.  The design allows for steering both front wheels and makes the cart prone to tip over even with a light load.
+          {% endif %}
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that the non-powered industrial trucks are inspected prior to use? Review how the Business Function verifies that  the non-powered industrial trucks are inspected prior to being used. 
+          {% endif %}
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that non-powered industrial trucks are not manufactured or modified? Review how the Business Function verifies that  the non-powered industrial trucks are not manufactured or modified.
+          {% endif %}
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that non-powered industrial trucks are used for its intended purpose and as designed for use?  Review how the Business Function verifies that  the non-powered industrial trucks are only used for its intended purpose and as designed for use.
+          {% endif %}
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that non-powered industrial trucks do not handle loads that exceed its capacity?  Review how the Business Function verifies that  the non-powered industrial trucks do not handle loads that exceed its capacity.
+          {% endif %}
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that non-powered industrial trucks use equipment designed specifically for the movement of barrels, drums, compressed gas cylinders and dewar with equipment? Review how the Business Function verifies that  the non-powered industrial trucks se equipment designed specifically for the movement of barrels, drums, compressed gas cylinders and dewar with equipment.
+          {% endif %}
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that a non-powered industrial truck is pushed when moving?  Review how the Business Function verifies that  the non-powered industrial trucks are pushed when moving.  Pulling may be needed if transitioning over doorway thresholds or up an incline.
+          {% endif %}
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that load securing devices including straps, chains, bars or pins as required are used considering the type of industrial truck and load being moved? Review how the Business Function verifies that  the load securing devices including straps, chains, bars or pins as required are used considering the specific type of industrial truck and load being moved.
+          {% endif %}
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that load paths are clear, free of obstructions/interferences, uneven surfaces, inclines, declines, etc. can cause loads to shift? Review how the Business Function verifies that all load paths are clear, free of any obstructions/interferences/hazards, uneven surfaces, inclines, declines, etc. that could cause loads to shift or move. 
+          {% endif %}
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that a non-powered industrial truck is chosen with the lowest profile in order to keep the center of gravity low? Review how the Business Function verifies that non-powered industrial trucks are chosen with the lowest possible profile in order to keep the center of gravity low during the movement.
+          {% endif %}
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure the load center of gravity is kept three feet or less from the ground or floor, for loads that weigh over 100 lbs.? Review how the Business Function verifies that the load center of gravity is kept three feet or less from the ground or floor for all loads that weigh over 100 lbs..
+          {% endif %}
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that non-powered industrial trucks are not used on stairs unless: Review how the Business Function verifies that non-powered industrial trucks are not used on stairs unless:
+          {% endif %}
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          - The device is specifically designed for use on stairs; - The device is specifically designed for use on stairs;
+          {% endif %}
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          - Entrances to the stairs are flagged or guarded so that others don't walk into the line of fire; - Entrances to the stairs are flagged or guarded so that others don't walk into the line of fire;
+          {% endif %}
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          - Loads are secured; and - Loads are secured; and
+          {% endif %}
+          {% if themeTag.name == "Non-Powered Industrial Trucks Safe Operation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          - No personnel associated with the load movement are in the line of fire? - No personnel associated with the load movement are in the line of fire.
+          {% endif %}
+          {% if themeTag.name == "Material Handling Equipment Inspection" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that prior to operation, material handling equipment operators conduct a documented pre-use inspection per manufacturer's instructions for the specific type of equipment? Review how the Business Function verifies that before operating, material handling equipment operators conduct a documented pre-use inspection per the manufacturer's instructions for the specific type of equipment.  Review how the Business Function makes the manufacturer's instructions available for use and reference. 
+          {% endif %}
+          {% if themeTag.name == "Material Handling Equipment Inspection" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that in addition to pre-use inspections, documented inspections are performed at a minimum yearly? Review how the Business Function verifies that documented inspections are performed at a minimum yearly in addition to the pre-use inspections required before each use of the equipment. 
+          {% endif %}
+          {% if themeTag.name == "Material Handling Equipment Inspection" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that all rigging equipment have a periodic inspection performed by a qualified person annually at a minimum or as specifically recommended by the manufacturer? Review how the Business Function verifies that  all rigging equipment have a periodic inspection performed by a qualified person annually at a minimum or as specifically recommended by the manufacturer.  Review how the Business Function makes the manufacturer's instructions available for use and reference. 
+          {% endif %}
+          {% if themeTag.name == "Material Handling Equipment Inspection" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that during inspections, deficiencies are documented, and the supervisor is notified for corrective action?  Review how the Business Function verifies that inspections document any deficiencies identified and the supervisor is notified for corrective action.
+          {% endif %}
+          {% if themeTag.name == "Material Handling Equipment Inspection" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that the equipment is taken out of service if at any time equipment is found to need repair, to be defective, or to be in any way unsafe until  it has been restored to safe operating condition by an Authorized Person? Review how the Business Function verifies that equipment is taken out of service if at any time equipment is found to need repair, to be defective, or to be in any way unsafe until  it has been restored to safe operating condition by an Authorized Person.
+          {% endif %}
+          {% if themeTag.name == "Material Handling Equipment Inspection" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that a legible manufacturer's manual is always readily assessable for all material handling equipment when in use? Review how the Business Function verifies that a legible manufacturer's manual is always readily assessable for all material handling equipment when in use.
+          {% endif %}
+          {% if themeTag.name == "Material Handling Equipment Inspection" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that preventive maintenance tasks are done by a skilled maintenance person to keep the equipment in safe operating condition and that records of the maintenance and any repairs are kept? Review how the Business Function verifies that preventive maintenance tasks are done by a skilled maintenance person in order to keep the equipment in safe operating condition and that associated maintenance/repair records kept.
+          {% endif %}
+          {% if themeTag.name == "Material Handling Equipment Inspection" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure that inspection records are kept for a period of 5 years?  Review how the Business Function verifies that all inspection records are kept for five years and are maintained in a way that is accessible for reference as needed. 
+          {% endif %}
+          {% if themeTag.name == "Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to develop, deliver, and/or manage training for all employees performing any material handling, lifting, or rigging activities? Review the Business Function's processes for developing, delivering, and managing material handling training.  Verify the Business Function assigns training to all personnel performing any material handling, lifting, or rigging activities, and how the Business Function identifies those personnel.  
+          {% endif %}
+          {% if themeTag.name == "Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to ensure all training is developed, delivered, and managed per the requirements of the Enterprise standard EHS Training EHS-GOV-3.2.1? Review the Business Function's processes for developing, delivering, and managing material handling training.  Verify the Business Function assigns training to all personnel performing any material handling, lifting, or rigging activities, and how the Business Function identifies those personnel.  Managing training includes assignment of training, assignment of training frequency, selection of training delivery method (CBT, in-person classroom, hands-on/on-the-job), content review, and review to ensure the training remains adequate, compliant, and effective at supporting personnel understanding. 
+          {% endif %}
+          {% if themeTag.name == "Training required for all personnel associated with crane operations (Lift Directors, Crane Operators, Riggers, Spotters, and Signal Persons)" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process to include that when using non-standard hand signals as identified in Appendix A - Standard Hoist Signals, the Signal Person, operator, and Lift Director (where there is one) contact each other prior to the operation and agree on the non-Standard hand signals that will be used? Verify the Business Function's material handling training program content includes that when using non-standard hand signals as identified in Appendix A - Standard Hoist Signals, the Signal Person, operator, and Lift Director (where there is one) contact each other prior to the operation and agree on the non-Standard hand signals that will be used.
+          {% endif %}
+          {% if themeTag.name == "Training required for all personnel associated with crane operations (Lift Directors, Crane Operators, Riggers, Spotters, and Signal Persons)" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include each employee who may be exposed to fall hazards while on, or hoisted by, equipment covered by this Standard have fall protection training in accordance with the Enterprise standard Working at Heights EHS-SOH-4.1.1.23? Verify the Business Function's material handling training program includes fall protection training required for all personnel who may be exposed to fall hazards while on, or hoisted by, equipment covered by this Standard.  Refer to the Enterprise standard Working at Heights EHS-SOH-4.1.1.23 for requirements. 
+          {% endif %}
+          {% if themeTag.name == "Training required for all personnel associated with crane operations (Lift Directors, Crane Operators, Riggers, Spotters, and Signal Persons)" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that lifting personnel are trained on work area control – swing radius hazards to prevent employees from entering these hazard areas? Verify the Business Function's material handling training program includes that all lifting personnel are to be trained on work area control – swing radius hazards to prevent employees from entering these hazard areas.  
+          {% endif %}
+          {% if themeTag.name == "Training required for all personnel associated with crane operations (Lift Directors, Crane Operators, Riggers, Spotters, and Signal Persons)" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that employees are trained in the procedure to be followed in the event of electrical contact with a power line? Verify the Business Function's material handling training program includes that personnel are to be trained in procedures to be used/followed if an electrical contact with a power line occurs.  Review how the Business Function verifies the procedural training has occurred. 
+          {% endif %}
+          {% if themeTag.name == "Lift Director Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that Lift Directors are competent to oversee and manage Critical Lift activities? Verify the Business Function's material handling training program includes the requirement that Lift Directors are to be competent to oversee and manage Critical Lift activities.  Review how the Business Function defines competent for the role of Lift Director and the process to verify competency. 
+          {% endif %}
+          {% if themeTag.name == "Lift Director Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that Lift Directors hold an Advanced Rigger qualification? Verify the Business Function's material handling training program includes the requirement that Lift Directors are to have an Advance Rigger qualification or certification.  Review the Business Function's process for obtaining and reviewing Advanced Rigger qualifications.  
+          {% endif %}
+          {% if themeTag.name == "Lift Director Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that Lift Directors are able to perform nearly any Common, Complex, or Critical Lift activity due to his/her training, experience, knowledge, skill, and ability? Verify the Business Function's material handling training program includes the requirement that Lift Directors are to be able to perform any lift - Common, Complex, or Critical - based on his/her training, knowledge, skill, and ability.  
+          {% endif %}
+          {% if themeTag.name == "Lift Director Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that site management designate Lift Directors that meet the qualifications in this Standard?  Review how the Business Function ensures local site management designates Lift Directors that meet the qualifications of this standard.  
+          {% endif %}
+          {% if themeTag.name == "Advanced and Basic Rigger Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include training and qualification conducted by a third party possessing a certification from a nationally recognized accreditation organization or accredited Business Function training program? Verify the Business Function's material handling training program includes the requirement that and third-party training or qualification is from a nationally recognized accreditation organization or accredited Business Function training program.  Review how the Business Function verifies the accreditation status of a training/qualification provider.
+          {% endif %}
+          {% if themeTag.name == "Advanced and Basic Rigger Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include training for Basic Riggers to be designed to that upon completion, Basic Riggers shall be able to demonstrate or have knowledge of how to: - Inspect rigging before use; - Identify and attach rigging with basic knowledge of hitch configurations, capacities, and basic knots; - Recognize associated hazards; - Signal operations; and - Use various types of rigging equipment and basic hitches and their applications? Verify the Business Function's material handling training program includes the requirement that Basic Rigger training is designed to support personnel demonstration or knowledge of all of the following activities: - How to properly inspect rigging before use; - How to identify and properly attach rigging with basic knowledge of hitch configurations, capacities, and basic knots; - Ability to recognize associated hazards; - Understanding of signal operations; and - How to use various types of rigging equipment and basic hitches and their applications.
+          {% endif %}
+          {% if themeTag.name == "Advanced and Basic Rigger Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that in addition to knowing and demonstrating Basic Rigger knowledge and skills, Training for Advanced Riggers is designed so that upon completion Advanced Riggers are able to perform the following rigging tasks unsupervised: - Select rigging components and procedures based on rigging capacity; - Estimate load weight and center of gravity; - Identify lift points; - Determine and select rigging based on loading; - Perform pre-use inspection of rigging and lift points; - Identify and attach rigging with knowledge of hitch configurations and load angle factors, rigging capacities, and load integrity; and - Understand load dynamics and associated hazards? Verify the Business Function's material handling program includes that in addition to the Basic Rigger knowledge and skills, Advanced Rigger training is designed to support personnel demonstration of their ability to perform the following tasks unsupervised: - Selecting rigging components and procedures based on rigging capacity; - Estimating load weight and center of gravity; - Identifying lift points; - Determining and selecting rigging based on loading; - Performing pre-use inspection of rigging and lift points; - Identifying and attaching rigging with knowledge of hitch configurations and load angle factors, rigging capacities, and load integrity; and - Understanding load dynamics and associated hazards.
+          {% endif %}
+          {% if themeTag.name == "Advanced and Basic Rigger Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that training at a minimum consists of 8 hours of instructional time, practical training , and evaluation of the Rigger's performance by a qualified individual? Verify the Business Function's material handling program includes the requirement that training is at least 8 hours of a combination of instructional time (classroom, delivery of content), practical training (demonstrations performed by the trainer and practical exercises performed by the trainee), and evaluation or testing.
+          {% endif %}
+          {% if themeTag.name == "Advanced and Basic Rigger Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that Riggers are required to pass a written examination and practical rigging examination?  Verify the Business Function's material handling program includes the requirement that Riggers (Basic and Advanced) pass a written examination and practical rigging examination (physical demonstration of rigging techniques on equipment observed by a qualified individual). 
+          {% endif %}
+          {% if themeTag.name == "Advanced and Basic Rigger Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that the evaluation cycle for Advanced Riggers and Basic Riggers is every 3 years? Verify the Business Function's material handling training for Basic and Advanced Riggers is assigned on a frequency for training/re-training/refresher of at least 3 years.  
+          {% endif %}
+          {% if themeTag.name == "Advanced and Basic Rigger Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that the evaluation is conducted by a third party or an individual who has the knowledge, training, and experience necessary to assess rigging operations? Verify the Business Function's material handling training program requires that the rigging operations demonstrated as part of the training evaluation is observed and evaluated by an individual who has the appropriate knowledge, skills, training, and experience to adequately assess and determine if the demonstration is satisfactory.  The individual may be third-party or an Entergy employee. 
+          {% endif %}
+          {% if themeTag.name == "Spotter Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that employees working as dedicated Spotters are trained to enable them to effectively perform their task? Verify the Business Function's material handling training program includes the requirement that employees who are working as dedicated Spotters are appropriately trained to support their knowledge, skills, and abilities to safely and effectively perform their task. 
+          {% endif %}
+          {% if themeTag.name == "Spotter Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that Dedicated Spotters for power lines are trained in accordance with 29 CFR 1926.1428? Verify the Business Function's material handling training program includes the requirement that employees who are working as dedicated Spotters for power lines are trained per the requirements of 29 CFR 1926.1428 Signal person qualifications.  
+          {% endif %}
+          {% if themeTag.name == "Signal Person Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that Signal Persons meet the qualification requirements prior to giving any signals? Verify the Business Function's material handling training program includes the requirement that Signal Persons meet all qualification requirements before being allowed to give any signals during a lift activity. 
+          {% endif %}
+          {% if themeTag.name == "Signal Person Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process ensure that the documentation of qualification for Signal Person is readily available, retrievable or accessible at the worksite? Verify the Business Function's material handling training program includes the requirement that documentation of the Signal person's qualifications are maintained and accessible at the local worksite. 
+          {% endif %}
+          {% if themeTag.name == "Signal Person Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Does the Business Function training process include that the qualification documentation is required to specify the types of signaling for which the Signal Person is qualified? Verify the Business Function's material handling training program includes the requirement that documentation of the Signal person's qualifications include the specific types of signals for which the Signal Person is qualified.  
+          {% endif %}
+          {% if themeTag.name == "Signal Person Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  Does the Business Function training process include that the qualification for Signal Person includes the types of signaling include hand signals, radio or other electronic means of signaling, voice signaling? Verify the Business Function's material handling training program includes the requirement that documentation of the Signal person's qualifications include the specific types of signals for which the Signal Person is qualified, including hand signals, radio, voice, or other electronic meas.  
+          {% endif %}
+          {% if themeTag.name == "Signal Person Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process ensure that each Signal Person knows and understands the type of signals used? Review how the  Business Function verifies that  the Signal Person knows and understands the type of signals being used during the lift activity.  The Signal Person must be qualified in the signals being used in the lift activity.  
+          {% endif %}
+          {% if themeTag.name == "Signal Person Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Does the Business Function training process ensure that each Signal Person knows and understands the standard method for hand signals if hand signals are used? Review how the Business Function verifies that the Signal Person knows and understands the standard method of hand signals if hand signals are being used during the lift activity. 
+          {% endif %}
+          {% if themeTag.name == "Signal Person Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process ensure that each Signal Person is competent in the application of the type of signals used?  Review how the Business Function verifies that each Signal Person is competent in the application of the type of signals being used in the lift activity. 
+          {% endif %}
+          {% if themeTag.name == "Signal Person Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process ensure that each Signal Person has a basic understanding of equipment operation and limitations, including the crane dynamics involved in swinging and stopping loads and boom deflection from hoisting loads? Review how the Business Function verifies that each Signal Person has a basic understanding of equipment operation and limitations, including the crane dynamics involved in swinging and stopping loads and boom deflection from hoisting loads.
+          {% endif %}
+          {% if themeTag.name == "Signal Person Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process ensure that each Signal Person knows and understands the relevant requirements of 29 CFR 1926.1419 through 1422 and 1926.1428? Review how the Business Function verifies that each Signal Person Signal Person knows and understands the relevant requirements of 29 CFR 1926.1419 through 1422 and 1926.1428.
+          {% endif %}
+          {% if themeTag.name == "Signal Person Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process ensure that each Signal Person demonstrates that he/she meets the requirements in this section through an oral or written test, and through a practical test?  Review how the Business Function verifies that each Signal Person Signal Person demonstrates that he/she has met the requirements in this section through an oral or written test, and through a practical test.  Review how those records are made available to the Business Function for review. 
+          {% endif %}
+          {% if themeTag.name == "Signal Person Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process ensure that if actions by the Signal Person indicate that the individual does not meet the qualification requirements, the individual is not be allowed to continue working as a Signal Person until re-training is provided and a re-assessment is made that confirms that the individual meets the qualification requirements? Review how the Business Function verifies that each Signal Person Signal Person meets the qualification requirements.  If the actions of the Signal Person indicates he/she does not meet the qualification requirements, review how the Business Function removes the Signal Person from his/her signaling responsibility until re-training is provided and re-assessment confirms they meet the required qualifications. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process ensure that each crane operator is trained, certified/licensed, and evaluated before operating any mobile crane equipment?  Review how the Business Function verifies that each Crane Operator is trained, certified/licensed, and evaluated before operating any mobile crane equipment.  
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process ensure that the training and certification/licensing conducted by a third-party possesses a certification from a nationally recognized accreditation organization?  Review how the Business Function verifies that any third party training and certification/licensing is provided by a third party who holds a current certification from a nationally recognized accreditation organization. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process ensure that the training and certification/licensing developed by the Business Function meets the following requirements:  Review how the Business Function verifies that the crane operator training and certification/licensing content that is developed by the Business Function meets all of the following requirements.
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  A determination through a written test that the individual knows the information necessary for safe operation of the specific type of equipment the individual will operate, including all of the following: Review how the Business Function verifies that the crane operator training and certification/licensing content that is developed by the Business Function includes a written test evaluation to demonstrate the operator knows the necessary information for operating the specific equipment safely, including: 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          i.  The controls and operational/performance characteristics? Review how the Business Function verifies that the crane operator training and certification/licensing content that is developed by the Business Function includes a written test evaluation to demonstrate the operator knows the necessary information for operating the specific equipment safely, including the controls and operational/performance characteristics of the equipment. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          ii.  The use of, and the ability to calculate, load/capacity information on a variety of configurations of the equipment?  Review how the Business Function verifies that the crane operator training and certification/licensing content that is developed by the Business Function includes a written test evaluation to demonstrate the operator knows the necessary information for operating the specific equipment safely, including how to use and calculate load/capacity information on a variety of equipment configurations. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          iii.  Procedures for preventing and responding to power line contact?  Review how the Business Function verifies that the crane operator training and certification/licensing content that is developed by the Business Function includes a written test evaluation to demonstrate the operator knows the necessary information for operating the specific equipment safely, including procedures for preventing and responding to contact with a power line.  
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          iv.  Technical knowledge of the subject matter criteria listed in Appendix J - Operator Certification: Written Examination: Technical Knowledge Criteria, applicable to the specific type of equipment the individual will operate? Review how the Business Function verifies that the crane operator training and certification/licensing content that is developed by the Business Function includes a written test evaluation to demonstrate the operator knows the necessary information for operating the specific equipment safely, including technical knowledge of the subject  matter criteria listed in Appendix J - Operator Certification: Written Examination: Technical Knowledge Criteria as it is applicable to the specific type of equipment. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          v.  Technical knowledge applicable to the suitability of the supporting ground and surface to handle expected loads, site hazards, and site access? Review how the Business Function verifies that the crane operator training and certification/licensing content that is developed by the Business Function includes a written test evaluation to demonstrate the operator knows the necessary information for operating the specific equipment safely, including technical knowledge about the suitability of ground and surface supports to handle expected loads, job site hazards, and site access. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          vi.  The individual is able to read and locate relevant information in the equipment manual and other materials containing information necessary for safe operation of the specific type of equipment the individual will operate? Review how the Business Function verifies that the crane operator training and certification/licensing content that is developed by the Business Function includes a written test evaluation to demonstrate the operator knows the necessary information for operating the specific equipment safely, including the ability to read and locate relevant information in the equipment manual and other materials containing information necessary for safe operation of the specific type of equipment the individual will operate.
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  A determination through a practical test that the individual has the skills necessary for safe operation of the equipment, including the following: Review how the Business Function verifies that the crane operator training and certification/licensing content that is developed by the Business Function includes a practical test evaluation (physical demonstration of operating techniques on equipment observed by a qualified individual)) to determine the operator has the skills necessary for safe operation of the equipment, including the following: 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          i.  The ability to  inspect, from visual and auditory observation, the following items: - Control mechanisms for maladjustments interfering with proper operation; - Control and drive mechanisms for apparent excessive wear of components and contamination by lubricants, water or other foreign matter; - Air, hydraulic, and other pressurized lines for deterioration or leakage, particularly those which flex in normal operation; - Hydraulic system for proper fluid level; - Hooks and latches for deformation, cracks, excessive wear, or damage such as from chemicals or heat; - Wire rope reeving for compliance with the manufacturer's specifications; - Wire rope, in accordance with § 1926.1413(a); - Electrical apparatus for malfunctioning, signs of apparent excessive deterioration, dirt or moisture accumulation; - Tires (when in use) for proper inflation and condition; - Ground conditions around the equipment for proper support, including ground settling under and around outriggers/stabilizers and supporting foundations, ground water accumulation, or similar conditions; - The equipment for level position within the tolerances specified by the equipment manufacturer's recommendations, both before each shift and after each move and setup; - Operator cab windows for significant cracks, breaks, or other deficiencies that would hamper the operator's view; and - Safety devices and operational aids for proper operation. Review how the Business Function verifies that the crane operator training and certification/licensing content that is developed by the Business Function includes a practical test evaluation to determine the operator has the skills necessary for safe operation of the equipment, including: i.  The ability to  inspect, from visual and auditory observation, the following items: - Control mechanisms for maladjustments interfering with proper operation; - Control and drive mechanisms for apparent excessive wear of components and contamination by lubricants, water or other foreign matter; - Air, hydraulic, and other pressurized lines for deterioration or leakage, particularly those which flex in normal operation; - Hydraulic system for proper fluid level; - Hooks and latches for deformation, cracks, excessive wear, or damage such as from chemicals or heat; - Wire rope reeving for compliance with the manufacturer's specifications; - Wire rope, in accordance with § 1926.1413(a); - Electrical apparatus for malfunctioning, signs of apparent excessive deterioration, dirt or moisture accumulation; - Tires (when in use) for proper inflation and condition; - Ground conditions around the equipment for proper support, including ground settling under and around outriggers/stabilizers and supporting foundations, ground water accumulation, or similar conditions; - The equipment for level position within the tolerances specified by the equipment manufacturer's recommendations, both before each shift and after each move and setup; - Operator cab windows for significant cracks, breaks, or other deficiencies that would hamper the operator's view; and - Safety devices and operational aids for proper operation.
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  Operational and maneuvering skills? Review how the Business Function verifies that the crane operator training and certification/licensing content that is developed by the Business Function includes skills needed to operate and maneuver the equipment. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          d.  Application of load chart information? Review how the Business Function verifies that the crane operator training and certification/licensing content that is developed by the Business Function includes how to apply the load chart information to the lift activity. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          e.  Application of safe shut-down and securing procedures?  Review how the Business Function verifies that the crane operator training and certification/licensing content that is developed by the Business Function includes how to apply shut-down and securing procedures properly and safely. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include the accreditation for the training/certifying organization to be reviewed by the nationally recognized accrediting agency every three years?  Verify the Business Function's material handling training program includes the requirement that the accreditation of the third-party crane operator training providers is reviewed by its nationally recognized accrediting agency at least every three years.
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that Crane Operator Certifications issued by an accredited crane operator training/certifying organization are valid for a period of five years? Verify the Business Function's material handling training program includes the requirement that Crane Operator certifications issued by an accredited third-party provider are valid for a maximum of five years. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that Entergy Crane Operator Certification programs (in lieu of a third-party training and certification program) are audited to meet the accreditation requirements outlined in 29 CFR 1926.1427(e)? Verify the Business Function's material handling training program includes the requirement that Entergy-developed Crane Operator Certification programs are audited to ensure it meets the accreditation requirements of  29 CFR 1926.1427(e).
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that the Business Function provides a documented evaluation to determine that each operator is Qualified following training certification or licensing?  Verify the Business Function's material handling training program includes the requirement that the Business Function provides a documented evaluation of each operator following his/her certification/licensing to ensure qualification criteria is met. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Does the Business Function training process include that evaluations will be conducted by Entergy or an agent of Entergy? Verify the Business Function's material handling training program includes the requirement that the documented evaluation of each operator following his/her certification/licensing to ensure qualification criteria is met is administered by Entergy or an authorized agent of Entergy. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  Does the Business Function training process include that evaluations will contain the content in Attachment VI – Crane Operator Evaluation Checklist/Documentation? Verify the Business Function's material handling training program includes the requirement that the documented evaluation of each operator following his/her certification/licensing to ensure qualification criteria is met meets at a minimum the content in Attachment VI – Crane Operator Evaluation Checklist/Documentation?. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include the evaluation will be conducted by an individual who has the knowledge, training, and experience necessary to assess equipment operators? Verify the Business Function's material handling training program includes the requirement that the documented evaluation of each operator following his/her certification/licensing to ensure qualification criteria is conducted by someone with the knowledge, skills, training, and experience necessary to assess and evaluate the qualifications of equipment operators.
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include the evaluator be an Entergy employee or agent of Entergy , and not an employee of the training and/or certification company that trained and certified the operator? Verify the Business Function's material handling training program includes the requirement that the evaluator is an Entergy employee or authorized agent of the Entergy, but not an employee of the training/certification company that provided the training/certification to the operator. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process include that Contractors provide documentation that their evaluations have been conducted by an individual who has the knowledge, training, and experience necessary to assess equipment operators? Verify the Business Function's material handling training program includes the requirement that Contractors provide the necessary documentation to the Business Function to demonstrate operator personnel knowledge, skills, training, and experience. 
+          {% endif %}
+          {% if themeTag.name == "Mobile Crane Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process allow for operators employed prior to December 10, 2018, the Business Function may choose to rely on previous assessments of the operator in lieu of conducting a new evaluation of that operator's existing knowledge and skills?  Review if the Business Function allows for relying on previous assessments of the operator for any operators employed before December 10, 2018 instead of conducting new evaluations of the operator's knowledge and skills. 
+          {% endif %}
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process for equipment operators include that prior to operating the equipment, the Business Function ensures all equipment operators are trained on the safe operation of the specific type of equipment the operator will be using?  Verify the Business Function's material handling training program includes the requirement that equipment operators must be trained on the safe operation of the specific type of equipment being used before being allowed to operate the equipment. 
+          {% endif %}
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process for equipment operators include that training be documented and consists of a combination of formal instruction, practical training, and evaluation of the operator's performance onsite by a Qualified individual?  Verify the Business Function's material handling training program includes the requirement that training includes a  combination of formal instruction, practical training, and evaluation of the operator's performance onsite by a Qualified individual.
+          {% endif %}
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process for equipment operators require that operators pass a written or oral examination and a practical operating examination unless able to furnish satisfactory evidence of qualifications and experience? Verify the Business Function's material handling training program includes the requirement that equipment operators pass a written or oral examination and a practical examination unless the operator is able to provide evidence sufficient to prove qualifications and experience. 
+          {% endif %}
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process for equipment operators require refresher training when: Verify the Business Function's material handling training program includes the requirement that equipment operators attend refresher training when: 
+          {% endif %}
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  The operator has been observed to operate the equipment in an unsafe manner? Verify the Business Function's material handling training program includes the requirement that equipment operators attend refresher training when the operator has been observed by others to be operating the equipment in an unsafe manner. 
+          {% endif %}
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  The operator has be involved in an accident or close call incident? Verify the Business Function's material handling training program includes the requirement that equipment operators attend refresher training when the operator has been involved in an accident or close call incident with the equipment. 
+          {% endif %}
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          c.  The operator has received an evaluation that reveals the operator is not operating the equipment safely?  Verify the Business Function's material handling training program includes the requirement that equipment operators attend refresher training when the operator has received an unsatisfactory evaluation showing the operator is not operating the equipment safely. 
+          {% endif %}
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process for equipment operators include an evaluation of each equipment operator's performance to be conducted and documented at least once every three years?  Verify the Business Function's material handling training program includes the requirement that the equipment operator's performance is evaluated at least one every three years for the piece(s) of equipment he/she operates. 
+          {% endif %}
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process for equipment operators include that the Business Function certify that powered industrial truck and digger derrick operators have been trained and evaluated? Verify the Business Function's material handling training program includes the requirement that the Business Function certifies that powered industrial truck and digger derrick operators have completed all necessary trainings and evaluations. 
+          {% endif %}
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          a.  Does the Business Function training process for equipment operators include that the certification include the name of the operator, the date of the training, the date of the evaluation, and the identity of the person(s) performing the training or evaluation? Verify the Business Function's material handling training program includes the requirement that the certification include the name of the operator, date of the training and evaluation, and name of the person(s) performing the training or evaluation. 
+          {% endif %}
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          b.  Does the Business Function training process for equipment operators include that Contract Partners provide documentation that these training certification have been met? Verify the Business Function's material handling training program includes the requirement that Contractors provide the necessary documentation to the Business Function to demonstrate operator personnel meet the training certification criteria. . 
+          {% endif %}
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process for equipment operators include that the Business Function ensure the instructor(s), internal and/or third-party, have the necessary knowledge, training, and experience to train new equipment operators? Verify the Business Function's material handling training program includes the requirement that the Business Function evaluate the training instructors and ensure they have the knowledge, skills, training, and experience to be able to train new equipment operators appropriately.  Their qualifications shall include prior experience and training on the type of equipment to be trained.
+          {% endif %}
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process for equipment operators include that hoist operators are either basic or advanced-rigging qualified, based on load weight, or work under the direction of an individual who is basic or advanced-rigging qualified? Verify the Business Function's material handling training program includes the requirement that hoist operators are either qualified in basic or advanced rigging, depending on the load weight, or work under the direction of someone who is current with basic or advanced-rigging qualifications. 
+          {% endif %}
+          {% if themeTag.name == "Equipment Operator Training" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function training process for equipment operators include that employees operating non-powered industrial trucks are trained to enable them to effectively perform their task? Verify the Business Function's material handling training program includes the requirement that personnel operating non-powered industrial trucks are trained to support the safe and effective operation of the equipment. 
+          {% endif %}
+          {% if themeTag.name == "Documentation and Recordkeeping" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Has the Business Function established processes for maintaining all necessary supporting records in accordance with the Entergy policy Records Management and Retention? Review how the Business Function maintains all supporting records to its material handling program per the requirements of the Entergy policy Records Management and Retention. 
+          {% endif %}
+          {% if themeTag.name == "Program Review and Evaluation" and topicTag.name == "Material Handling, Rigging, and Lifting" %}
+          Does the Business Function have a process to assess the overall health of the material handling program by including it in a formal review of their compliance performance as part of the management review process as required by the Enterprise standard EHS Assessments and Audits EHS-GOV-5.2.2? Review how the Business Function assesses and reviews the health of the material handling program, including the program in its formal review of the management system as required by the Enterprise standard EHS Assessments and Audits EHS-GOV-5.2.2.
+          {% endif %}
+
+      run-prompt:
+        input:
+          snippets: get-theme-topic-snippets
+          instructionPrompt: get-instruction-prompt-for-tag
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+        tool: llm
+        skipIfEmpty: snippets
+        prompt: |
+          {{instructionPrompt.text}}
+
+          ## Document Snippets for Analysis:
+          ```text
+          {% for s in snippets %}
+          --- Snippet Start ---
+          {{s.text}}
+          --- Snippet End ---
+          {% else %}
+          No relevant snippets found for these tags.
+          {% endfor %}
+          ```
+
+          Please analyze the snippets and provide your assessment in the following markdown table format:
+
+          | Question | Determination | Confidence | Citation | Corrective Action | Recommended Language |
+          |----------|--------------|------------|----------|-------------------|---------------------|
+          {% for question in questions %}| [Question text] | YES/NO/MAYBE | High/Medium | [Relevant snippet with ***emphasis*** or "N/A - Requirement not found in provided snippets"] | [Required if NO/MAYBE, N/A if YES] | [Required if NO/MAYBE, N/A if YES] |
+          {% endfor %}
+
+          Note:
+          - For YES determinations, mark Corrective Action and Recommended Language as "N/A"
+          - For NO/MAYBE determinations, provide specific corrective actions and recommended language
+          - Use ***bold and italics*** to emphasize key phrases in citations
+          - If no relevant snippets found, use "N/A - Requirement not found in provided snippets" as citation
+
+      create-insight:
+        input:
+          summary: run-prompt
+          snippets: get-theme-topic-snippets
+          themeTag: function/themeTag
+          topicTag: function/topicTag
+          title: function/title
+        skipIfEmpty: summary
+        tool: insight
+        text: |
+          # {{themeTag.name}} - {{topicTag.name}} Compliance Assessment Table
+
+          {{summary.text}}
+
+      add-insight:
+        input:
+          knowledge: function/knowledge
+          insight: create-insight
+          snippets: get-theme-topic-snippets
+        tool: knowledge-set
+        skipIfEmpty: insight
+        operations:
+          - op: set-nodes
+            nodes: insight
+          - op: set-nodes
+            nodes: snippets
