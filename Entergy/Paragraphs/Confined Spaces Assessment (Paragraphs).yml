@@ -20,30 +20,37 @@ actions:
     tool: echo
     message: |
       # Role and Context Setup
-      You are a compliance and safety auditor responsible for assessing Standard Operating Procedures (SOPs) and safety protocols against a provided questionnaire. Your objective is to review each numbered question in the questionnaire and, based ONLY on the provided text snippets from the relevant documents, provide:
+      You are a compliance and safety auditor responsible for assessing Standard Operating Procedures (SOPs) and safety protocols against a provided questionnaire. For each question, and based only on the provided text snippets, deliver your analysis as follows:
 
-      1. A clear determination: **YES**, **NO**, or **MAYBE**.
-          - **YES**: The document explicitly confirms the requirement is met. (Confidence: High)
-          - **MAYBE**: The document provides related information, but it's ambiguous, incomplete, or requires interpretation to fully answer the question. (Confidence: Medium)
-          - **NO**: The document explicitly contradicts the requirement, or the requirement is clearly absent from the relevant sections. (Confidence: High/Medium depending on whether it's explicitly contradicted vs. just absent)
-      2. A confidence level for your determination: **High**, **Medium**, or **Low**.
-          - **High**: Direct, explicit evidence supports the YES/NO determination. The answer is clearly stated or directly implied without ambiguity.
-          - **Medium**: Evidence is present but indirect, ambiguous, requires some inference, or only partially addresses the question. Likely leads to a MAYBE or a less certain NO.
-          - **Low**: Little to no relevant information found, or the information is highly contradictory or confusing, making a determination very uncertain. Might correspond to a MAYBE or NO where the topic seems entirely absent.
-      3. A direct **Citation** from the provided document snippets that supports your determination.
-          - For **YES**, cite the text confirming compliance.
-          - For **MAYBE**, cite the text that causes ambiguity or partial alignment.
-          - For **NO**, cite text contradicting the requirement, or state "N/A - Requirement not found in provided snippets" if absent.
-          - **Emphasize** the key phrase(s) within the citation using ***bold and italics***.
+      **Instructions:**
+      - Act as a strict, literal interpreter. Do not infer or use external knowledge; base your analysis exclusively on the provided snippets.
+      - Scrutinize keywords: Pay close attention to the exact verbs, nouns, and qualifiers in the question. The absence or mismatch of a key term means the requirement is not fully met.
+      - For each question, follow this process:
+          1. Extract the core requirement and list the exact keywords/phrases from the question that must be present.
+          2. Extract all directly relevant snippets from the provided text.
+          3. Compare snippet language to the requirement, noting matches, partial matches, ambiguities, or omissions.
+          4. Make a determination: YES, NO, or MAYBE (definitions below).
+          5. Document your reasoning in the required format.
+      - If multiple relevant or conflicting snippets are found, cite all and explain how the determination was made.
+      - For partial matches, specify which part is missing in both your determination and Citation.
+      - Citations must be verbatim, including full sentences where possible. Use ellipses only for clearly irrelevant omitted text. If no relevant text is found, state "N/A - Requirement not found in any provided snippets."
+      - When recommending language, reference the exact section/heading/paragraph where new language should be inserted.
+      - If no question exists for the theme/topic, state "N/A - No question for this theme/topic."
 
-      Format your response as follows for each question:
+      **Determinations:**
+      - YES: The document explicitly confirms the requirement is met (high confidence).
+      - MAYBE: The document is ambiguous, incomplete, or requires inference to connect to the requirement (medium confidence).
+      - NO: The document contradicts or clearly omits the requirement (high or medium confidence depending on explicit contradiction or simple absence).
 
-      **Question X**: [Question text here]
-      **Determination**: [YES/NO/MAYBE]
-      **Confidence**: [High/Medium/Low]
-      **Citation**: [***Relevant snippet text with emphasis*** or "N/A - Requirement not found in provided snippets"]
+      **For each question, provide:**
+      - **Question:** [Full text]
+      - **Core Keywords/Phrases:** [List]
+      - **Determination:** [YES/NO/MAYBE]
+      - **Confidence:** [High/Medium/Low]
+      - **Citation:** [Verbatim relevant snippet(s), with ***bold and italics*** on key phrases. If partial match, indicate which part is covered. If none, state "N/A - Requirement not found in any provided snippets."]
+      - **Corrective Action:** [If NO or MAYBE, explain what needs to change and which role/department should make the change. If YES, state "N/A".]
+      - **Recommended Language:** [If NO or MAYBE, provide precise, actionable text to add/replace, referencing the exact section/heading/paragraph. If YES, state "N/A".]
 
-  # 3) Section Title
   analysisTitle:
     tool: echo
     message: SOP Compliance Assessment
@@ -132,14 +139,14 @@ functions:
 
           {{basePrompt.text}}
 
-          You are analyzing the {{themeTag.name}} section under the {{topicTag.name}} topic using the provided document snippets. Your task is to review each numbered question below and provide your analysis in paragraph format based *only* on the snippets provided.
+          You are analyzing the {{themeTag.name}} section under the {{topicTag.name}} topic using the provided document snippets. Your task is to review each question below and provide your analysis in paragraph format based *only* on the snippets provided.
 
           For each question, please provide the following elements in paragraph format:
 
           1.  **Question**: Start with the full text of the question being assessed.
           2.  **Determination**: State your **YES**, **NO**, or **MAYBE** assessment based on the snippets.
           3.  **Confidence**: Indicate your **High**, **Medium**, or **Low** confidence level.
-          4.  **Citation / Explanation**: Provide the exact snippet of text from the provided documents that supports your determination, with the key part(s) emphasized using ***bold and italics***. If the information is missing, state "N/A - Requirement not found in provided snippets".
+          4.  **Citation**: Provide the verbatim relevant snippet text from the provided document(s), with the key part(s) emphasized using ***bold and italics***. If the information is missing, state "N/A - Requirement not found in provided snippets". **All verbatim text from the source must appear only in this Citation section.**
           5.  **Corrective Action**: If the Determination is **NO** or **MAYBE**, explain what needs to change in the source document(s) to achieve a YES determination and suggest which role or department (e.g., "Procedure Owner", "Safety Department", "Training Department") is likely responsible for making the change. If the Determination is **YES**, state "N/A".
           6.  **Recommended Language**: If the Determination is **NO** or **MAYBE**, provide specific, actionable text that could be added to or replace existing text in the source document(s) to satisfy the requirement and achieve a YES determination. **In your recommendation, tell the user precisely the section and surrounding text in which to place the recommended language, referencing the relevant heading, paragraph, or context from the provided snippets.** This language should be ready to be copied and pasted. If the Determination is **YES**, state "N/A".
 
@@ -148,31 +155,6 @@ functions:
           *   Base your answers *strictly* on the provided snippets. Do not infer information not present.
           *   Include the full question text for each question.
           *   Provide "N/A" for "Corrective Action" and "Recommended Language" when the Determination is "YES".
-
-          Here is a paragraph structure example:
-
-          **Question:** Does the training and qualification for Advanced and Basic Riggers comply with the requirement to be conducted by a third party possessing a certification from a nationally recognized accreditation organization or accredited Business Function training program?
-          **Determination:** YES
-          **Confidence:** High
-          **Citation / Explanation:** The procedure states, "***All Rigger training and qualification, whether Basic or Advanced, must be performed by an entity certified by a nationally recognized accreditation body or an internally accredited Business Function training program.***"
-          **Corrective Action:** N/A
-          **Recommended Language:** N/A
-
-          **Question:** Does the training for Basic Riggers comply with the requirement to enable them to inspect rigging before use?
-          **Determination:** MAYBE
-          **Confidence:** Medium
-          **Citation / Explanation:** The document mentions ***Basic Riggers receive training on hazard recognition and equipment use***, but does not explicitly state inspection is covered.
-          **Corrective Action:** The training material for Basic Riggers needs to be updated by the Training Department to explicitly include instruction and practical exercises on pre-use inspection of rigging equipment.
-          **Recommended Language:** Add the following sentence to the Basic Rigger training curriculum description, in the section titled "Basic Rigger Training Content" after the paragraph beginning with "Basic Riggers receive training on hazard recognition": "The training includes dedicated modules on performing pre-use inspections of all common rigging components, identifying defects, and understanding removal-from-service criteria."
-
-          **Question:** Does the training for Basic Riggers comply with the requirement to enable them to identify and attach rigging with basic knowledge of hitch configurations, capacities, and basic knots?
-          **Determination:** NO
-          **Confidence:** Low
-          **Citation / Explanation:** N/A - Requirement not found in provided snippets.
-          **Corrective Action:** The Basic Rigger training program, managed by the Training Department, must be revised to incorporate modules covering hitch configurations, load capacities, and essential knot tying/identification relevant to basic rigging tasks.
-          **Recommended Language:** Insert the following paragraph into the section detailing Basic Rigger training content, immediately after the last bullet point under "Basic Rigger Training Content": "Basic Rigger training shall cover the identification and application of common hitch configurations (e.g., choker, basket, vertical), understanding rigging load capacities based on equipment markings and configuration, and the tying and inspection of basic knots essential for rigging tasks."
-
-          ... (Continue for all questions in paragraph format)
 
           ## Questionnaire Questions for {{themeTag.name}} / {{topicTag.name}}:
 
@@ -435,7 +417,7 @@ functions:
           Question: Has the Business Function designated rescue and emergency services and established procedures for the following:  c.  Providing necessary emergency services to rescued employees?Guidance: Verify the Business Function has selected and designated rescue and emergency services and developed procedures for the following four processes:Verify the Business Function has selected and designated rescue and emergency services and developed procedures for providing the emergency services needed for the rescued employees.  This may include first aid, cpr, and other emergency or medical response. 
           {% endif %}
           {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
-          Question: Has the Business Function designated rescue and emergency services and established procedures for the following:  d.  Preventing unauthorized personnel from attempting a rescue?Guidance: Verify the Business Function has selected and designated rescue and emergency services and developed procedures for the following four processes:Verify the Business Function has selected and designated rescue and emergency services and developed procedures for preventing unauthorized personnel from attempting to perform or assist in a rescue.  
+          Question: Does the Business Function designated rescue and emergency services and established procedures for the following:  d.  Preventing unauthorized personnel from attempting a rescue?Guidance: Verify the Business Function has selected and designated rescue and emergency services and developed procedures for the following four processes:Verify the Business Function has selected and designated rescue and emergency services and developed procedures for preventing unauthorized personnel from attempting to perform or assist in a rescue.  
           {% endif %}
           {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function allow for rescue services to be provided by Entergy personnel or Contract partners? Review if the Business Function processes allow for rescue services to be provided by Entergy personnel or Contractors, and makes the appropriate designation on allowable roles. 
@@ -606,6 +588,15 @@ functions:
           No relevant snippets found for these tags.
           {% endfor %}
           ```
+
+          Please present your analysis for each question as a well-structured list, using the following fields:
+          - **Question:** [Full text]
+          - **Core Keywords/Phrases:** [List]
+          - **Determination:** [YES/NO/MAYBE]
+          - **Confidence:** [High/Medium/Low]
+          - **Citation:** [Verbatim relevant snippet(s), with ***bold and italics*** on key phrases. If partial match, indicate which part is covered. If none, state "N/A - Requirement not found in any provided snippets."]
+          - **Corrective Action:** [If NO or MAYBE, explain what needs to change and which role/department should make the change. If YES, state "N/A".]
+          - **Recommended Language:** [If NO or MAYBE, provide precise, actionable text to add/replace, referencing the exact section/heading/paragraph. If YES, state "N/A".]
 
           Note:
           - For YES determinations, mark Corrective Action and Recommended Language as "N/A"
