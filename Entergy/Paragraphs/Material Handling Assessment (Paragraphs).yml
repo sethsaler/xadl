@@ -1081,13 +1081,6 @@ functions:
           {% endfor %}
           ```
 
-          Please analyze the snippets and provide your assessment in the following markdown table format:
-
-          | Question | Determination | Confidence | Citation | Corrective Action | Recommended Language |
-          |----------|--------------|------------|----------|-------------------|---------------------|
-          {% for question in questions %}| [Question text] | YES/NO/MAYBE | High/Medium/Low | [Relevant snippet with ***emphasis*** or "N/A - Requirement not found in provided snippets"] | [Required if NO/MAYBE, N/A if YES] | [Required if NO/MAYBE, N/A if YES] |
-          {% endfor %}
-
           Note:
           - For YES determinations, mark Corrective Action and Recommended Language as "N/A"
           - For NO/MAYBE determinations, provide specific corrective actions and recommended language

@@ -26,9 +26,10 @@ actions:
           - **YES**: The document explicitly confirms the requirement is met. (Confidence: High)
           - **MAYBE**: The document provides related information, but it's ambiguous, incomplete, or requires interpretation to fully answer the question. (Confidence: Medium)
           - **NO**: The document explicitly contradicts the requirement, or the requirement is clearly absent from the relevant sections. (Confidence: High/Medium depending on whether it's explicitly contradicted vs. just absent)
-      2. A confidence level for your determination: **High** or **Medium**.
-          - **High**: Direct evidence supports the YES/NO determination.
-          - **Medium**: Evidence is indirect, ambiguous, or requires inference (likely leading to a MAYBE or a less certain NO).
+      2. A confidence level for your determination: **High**, **Medium**, or **Low**.
+          - **High**: Direct, explicit evidence supports the YES/NO determination. The answer is clearly stated or directly implied without ambiguity.
+          - **Medium**: Evidence is present but indirect, ambiguous, requires some inference, or only partially addresses the question. Likely leads to a MAYBE or a less certain NO.
+          - **Low**: Little to no relevant information found, or the information is highly contradictory or confusing, making a determination very uncertain. Might correspond to a MAYBE or NO where the topic seems entirely absent.
       3. A direct **Citation** from the provided document snippets that supports your determination.
           - For **YES**, cite the text confirming compliance.
           - For **MAYBE**, cite the text that causes ambiguity or partial alignment.
@@ -39,7 +40,7 @@ actions:
 
       **Question X**: [Question text here]
       **Determination**: [YES/NO/MAYBE]
-      **Confidence**: [High/Medium]
+      **Confidence**: [High/Medium/Low]
       **Citation**: [***Relevant snippet text with emphasis*** or "N/A - Requirement not found in provided snippets"]
 
   # 3) Section Title
@@ -246,9 +247,6 @@ functions:
           {% endif %}
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure that non-permit required confined space entry activities are in alignment with the Enterprise standard Pre-Job Safety Planning EHS-SOH-4.1.1.11?Review how the Business Function verifies that all activities for non-permit required confined space entry meet the requirements of the Enterprise standard Pre-Job Safety Planning EHS-SOH-4.1.1.11.
-          {% endif %}
-          "
-
           {% endif %}
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Has the Business Function developed and established a written procedure for entry into non-permit required confined spaces that includes the following: a.  Prohibited tasks within the space?Guidance: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the following nine elements: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes all tasks or activities prohibited while within the space.  This includes those tasks that could create a hazardous atmosphere, welding, cutting, painting, application of coatings or pose other significant risks such as electrical safety risks. These tasks should only be conducted in confined spaces after being evaluated under a permitting process
@@ -609,7 +607,11 @@ functions:
           {% endfor %}
           ```
 
-          Please generate the Markdown table based on the instructions and the snippets above.
+          Note:
+          - For YES determinations, mark Corrective Action and Recommended Language as "N/A"
+          - For NO/MAYBE determinations, provide specific corrective actions and recommended language
+          - Use ***bold and italics*** to emphasize key phrases in citations
+          - If no relevant snippets found, use "N/A - Requirement not found in provided snippets" as citation
 
       create-insight:
         input:
