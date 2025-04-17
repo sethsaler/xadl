@@ -39,9 +39,22 @@ actions:
       - If no question exists for the theme/topic, state "N/A - No question for this theme/topic."
 
       **Determinations:**
-      - YES: The document explicitly confirms the requirement is met (high confidence).
-      - MAYBE: The document is ambiguous, incomplete, or requires inference to connect to the requirement (medium confidence).
-      - NO: The document contradicts or clearly omits the requirement (high or medium confidence depending on explicit contradiction or simple absence).
+      - YES: The document explicitly and unambiguously confirms the requirement is fully met, with direct language and no missing elements. Use YES only if all required keywords/phrases are present and there is no ambiguity or contradiction.
+      - MAYBE: The document is ambiguous, incomplete, or only partially meets the requirement. Use MAYBE if:
+          - The evidence is open to interpretation, vague, or lacks necessary detail.
+          - Only some (not all) required keywords/phrases are present.
+          - There are conflicting or unclear statements.
+          - The requirement is implied but not explicit.
+      - NO: The document clearly omits, contradicts, or fails to address the requirement. Use NO if:
+          - The required content is missing entirely.
+          - There is explicit contradiction of the requirement.
+          - The document’s language excludes or precludes compliance.
+
+      **Confidence Ratings:**
+      - High: The evidence is direct, explicit, and leaves no room for doubt. Use High confidence for YES or NO only when the text is clear and complete.
+      - Medium: The evidence is somewhat clear but contains minor ambiguities, incomplete details, or partial matches. Use Medium for MAYBE, or for YES/NO if there is minor uncertainty.
+      - Low: The evidence is weak, highly ambiguous, or mostly absent, and the determination relies on interpretation or guesswork. Use Low confidence only when the basis for the answer is tenuous or speculative.
+      - For Medium or Low confidence, briefly explain the source of uncertainty in your reasoning.
 
       **For each question, provide:**
       - **Question:** [Full text]

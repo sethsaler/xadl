@@ -39,9 +39,22 @@ actions:
       - If no question exists for the theme/topic, state "N/A - No question for this theme/topic."
 
       **Determinations:**
-      - YES: The document explicitly confirms the requirement is met (high confidence).
-      - MAYBE: The document is ambiguous, incomplete, or requires inference to connect to the requirement (medium confidence).
-      - NO: The document contradicts or clearly omits the requirement (high or medium confidence depending on explicit contradiction or simple absence).
+      - YES: The document explicitly and unambiguously confirms the requirement is fully met, with direct language and no missing elements. Use YES only if all required keywords/phrases are present and there is no ambiguity or contradiction.
+      - MAYBE: The document is ambiguous, incomplete, or only partially meets the requirement. Use MAYBE if:
+          - The evidence is open to interpretation, vague, or lacks necessary detail.
+          - Only some (not all) required keywords/phrases are present.
+          - There are conflicting or unclear statements.
+          - The requirement is implied but not explicit.
+      - NO: The document clearly omits, contradicts, or fails to address the requirement. Use NO if:
+          - The required content is missing entirely.
+          - There is explicit contradiction of the requirement.
+          - The document’s language excludes or precludes compliance.
+
+      **Confidence Ratings:**
+      - High: The evidence is direct, explicit, and leaves no room for doubt. Use High confidence for YES or NO only when the text is clear and complete.
+      - Medium: The evidence is somewhat clear but contains minor ambiguities, incomplete details, or partial matches. Use Medium for MAYBE, or for YES/NO if there is minor uncertainty.
+      - Low: The evidence is weak, highly ambiguous, or mostly absent, and the determination relies on interpretation or guesswork. Use Low confidence only when the basis for the answer is tenuous or speculative.
+      - For Medium or Low confidence, briefly explain the source of uncertainty in your reasoning.
 
       **For each question, provide:**
       - **Question:** [Full text]
@@ -162,408 +175,543 @@ functions:
           {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Has the Business Function conducted an initial survey of the workplace to identify all confined spaces required by this standard and in alignment with the requirements of the Enterprise standard Risk Management EHS-GOV-2.1.1?Verify the Business Function has completed an initial survey of its workplace(s) and has identified all confined spaces required by this standard.  The survey process must meet the requirements of the enterprise standard Risk Management EHS-GOV-2.1.1.
           {% endif %}
+          
           {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to designate a qualified person to conduct the workplace evaluation? Verify the Business Function has a process in place to identify and designate a qualified person to conduct the workplace evaluation to identify all confined spaces required by this standard. 
           {% endif %}
+
           {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to conduct a confined space hazard assessment for each confined space or each type of confined space identified, including a review of the following:  a.  The current and past uses of the confined space which may adversely impact the atmosphere of the confined space?Guidance: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of the following nine elements: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of the current and past uses of the confined space which may negatively impact the atmosphere of the confined space.  This could include residual gasses or matter left in the space.  
           {% endif %}
+
           {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to conduct a confined space hazard assessment for each confined space or each type of confined space identified, including a review of the following:  b.  The physical characteristics, configuration, location of the confined space, and access and egress points?Guidance: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of the following nine elements: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of the physical characteristics of the confined space, the configuration of the space, location, and access and egress points.  
           {% endif %}
+
           {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to conduct a confined space hazard assessment for each confined space or each type of confined space identified, including a review of the following:  c.  Existing or potential atmospheric hazards?Guidance: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of the following nine elements: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of the existing or potential atmospheric hazards.  This may include oxygen deficient or enriched, flammable or explosive, or toxic atmospheres.
           {% endif %}
+
           {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to conduct a confined space hazard assessment for each confined space or each type of confined space identified, including a review of the following:  d.  Biological hazards?Guidance: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of the following nine elements: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of any biological hazards present in the confined space. 
           {% endif %}
+
           {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to conduct a confined space hazard assessment for each confined space or each type of confined space identified, including a review of the following:  e. Mechanical hazards? Guidance: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of the following nine elements: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of any mechanical hazards present in the confined space. 
           {% endif %}
+
           {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to conduct a confined space hazard assessment for each confined space or each type of confined space identified, including a review of the following:  f.  Electrical hazards?  Guidance: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of the following nine elements: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of any electrical hazards present in the confined space. 
           {% endif %}
+
           {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to conduct a confined space hazard assessment for each confined space or each type of confined space identified, including a review of the following:  g. Physical hazards?Guidance: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of the following nine elements: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of any physical hazards present in the confined space. 
           {% endif %}
+
           {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to conduct a confined space hazard assessment for each confined space or each type of confined space identified, including a review of the following:  h.  Chemical hazards? Guidance: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of the following nine elements: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of any chemical hazards present in the confined space. 
           {% endif %}
+
           {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to conduct a confined space hazard assessment for each confined space or each type of confined space identified, including a review of the following:  i.  Other serious safety hazards? Guidance: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of the following nine elements: Verify the Business Function has a process in place in conduct a confined space hazard assessment for each confined space identified (or for each type of confined space identified if commonalities exist and the volume is too large), and includes a review of any other serious safety hazards present in the confined space. 
           {% endif %}
+
           {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to classify the confined spaces identified as either a permit-required confined space, non-permit-required confined space or enclosed space and maintain an inventoried list detailing the classification of each space?Verify the Business Function has a process in place to classify its confined spaces identified in the workplace evaluation as either a permit-required confined space, non-permit-required space, or enclosed space.  Verify the Business Function maintains a documented inventory list detailing the classification of each space identified. 
           {% endif %}
+
           {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function establish a process to manage the inventory of confined spaces? Verify the Business Function has a process in place to manage and maintain the documented inventory list of confined spaces, including review and update of the classifications as appropriate. 
           {% endif %}
+
           {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function establish a frequency for and conduct periodic evaluations of permit-required, confined and enclosed spaces to validate the hazard assessment and classification of the spaces remain accurate, updating the confined space inventory list if needed? Verify the Business Function has defined a set frequency for the periodic evaluations of its confined spaces (including permit-required, non-permit-required, and enclosed spaces) in order to validate the hazard assessment and classification remain accurate.  Verify the Business Function periodic evaluation process includes updating the confined space inventory list as needed. 
           {% endif %}
+
           {% if themeTag.name == "Initial Identification and Hazard Evaluation of Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to post danger signs for permit-required confined spaces or other effective means to communicate to personnel the existence, location and the dangers posed by the permit-required confined space(s)?Verify the Business Function has a process to post warning signs for permit-required confined spaces to communicate to personnel the presence, location, and dangers of the space.  A sign reading “DANGER—PERMIT-REQUIRED CONFINED SPACE, DO NOT ENTER” or other similar language would satisfy the requirement for a sign. Signs should be legible and able to withstand the environmental conditions in which they are placed. 
           {% endif %}
+
           {% if themeTag.name == "Confined Space Entry Procedure" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Has the Business Function developed and established a written confined space entry procedure per the requirements of 29 CFR 1910.146 if the Business Function determines Entergy employees or contract partners will be entering the confined space? Verify the Business Function has developed and implemented a written confined space entry procedure that meets the requirements of 29 CFR 1910.146 if the Business Function decides that Entergy employees or contract partners will be entering the confined space.  If contract partners will be entering, the Business Function must have a written procedure. 
           {% endif %}
+
           {% if themeTag.name == "Confined Space Entry Procedure" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the written procedure include specific entry procedures, including communication of and review of known hazards and mitigations or control measures, and attendant requirements, and is in alignment with the requirements of the Enterprise standard Pre-Job Safety Planning EHS-SOH-4.1.1.11?Verify the Business Function's written confined space entry procedure includes specific entry requirements, including review and communication of known hazards and control measures, and attendant requirements.  Verify the communication meets the requirements of the Enterprise standard Pre-Job Safety Planning EHS-SOH-4.1.1.11.
           {% endif %}
+
           {% if themeTag.name == "Confined Space Entry Procedure" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the written procedure include requirements to evaluate all of the following prior to entry: a.  The initial space classification?Guidance: Verify the Business Function's written confined space entry procedures includes requirements to evaluate the following three elements prior to entry into the space: Verify the Business Function's written confined space entry procedures includes requirements to evaluate the initial space classification prior to entry into the space.
           {% endif %}
+
           {% if themeTag.name == "Confined Space Entry Procedure" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the written procedure include requirements to evaluate all of the following prior to entry: b.  Work that will be performed within the confined or enclosed space? Guidance: Verify the Business Function's written confined space entry procedures includes requirements to evaluate the following three elements prior to entry into the space: Verify the Business Function's written confined space entry procedures includes requirements to evaluate the work that will be performed within the space prior to entry into the space.
           {% endif %}
+
           {% if themeTag.name == "Confined Space Entry Procedure" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the written procedure include requirements to evaluate all of the following prior to entry: c.  Activities being performed and conditions in adjacent or surrounding areas which could impact the confined space or entry activities, and ensure that all appropriate barriers are in place to manage the hazards presented by outside work or conditions?Guidance: Verify the Business Function's written confined space entry procedures includes requirements to evaluate the following three elements prior to entry into the space: Verify the Business Function's written confined space entry procedures includes requirements to evaluate the activities being performed and conditions in adjacent or surrounding areas to the space which could impact the planned activities in the space prior to entry into the space.
           {% endif %}
+
           {% if themeTag.name == "Confined Space Entry Procedure" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure that all unclassified confined spaces or spaces that cannot be confirmed as confined are considered hazardous and  permit-required confined spaces until a pre-entry assessment or referral to the confined space inventory list demonstrates otherwise?Review how the Business Function verifies that all unclassified confined spaces or spaces that cannot whose classification cannot be confirmed are treated as hazardous and permit-required confined spaces until a pre-entry assessment can be conducted and demonstrates otherwise. 
           {% endif %}
+
           {% if themeTag.name == "Confined Space Entry Procedure" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure that any space not identified on the confined space inventory list is not entered until a qualified person can evaluate the space and classify appropriately?Review how the Business Function verifies that any space that is not listed on the confined space inventory list is not entered until the space can be evaluated by a qualified person and classified appropriately. 
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to demonstrate that non-permit required and enclosed spaces can be maintained in a safe condition? Verify the Business Function has a process to verify and prove that non-permit required and enclosed spaces can be maintained in a safe condition.  An enclosed space which is confirmed to be under normal operating conditions and does not contain a hazardous atmosphere or hazardous conditions can be managed as a non-permit required confined space. 
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure that non-permit required confined space entry activities are in alignment with the Enterprise standard Pre-Job Safety Planning EHS-SOH-4.1.1.11?Review how the Business Function verifies that all activities for non-permit required confined space entry meet the requirements of the Enterprise standard Pre-Job Safety Planning EHS-SOH-4.1.1.11.
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Has the Business Function developed and established a written procedure for entry into non-permit required confined spaces that includes the following: a.  Prohibited tasks within the space?Guidance: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the following nine elements: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes all tasks or activities prohibited while within the space.  This includes those tasks that could create a hazardous atmosphere, welding, cutting, painting, application of coatings or pose other significant risks such as electrical safety risks. These tasks should only be conducted in confined spaces after being evaluated under a permitting process
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Has the Business Function developed and established a written procedure for entry into non-permit required confined spaces that includes the following: b.  Allowable tasks within the confined space?Guidance: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the following nine elements: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the tasks that are allowable within the confined space.  
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Has the Business Function developed and established a written procedure for entry into non-permit required confined spaces that includes the following: c.  Equipment needs for entry? Guidance: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the following nine elements: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the equipment needed for entry into the confined space. 
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Has the Business Function developed and established a written procedure for entry into non-permit required confined spaces that includes the following: d.  Personal protective equipment requirements? Guidance: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the following nine elements: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the personal protective equipment needed for personnel entering the confined space. 
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Has the Business Function developed and established a written procedure for entry into non-permit required confined spaces that includes the following: e.  Preparation to make the confined space safe for entry, including evaluation of activities and conditions in adjacent or surrounding areas which could impact the confined space?Guidance: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the following nine elements: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the preparation needed to make the confined space safe for entry.  This includes an evaluation of activities and conditions in adjacent or surrounding areas which could negatively impact the confined space. 
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Has the Business Function developed and established a written procedure for entry into non-permit required confined spaces that includes the following: f.  Isolation of energy sources?Guidance: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the following nine elements: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the procedures for isolation of energy sources. 
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Has the Business Function developed and established a written procedure for entry into non-permit required confined spaces that includes the following: g. Proper ventilation? Guidance: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the following nine elements: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the procedures for providing proper ventilation in the confined space. 
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Has the Business Function developed and established a written procedure for entry into non-permit required confined spaces that includes the following: h.  Hot work safeguards?Guidance: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the following nine elements: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the procedures for providing necessary safeguards for hot work. 
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Has the Business Function developed and established a written procedure for entry into non-permit required confined spaces that includes the following: i.  Rescue equipment requirement? Guidance: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the following nine elements: Verify the Business Function has developed and implemented a written procedure for entry into non-permit required confined spaces and includes the requirements for appropriate rescue equipment to be available for use in case of an emergency. 
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function require the work crew/supervisor to confirm the space is listed on the inventory list and validated as a non-permit required confined space prior to any entry?Verify the Business Function requires the work crew/supervisor to confirm the space to be entered is included on the confined space inventory list, and validates the space is  identified as non-permit required prior to any entry.  
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure a qualified person determines whether atmospheric testing is required of the non-permit required confined space?Review how the Business Function verifies that a qualified person determines if atmospheric testing is required of the non-permit required confined space before allowing entry. 
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure that entry is not allowed to proceed as non-permitted if the testing results indicate the atmospheric levels are not within acceptable limits as defined by the term hazardous atmosphere in Section 8 of this standard?Review how the Business Function verifies that entry into the confined space is not allowed to proceed as non-permitted if the atmospheric testing results indicate the atmospheric levels of the space are not within the acceptable limits.  A hazardous atmosphere is defined as an atmosphere that may expose the employees to the risk of death, incapacitation, impairment of ability to self-rescue, injury, or acute illness from one or more of the following: • flammable gas, vapor, or mist in excess of 10% of its lower explosive limit (LEL); • airborne combustible dust at a concentration that meets or exceeds its LEL; • atmospheric oxygen concentration below 19.5% or above 23.5%; • atmospheric concentration of any substance for which a dose or permissible exposure limit is published in subpart G, Occupational Health and Environmental Control; or in subpart Z, Toxic and Hazardous Substances, of this part and which could result in employee exposure in excess of its does or permissible exposure limit; or • any other atmospheric condition that is immediately dangerous to life or health. 
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to investigate any readings that are outside the acceptable limits?Review how the Business Function reviews and investigates any atmospheric testing results that are outside the acceptable limits. 
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to reevaluate the space before allowing entry whenever there are changes in the use or configuration of a confined space or other hazards may be present, and if necessary, reclassify it as a permit-required confined space?Review how the Business Function reevaluates a confined space whenever there are changes in the use or configuration of the space, or hazards present, and if necessary reclassify it as permit-required before allowing entry. 
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure personnel Stop Work immediately if a hazardous atmosphere is detected during entry into a non-permit required confined space, secure the area and contact a supervisor per the requirements of the Enterprise standard Stop Work Authority EHS-GOV-2.1.3 and leave the space? Review how the Business Function verifies personnel Stop Work immediately upon detecting a hazardous atmosphere in a non-permit required confined space.  Verify the process includes securing the area, contacting the supervisor per the requirements of the Enterprise standard Stop Work Authority EHS-GOV-2.1.3, and leave the space.
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure the space is evaluated to determine how the hazardous atmosphere developed?Review how the Business Function verifies the confined space is evaluated in order to identify how the hazardous atmosphere developed in the space. 
           {% endif %}
+
           {% if themeTag.name == "Non-Permit Required Confined Spaces and Enclosed Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure that all  appropriate measures are implemented to protect personnel from the hazardous atmosphere before allowing re-entry?Review how the Business Function verifies that all necessary and appropriate control measures are implemented and in place in order to protect personnel from the hazardous atmosphere before re-entry is allowed. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Has the Business Function developed and implemented a written confined space procedure that complies with the requirements of 29 CFR 1910.146 Permit-required confined spaces and establishes the requirements for permitting and approval? Verify the Business Function has developed and implemented a written procedure that meets the requirements of 29 CFR 1910.146 and establishes the requirements for the confined space permit process, including permit review and approval. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure the written procedures are readily available for use and inspection by employees and their authorized representatives?Review how the Business Function verifies that its written confined space entry procedures are readily available for use, reference, and inspection by personnel and their authorized representatives. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Has the Business Function established a permitting process review of hazards, mitigation measures, and authorization by the Qualified Person prior to entry into a permit-required space?Verify the Business Function has developed and implemented a permitting process including, the review of hazards, necessary mitigation measures, and authorization by the Qualified Person before entry into a permit-required space is allowed. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function's permit system and supporting document require the following at a minimum:  a.  The permit space to be entered? Guidance: Verify the Business Function's confined space entry permitting process and supporting documentation require the following fourteen elements:Verify the Business Function's confined space entry permitting process and supporting documentation requires a description of the permitted space to be entered. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function's permit system and supporting document require the following at a minimum:  b.  The purpose of the entry?Guidance: Verify the Business Function's confined space entry permitting process and supporting documentation require the following fourteen elements:Verify the Business Function's confined space entry permitting process and supporting documentation requires a description of the purpose of the entry. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function's permit system and supporting document require the following at a minimum:  c.  The date and authorized duration/time of the entry permit?Guidance: Verify the Business Function's confined space entry permitting process and supporting documentation require the following fourteen elements:Verify the Business Function's confined space entry permitting process and supporting documentation requires the date and authorized duration/length of time the entry permit is considered valid. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function's permit system and supporting document require the following at a minimum:  d.  Named personnel serving as attendants?Guidance: Verify the Business Function's confined space entry permitting process and supporting documentation require the following fourteen elements:Verify the Business Function's confined space entry permitting process and supporting documentation requires the names of all personnel serving as attendants during the entry. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function's permit system and supporting document require the following at a minimum:  e.  Named individual serving as the entry supervisor, with space for signature or initial of the entry supervisor authorizing the entry?Guidance: Verify the Business Function's confined space entry permitting process and supporting documentation require the following fourteen elements:Verify the Business Function's confined space entry permitting process and supporting documentation requires the names of the individual serving as the entry supervisor, and includes space for signature or initials of the entry supervisor authorizing/approving the entry. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function's permit system and supporting document require the following at a minimum:  f.  Hazards of the permit space to be entered?Guidance: Verify the Business Function's confined space entry permitting process and supporting documentation require the following fourteen elements:Verify the Business Function's confined space entry permitting process and supporting documentation requires a description of the hazards present in the permitted space to be entered. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function's permit system and supporting document require the following at a minimum:  g.  Measures used to isolate the permit space and to eliminate or control hazards before entry?Guidance: Verify the Business Function's confined space entry permitting process and supporting documentation require the following fourteen elements:Verify the Business Function's confined space entry permitting process and supporting documentation requires a description of the measures and controls to be used to isolate the permitted space and eliminate or control the hazards before entry is allowed. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function's permit system and supporting document require the following at a minimum:  h.  Acceptable entry conditions? Guidance: Verify the Business Function's confined space entry permitting process and supporting documentation require the following fourteen elements:Verify the Business Function's confined space entry permitting process and supporting documentation requires a description of the acceptable entry conditions that must be present before entry is allowed.
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function's permit system and supporting document require the following at a minimum:  i.  Results of initial and periodic atmospheric tests, date/time the tests were performed, and the names or initials of the qualified testers?Guidance: Verify the Business Function's confined space entry permitting process and supporting documentation require the following fourteen elements:Verify the Business Function's confined space entry permitting process and supporting documentation requires the results of the initial and periodic atmospheric tests conducted of the space, including the date and time the tests were performed, and the name(s) or initials of the qualified testers conducting the test.
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function's permit system and supporting document require the following at a minimum:  j.  Rescue and emergency services available and how aid will be summoned in the event of an emergency?Guidance: Verify the Business Function's confined space entry permitting process and supporting documentation require the following fourteen elements:Verify the Business Function's confined space entry permitting process and supporting documentation requires a description of the rescue and emergency services available and process for how any aid will be summoned/called in the event of an emergency situation. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function's permit system and supporting document require the following at a minimum:  k.  Communication procedures used by authorized entrants and attendants for maintaining contact during the entry?Guidance: Verify the Business Function's confined space entry permitting process and supporting documentation require the following fourteen elements:Verify the Business Function's confined space entry permitting process and supporting documentation requires the communication procedures to be used by the authorized entrants and the assigned attendants to ensure contact is maintained during the course of the entry. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function's permit system and supporting document require the following at a minimum:  l.  Equipment, such as PPE, testing equipment, communications, alarms, rescue equipment, etc., required?Guidance: Verify the Business Function's confined space entry permitting process and supporting documentation require the following fourteen elements:Verify the Business Function's confined space entry permitting process and supporting documentation requires a listing of all equipment required to support the entry, including PPE, testing equipment, communication equipment, alarms, barricades, rescue equipment, etc.
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function's permit system and supporting document require the following at a minimum:  m.  Reference to any additional permits, such as hot work?Guidance: Verify the Business Function's confined space entry permitting process and supporting documentation require the following fourteen elements:Verify the Business Function's confined space entry permitting process and supporting documentation requires reference to any other applicable permits associated with the confined space entry activity, such as a hot work permit. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function's permit system and supporting document require the following at a minimum:  n.  Reference number or unique identifier for each permit for tracking purposes?Guidance: Verify the Business Function's confined space entry permitting process and supporting documentation require the following fourteen elements:Verify the Business Function's confined space entry permitting process and supporting documentation requires a reference number or other unique identifier for each individual permit for documentation and tracking purposes. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Has the Business Function developed its own permit as long as it contains the minimum requirements listed above?Verify the Business Function has developed a confined space entry permit that contains the requirements above.  Refer to Appendix B for an example confined space permit which may be used.
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure the confined space entry permit includes approval by a Qualified Person appropriate to the scale, magnitude, scope, and complexity of the proposed work, and is communicated to all affected personnel before entry into the confined space can begin?Review how the Business Function verifies that the confined space entry permit process includes approval by a Qualified Person.  Review how the Business Function identifies and selects the Qualified Person considering the scale, magnitude, scope, and complexity of the proposed entry work.  Review how the Business Function verifies the approval is communicated to all affected personnel before entry can begin. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure the permit is posted on the job site for the duration of the job?Review how the Business Function verifies the permit is posted physically at the job site where the entry is being performed for the entire duration of the entry. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure that the existing permit is cancelled if any circumstances cause an interruption in the job, atmospheric testing conducted, and a new permit completed and approved before work can resume?Review how the Business Function verifies that the existing approved permit is cancelled if any circumstances or conditions cause an interruption in the confined space entry work.  This may include the sounding of alarms, evacuations, issuances of Stop Work, etc.  Review how the Business Function verifies that atmospheric testing is conducted, and a new permit completed and approved before the work can resume.  
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function procedures include a  requirement for an attendant(s) to be assigned and posted immediately outside designated entry points for the duration of the confined space entry?Verify the Business Function written procedures for confined space entry include a requirement that an attendant be assigned and physically located immediately outside the designated entry points of the space for the entire duration of the entry. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function procedures include a requirement for other available entry points to be posted and flagged or barricaded to prevent unauthorized entry?Verify the Business Function written procedures include a requirement than any other entry points are posted and flagged or barricaded to prevent unauthorized entry by others. 
           {% endif %}
+
           {% if themeTag.name == "Permit-Required Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure that the permit is immediately revoked and all work stopped until another permit can be reviewed and approved if conditions or work activities are outside of the scope as detailed on the approved permit or could introduce a new hazard not originally identified on the permit?Review how the Business Function verifies the permit is immediately revoked and withdrawn, and all work stopped when conditions or work activities are outside the scope as included on the approved permit or could introduce a new hazard not originally identified and included on the approved permit.  Review how the Business Function verifies that all work remains stopped until another permit can be completed and approved. 
           {% endif %}
+
           {% if themeTag.name == "Re-Classified Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function allow a space currently classified as permit-required to be re-classified as a non-permit required confined space only under the conditions as specified in §1910.146(c)(7), including the following:  a.  If the permitted space poses no actual or potential atmospheric hazards and if all hazards within the space are eliminated without entry into the space, the permitted space may be reclassified as a non-permit confined space for as long as the non-atmospheric hazards remain eliminated?Guidance: Review if the Business Function's processes for classifying confined spaces allows for permit-required spaces to be reclassified as non-permit required spaces if any of the following four conditions are present:Review if the Business Function's processes for classifying confined spaces allows for permit-required spaces to be reclassified as non-permit required spaces if the permitted space now poses no actual or potential atmospheric hazards and all hazards within the space are eliminated without entry into the space.  
           {% endif %}
+
           {% if themeTag.name == "Re-Classified Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function allow a space currently classified as permit-required to be re-classified as a non-permit required confined space only under the conditions as specified in §1910.146(c)(7), including the following:  b.  If it is necessary to enter the permitted space to eliminate hazards, such entry will be performed per the requirements of section 4.3.2 of this standard; and off testing and inspection during that entry demonstrate that the hazards within the permitted space have been eliminated, the permitted space may be reclassified as a non-permit required confined space for as long as the hazards remain eliminated?Guidance: Review if the Business Function's processes for classifying confined spaces allows for permit-required spaces to be reclassified as non-permit required spaces if any of the following four conditions are present:Review if the Business Function's processes for classifying confined spaces allows for permit-required spaces to be reclassified as non-permit required spaces if entry is required to eliminate hazards within the space, the entry meets the requirements of section 4.3.2 of this standard, and testing and inspection of the space demonstrates that all hazards have been eliminated.
           {% endif %}
+
           {% if themeTag.name == "Re-Classified Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function allow a space currently classified as permit-required to be re-classified as a non-permit required confined space only under the conditions as specified in §1910.146(c)(7), including the following:  c.  The Business Function documents the basis for determining that all hazards in a permitted space have been eliminated, through a certification that contains the date, location of the space, and signature of the person making that determination, with the certification made available to each personnel entering the space or to the personnel’s authorized representative?Guidance: Review if the Business Function's processes for classifying confined spaces allows for permit-required spaces to be reclassified as non-permit required spaces if any of the following four conditions are present:Review if the Business Function's processes for classifying confined spaces allows for permit-required spaces to be reclassified as non-permit required spaces if the Business Function documents the basis/rationale for determining that all hazards in the space have been eliminated through a documented certification including the date, location of the space, and signature of the authorized person making the determination. 
           {% endif %}
+
           {% if themeTag.name == "Re-Classified Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function allow a space currently classified as permit-required to be re-classified as a non-permit required confined space only under the conditions as specified in §1910.146(c)(7), including the following:  d.  If hazards arise within a permitted space that has been reclassified to a non-permit required space as listed above, each personnel in the space will exit the space, and  the Business Function will then reevaluate the space and determine whether it must be reclassified to a permit-required space?Guidance: Review if the Business Function's processes for classifying confined spaces allows for permit-required spaces to be reclassified as non-permit required spaces if any of the following four conditions are present:Review if the Business Function's processes for classifying confined spaces allows for permit-required spaces to be reclassified as non-permit required spaces if any other hazards arise in the non-permit required space, then each personnel will evacuate the space until the space can be reevaluated and reclassified as necessary. 
           {% endif %}
+
           {% if themeTag.name == "Re-Classified Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure that reclassifications are temporary and applicable only to the entry and work evaluated?Review how the Business Function verifies that reclassifications of spaces are only temporary in length/duration, and applicable only to the entry and scope of work being evaluated. 
           {% endif %}
+
           {% if themeTag.name == "Re-Classified Confined Spaces" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure that reclassifications require further verification that all atmospheric hazards and non-atmospheric serious hazards remain eliminated during the entry?Review how the Business Function verifies that reclassifications of spaces require additional verification that all hazards (atmospheric and non-atmospheric) remain eliminated for the duration of the entry. 
           {% endif %}
+
           {% if themeTag.name == "Atmospheric Testing" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that all necessary testing has been conducted for hazardous atmospheres or potential hazardous atmospheres prior to authorizing entry into a confined space, including ensuring the following:  a.  Test equipment and accessories are approved or certified for use in such areas and calibrated per the manufacturer’s recommendations, or more often if needed, to maintain accuracy as per the requirements of the Enterprise standard IH Equipment Maintenance and Calibration Standard EHS-SOH-4.1.2.3?Guidance: Review how the Business Function verifies that all required testing has been conducted to identify hazardous or potentially hazardous atmospheres prior to allowing entry into a confined space, including the seven considerations: Review how the Business Function verifies that all required testing has been conducted to identify hazardous or potentially hazardous atmospheres prior to allowing entry into a confined space, including that all test equipment and accessories are approved, certified, and calibrated per the manufacturer's recommendations, and meets the requirements of the Enterprise standard IH Equipment Maintenance and Calibration Standard EHS-SOH-4.1.2.3.  An example of certified for use is the use of intrinsically safe monitoring equipment
           {% endif %}
+
           {% if themeTag.name == "Atmospheric Testing" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that all necessary testing has been conducted for hazardous atmospheres or potential hazardous atmospheres prior to authorizing entry into a confined space, including ensuring the following:  b.  All atmospheric testing shall be conducted by a Qualified Person?Guidance: Review how the Business Function verifies that all required testing has been conducted to identify hazardous or potentially hazardous atmospheres prior to allowing entry into a confined space, including the seven considerations: Review how the Business Function verifies that all required testing has been conducted to identify hazardous or potentially hazardous atmospheres prior to allowing entry into a confined space, including that all atmospheric testing is to be conducted by a Qualified Person. 
           {% endif %}
+
           {% if themeTag.name == "Atmospheric Testing" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that all necessary testing has been conducted for hazardous atmospheres or potential hazardous atmospheres prior to authorizing entry into a confined space, including ensuring the following:  c.  Testing procedures ensure that any employee who enters the space, or that employee's authorized representative, shall be provided an opportunity to observe the pre-entry testing required by this paragraph?Guidance: Review how the Business Function verifies that all required testing has been conducted to identify hazardous or potentially hazardous atmospheres prior to allowing entry into a confined space, including the seven considerations: Review how the Business Function verifies that all required testing has been conducted to identify hazardous or potentially hazardous atmospheres prior to allowing entry into a confined space, including that all testing procedures verify that any personnel who enters the space, or the personnel's authorized representative, is allowed to observe the pre-entry atmospheric testing activities.
           {% endif %}
+
           {% if themeTag.name == "Atmospheric Testing" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that all necessary testing has been conducted for hazardous atmospheres or potential hazardous atmospheres prior to authorizing entry into a confined space, including ensuring the following:  d.  Testing is conducted in such a way that represents the atmosphere in the confined space where entrants may be present which may include use of extendable testers, testing at multiple entry points etc.?Guidance: Review how the Business Function verifies that all required testing has been conducted to identify hazardous or potentially hazardous atmospheres prior to allowing entry into a confined space, including the seven considerations: Review how the Business Function verifies that all required testing has been conducted to identify hazardous or potentially hazardous atmospheres prior to allowing entry into a confined space, including that all testing is performed in way to represent the atmosphere within the confined space to be entered.  This may include the use of extendable testers, testing at multiple entry points, etc. to ensure the samples are representative of the atmosphere in the confined space to which personnel will be exposed. 
           {% endif %}
+
           {% if themeTag.name == "Atmospheric Testing" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that all necessary testing has been conducted for hazardous atmospheres or potential hazardous atmospheres prior to authorizing entry into a confined space, including ensuring the following:  e.  Testing durations account for the capabilities of test equipment and manufacturer recommendations on sample pumps?Guidance: Review how the Business Function verifies that all required testing has been conducted to identify hazardous or potentially hazardous atmospheres prior to allowing entry into a confined space, including the seven considerations: Review how the Business Function verifies that all required testing has been conducted to identify hazardous or potentially hazardous atmospheres prior to allowing entry into a confined space, including that the testing duration takes into account the capabilities/limitations of the test equipment and manufacturer recommendations on sample pumps.  
           {% endif %}
+
           {% if themeTag.name == "Atmospheric Testing" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that all necessary testing has been conducted for hazardous atmospheres or potential hazardous atmospheres prior to authorizing entry into a confined space, including ensuring the following:  f.  Define the frequency for routine testing to verify acceptable entry conditions for entry into the confined space continue to exist, including continuous monitoring required when  any welding, cutting, or painting operations are being performed within the confined space?Guidance: Review how the Business Function verifies that all required testing has been conducted to identify hazardous or potentially hazardous atmospheres prior to allowing entry into a confined space, including the seven considerations: The frequency for testing depends on the space itself, the work being performed inside the space, or other work that could affect the atmosphere of the space. Frequency examples include pre-entry, per shift, periodically, and continuously. For permit-required confined spaces, verification testing must be completed before first entry with testing results recorded on the permit for review and approval that concentrations are within the range of acceptable entry conditions.  
           {% endif %}
+
           {% if themeTag.name == "Atmospheric Testing" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that all necessary testing has been conducted for hazardous atmospheres or potential hazardous atmospheres prior to authorizing entry into a confined space, including ensuring the following:  g.  Testing is conducted in this order: Oxygen → Combustible gasses → Toxic gasses and vapors, if necessary?Guidance: Review how the Business Function verifies that all required testing has been conducted to identify hazardous or potentially hazardous atmospheres prior to allowing entry into a confined space, including the seven considerations: Review how the Business Function verifies that all required testing has been conducted to identify hazardous or potentially hazardous atmospheres prior to allowing entry into a confined space, including that all testing is performed in the following order:   Oxygen → Combustible gasses → Toxic gasses and vapors. Multi-gas monitors are designed to test in this order. 
           {% endif %}
+
           {% if themeTag.name == "Ventilation Requirements" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure ventilation methods are selected and set-up or approved by a qualified person with knowledge of ventilation principles, hazards, and controls?Review how the Business Function verifies that ventilation methods to be used in the confined space are selected and put in place or approved by a Qualified Person with the appropriate knowledge of ventilation principles, hazards, and control methods. 
           {% endif %}
+
           {% if themeTag.name == "Ventilation Requirements" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure space remains ventilated until the atmosphere is tested to be within the acceptable limits?Review how the Business Function verifies that ventilation methods remain in place until the atmosphere is tested to be within the acceptable limits. 
           {% endif %}
+
           {% if themeTag.name == "Ventilation Requirements" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure ventilation is maintained during the entry activities if there is a potential for atmospheric conditions within to become unacceptable?Review how the Business Function verifies that ventilation is in place and maintained during the entry if there is a potential for atmospheric conditions within the space to become unacceptable during the course of the entry. 
           {% endif %}
+
           {% if themeTag.name == "Contract Partners Performing Confined Space Entry" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to communicate the requirements of this Confined Space Entry Standard, the location of the confined spaces, and all associated hazards to the contract partners on site in accordance with the Enterprise standard Contractor S&OH Management EHS-GOV-4.3.1?Verify the Business Function has a process to communicated the requirements of this standard, the location of its confined spaces, and all known hazards to contractors on site per the requirements of he Enterprise standard Contractor S&OH Management EHS-GOV-4.3.1.
           {% endif %}
+
           {% if themeTag.name == "Contract Partners Performing Confined Space Entry" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure the Contract Partner is required to complete an Entergy confined space permit with approval by an Entry Supervisor and others if designated by the business function prior to entry into a permit-required confined space?Verify the Business Function has a process to verify the Contractors completes an Entergy confined space permit form with documented approval by an Entry Supervisor before entry is allowed.  The Business Function may require additional approval by others designated by the Business Function. 
           {% endif %}
+
           {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Has the Business Function designated rescue and emergency services and established procedures for the following:  a.  Summoning rescue and emergency services?Guidance: Verify the Business Function has selected and designated rescue and emergency services and developed procedures for the following four processes:Verify the Business Function has selected and designated rescue and emergency services and developed procedures for summoning/calling rescue and emergency services. 
           {% endif %}
+
           {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Has the Business Function designated rescue and emergency services and established procedures for the following:  b.  Rescuing entrants from permit-required confined spaces?Guidance: Verify the Business Function has selected and designated rescue and emergency services and developed procedures for the following four processes:Verify the Business Function has selected and designated rescue and emergency services and developed procedures for rescuing the entrants from the permit-required confined space. 
           {% endif %}
+
           {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Has the Business Function designated rescue and emergency services and established procedures for the following:  c.  Providing necessary emergency services to rescued employees?Guidance: Verify the Business Function has selected and designated rescue and emergency services and developed procedures for the following four processes:Verify the Business Function has selected and designated rescue and emergency services and developed procedures for providing the emergency services needed for the rescued employees.  This may include first aid, cpr, and other emergency or medical response. 
           {% endif %}
+
           {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function designated rescue and emergency services and established procedures for the following:  d.  Preventing unauthorized personnel from attempting a rescue?Guidance: Verify the Business Function has selected and designated rescue and emergency services and developed procedures for the following four processes:Verify the Business Function has selected and designated rescue and emergency services and developed procedures for preventing unauthorized personnel from attempting to perform or assist in a rescue.  
           {% endif %}
+
           {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function allow for rescue services to be provided by Entergy personnel or Contract partners? Review if the Business Function processes allow for rescue services to be provided by Entergy personnel or Contractors, and makes the appropriate designation on allowable roles. 
           {% endif %}
+
           {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to evaluate a prospective rescuer’s ability to respond to a summons in a timely manner?Review how the Business Function evaluates a prospective rescuer's ability to respond to an emergency summons in a timely manner before officially designated them as a rescuer. 
           {% endif %}
+
           {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to evaluate a prospective rescuer’s ability and proficiency with rescue-related tasks and equipment to function appropriately in responding to a rescue or permit space identified?Verify the Business Function has a process to evaluate the prospective rescuer's ability and proficiency in rescue-related tasks and equipment in order to appropriately respond when needed. 
           {% endif %}
+
           {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure at least one member of the rescue services team has current training in basic first and cardio-pulmonary resuscitation (CPR)?Review how the Business Function verifies that at least one member of the rescue team has current training in basic first aid and CPR.  
           {% endif %}
+
           {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to select a rescue team or service from those evaluated that has the capability to reach the victim within an appropriate time frame and is equipped for and proficient in the rescue service needed?Review how the Business Function selects the rescue team or service from those prospective teams/services evaluated.  Review how the Business Function determines the rescue team or service selected has the necessary capabilities to respond in an appropriate time with all necessary equipment and personnel. 
           {% endif %}
+
           {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to inform the rescue team or service of the hazards present?Review how the Business Function communicates with rescue team or service the hazards present in its operations. 
           {% endif %}
+
           {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to provide the rescue team or service with access to all permit spaces or mock-ups with similar characteristics in order to develop appropriate rescue plans and practice rescue operations?Review how the Business Function provides the rescue team or service with access to the permit spaces or mock-ups of the spaces in order for development of  rescue plans and practice of rescue operations as needed. 
           {% endif %}
+
           {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to provide the  affected employees with the appropriate equipment, training, and drills to support successful rescue response if the rescue and emergency services will be performed by Entergy personnel? Review how the Business Function provides affected personnel with the appropriate equipment, training, and drills needed to support successful rescue actions if the rescue team consists of Entergy personnel. 
           {% endif %}
+
           {% if themeTag.name == "Rescue and Emergency Services" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure alignment with the requirements of the Enterprise standard Contractor S&OH Management EHS-GOV-4.3.1 if rescue and emergency services will be performed by contract partners? Review how the Business Function verifies that the requirements of the Enterprise standard Contractor S&OH Management EHS-GOV-4.3.1 are met if the rescue and emergency services are provided by Contractors. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to develop, deliver, and manage confined space training for all employees performing or supporting confined space entry activities?Verify the Business Function has a process to develop, deliver, and manage the training necessary to support its confined space entry program for all personnel performing or supporting confined space entry activities.  This includes Qualified Personnel, attendants, atmospheric testers, entrants, etc. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure the training establishes employee proficiency in the duties required by this standard and must introduce new or revised procedures, as necessary, for compliance with this standard?Review how the Business Function verifies that the training supports employee knowledge and skill retention in order to perform the duties required by this standard, and introduces new or revised procedures as needed to support compliance. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure all contract partners performing confined space entry activities are appropriately trained per the requirements of the Enterprise standard Contractor S&OH Management EHS-GOV-4.3.1?Review how the Business Function verifies that the contractors performing confined space activities are appropriately trained and meet the requirements of he Enterprise standard Contractor S&OH Management EHS-GOV-4.3.1.
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure training is delivered prior to entry or assignment of responsibility and annually thereafter?Review how the Business Function verifies that training is delivered before entry is allowed or upon assignment of responsibility.  Review how the Business Function verifies that training is provided at least annually thereafter. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure the training cover the following at a minimum: a.  The confined space entry procedures?Guidance: Verify the confined space entry training includes the following three elements at a minimum: Verify the confined space entry training includes the requirements of the current and applicable confined space entry procedures. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure the training cover the following at a minimum: b.  The difference in permit-required and non-permit required confined spaces and how to identify?Guidance: Verify the confined space entry training includes the following three elements at a minimum: Verify the confined space entry training includes the difference in designation between permit-required and non-permit required confined spaces and how to identify each. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure the training cover the following at a minimum: c.  Use of the confined space entry permit and the permitting process?Guidance: Verify the confined space entry training includes the following three elements at a minimum: Verify the confined space entry training includes the use of the confined space entry permit and the permitting process, including completion, review, approval, and conditions where it is revoked.
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to develop and deliver the training needed to support the understanding, knowledge and skills necessary for the safe performance of duties of entrants, attendants, entry supervisors, atmospheric testers, and rescue personnel?Verify the Business Function has a process established to develop and deliver training needed to support the knowledge and skill retention of the following roles:  entrants, attendants, entry supervisors, atmospheric testers, and rescue personnel. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for entrants into a confined space include the following at a minimum: a.  To alert the attendant whenever a warning sign or symptom of exposure to a dangerous situation or the entrant detects a prohibitive condition?Guidance: Review how the Business Function verifies that the training content for those personnel entering a confined space includes the following four elements: Review how the Business Function verifies that the training content for those personnel entering a confined space includes how to alert the attendant whenever a warning sign, symptom of possible exposure to a dangerous situation, or a prohibitive condition is encountered. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for entrants into a confined space include the following at a minimum: b.  To exit the space immediately when an evacuation order is given by the attendant or entry supervisor or the entrant recognizes any warning sign or symptom of exposure to a danger situation or prohibitive condition?Guidance: Review how the Business Function verifies that the training content for those personnel entering a confined space includes the following four elements: Review how the Business Function verifies that the training content for those personnel entering a confined space includes how to exit the confined space immediately when an evacuation order is given by the attendant or entry supervisor, or when the entrant recognizes any warning sign, symptom of possible exposure to a dangerous situation, or a prohibitive condition.
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for entrants into a confined space include the following at a minimum: c.  To exit the space if an evacuation alarm is activated?Guidance: Review how the Business Function verifies that the training content for those personnel entering a confined space includes the following four elements: Review how the Business Function verifies that the training content for those personnel entering a confined space includes how to exit the confined space immediately when an evacuation alarm is sounded. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for entrants into a confined space include the following at a minimum: d.  To inform the attendant or entry supervisor of unusual circumstances?Guidance: Review how the Business Function verifies that the training content for those personnel entering a confined space includes the following four elements: Review how the Business Function verifies that the training content for those personnel entering a confined space includes how to inform the attendant or entry supervisor of any unusual circumstances encountered in the confined space. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for attendants include the following at a minimum: a.  The hazards that may be encountered during an entry?Guidance: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes the following eleven elements: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes the hazards that may be encountered during a confined space entry. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for attendants include the following at a minimum: b.  The modes, signs, symptom, and consequences of exposures, and be aware of behavioral effects of entrants to hazard exposures?Guidance: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes the following eleven elements: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes the modes, signs, symptoms, and consequences of potential exposures, and to be aware of possible behavioral effects of entrants to hazard exposures. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for attendants include the following at a minimum: c.  Continuously maintaining an accurate count of entrants in the permitted space?Guidance: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes the following eleven elements: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes continuously maintaining an accurate count of the number of entrants in the confined space. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for attendants include the following at a minimum: d.  Remaining outside the space until relieved by another trained attendant?Guidance: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes the following eleven elements: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes remaining physically outside the space until relief is provided by another trained attendant. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for attendants include the following at a minimum: e.  Communicating with entrants to monitor entrant’s status and to alert the entrant(s) of the need to evacuate the space?Guidance: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes the following eleven elements: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes communicating with the entrants to monitor the entrant's status and to alert the entrants if the need to evacuate the space arises. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for attendants include the following at a minimum: f.  Monitoring the space to determine if it remains safe, and order evacuation if a prohibited condition is detected?Guidance: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes the following eleven elements: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes monitoring the space during the entry to verify it remains safe for entry, and order an evacuation if a prohibited or unsafe condition is detected. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for attendants include the following at a minimum: g.  Summoning rescue and emergency services as soon it is determined it is needed?Guidance: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes the following eleven elements: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes summoning or calling for rescue and emergency services as soon as it is determined those services are needed. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for attendants include the following at a minimum: h.  Warning any unauthorized person to stay away from the confined space activity, advising them to immediately exit the area if needed?Guidance: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes the following eleven elements: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes providing warning to any unauthorized personnel to stay away from the confined space activity, and advising them to immediately exit the area if needed. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for attendants include the following at a minimum: i.  Informing the entrant and entry supervisor if any unauthorized persons have entered the permit space?Guidance: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes the following eleven elements: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes informing the entrant and the entry supervisor if any unauthorized personnel have entered the permitted space. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for attendants include the following at a minimum: j.  Non-entry rescue methods?Guidance: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes the following eleven elements: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes non-entry rescue methods which can be used in case of an emergency. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for attendants include the following at a minimum: k.  Refraining from performing any other duties that could interfere with attendant responsibilities?Guidance: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes the following eleven elements: Review how the Business Function verifies that the training content for those personnel serving as an attendant to the confined space includes refraining from any other duties which could interfere with the ability to perform the attendant responsibilities.  This includes additional responsibilities which may cause distraction, movement from the physical location needed for monitoring, additional noise which could interfere with communications, or inability to continuously monitor the space. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for the Entry Supervisor include the following at a minimum: a.  The hazards the entry team may be faces with during an entry?Guidance: Review how the Business Function verifies that the training content for those personnel serving as the entry supervisor to the confined space includes the following five elements: Review how the Business Function verifies that the training content for those personnel serving as the entry supervisor to the confined space includes the hazards the entrants may face while performing an entry.  
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for the Entry Supervisor include the following at a minimum: b.  The modes, signs, symptoms, and consequences of exposures?Guidance: Review how the Business Function verifies that the training content for those personnel serving as the entry supervisor to the confined space includes the following five elements: Review how the Business Function verifies that the training content for those personnel serving as the entry supervisor to the confined space includes the modes, signs, symptoms, and consequences of potential exposures to personnel. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for the Entry Supervisor include the following at a minimum: c.  Removing unauthorized persons?Guidance: Review how the Business Function verifies that the training content for those personnel serving as the entry supervisor to the confined space includes the following five elements: Review how the Business Function verifies that the training content for those personnel serving as the entry supervisor to the confined space includes removing unauthorized personnel from the confined space area.  
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for the Entry Supervisor include the following at a minimum: d.  Transferring of responsibility to another entry supervisor if needed?Guidance: Review how the Business Function verifies that the training content for those personnel serving as the entry supervisor to the confined space includes the following five elements: Review how the Business Function verifies that the training content for those personnel serving as the entry supervisor to the confined space includes transferring responsibility to another entry supervisor if relief is needed. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for the Entry Supervisor include the following at a minimum: e.  Reviewing, approving, and cancelling the permit?Guidance: Review how the Business Function verifies that the training content for those personnel serving as the entry supervisor to the confined space includes the following five elements: Review how the Business Function verifies that the training content for those personnel serving as the entry supervisor to the confined space includes the permitting process, including reviewing, approving, and cancelling the permit.  
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for atmospheric testers include the following at a minimum: a.  The means and methods of evaluating atmospheric hazards in permit spaces?Guidance: Review how the Business Function verifies that the training content for those personnel serving as atmospheric testers for the confined space includes the following four elements: Review how the Business Function verifies that the training content for those personnel serving as atmospheric testers for the confined space includes the ways and methods of evaluating hazards in confined spaces.   
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for atmospheric testers include the following at a minimum: b.  The knowledge and skills needed to calibrate, use, and interpret the results of test equipment?Guidance: Review how the Business Function verifies that the training content for those personnel serving as atmospheric testers for the confined space includes the following four elements: Review how the Business Function verifies that the training content for those personnel serving as atmospheric testers for the confined space includes the knowledge and skills needed to appropriately use the testing equipment, including calibration, use, and interpretation of the testing results.  
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for atmospheric testers include the following at a minimum: c.  The limitations of specific test equipment?Guidance: Review how the Business Function verifies that the training content for those personnel serving as atmospheric testers for the confined space includes the following four elements: Review how the Business Function verifies that the training content for those personnel serving as atmospheric testers for the confined space includes the limitations of the specific testing equipment being used.  
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for atmospheric testers include the following at a minimum: d.  The reasons for testing atmospheric hazards in order: first of oxygen, next for flammable gases and vapors, and then for toxic atmospheric hazards?Guidance: Review how the Business Function verifies that the training content for those personnel serving as atmospheric testers for the confined space includes the following four elements: Review how the Business Function verifies that the training content for those personnel serving as atmospheric testers for the confined space includes understanding the reasons the atmospheric hazards are tested in this order: first for oxygen, then for flammable gases and vapors, and last for toxic atmospheric hazards. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for rescue personnel include the following at a minimum: a.  The rescue equipment to be used?Guidance: Review how the Business Function verifies that the training content for those personnel serving as rescue personnel to the confined space includes the following two elements: Review how the Business Function verifies that the training content for those personnel serving as rescue personnel to the confined space includes the rescue equipment being used during rescue operations.
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that training for rescue personnel include the following at a minimum: b.  Basic first aid and CPR? Guidance: Review how the Business Function verifies that the training content for those personnel serving as rescue personnel to the confined space includes the following two elements: Review how the Business Function verifies that the training content for those personnel serving as rescue personnel to the confined space includes how to administer basic first aid and CPR. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that additional training is delivered as follows:  a.  Before there is a change in assigned duties?Guidance: Review how the Business Function verifies that additional training is provided in the following situations/circumstances: Review how the Business Function verifies that additional training is provided when there is a change in assigned job duties.  Training must be provided before the person assumes full responsibility of the duty. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that additional training is delivered as follows:  b.  Whenever there is a change in permit space entry operations that presents a hazard about which an employee has not previously been trained?Guidance: Review how the Business Function verifies that additional training is provided in the following situations/circumstances: Review how the Business Function verifies that additional training is provided when there is a change in the permitted space entry that presents a hazard in which the personnel have not been previously trained.  
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Question: Does the Business Function have a process to ensure that additional training is delivered as follows:  c.  Whenever there is any evidence of a deviation from the permit space entry procedures required or if there are inadequacies in the employee's knowledge or use of these procedures?Guidance: Review how the Business Function verifies that additional training is provided in the following situations/circumstances: Review how the Business Function verifies that additional training is provided when there is evidence of a deviation from the confined space entry procedures or there are inadequacies in the personnel's knowledge and use of the procedures. 
           {% endif %}
+
           {% if themeTag.name == "Training" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to ensure all training is developed, delivered, and managed per the requirements of the Enterprise standard EHS Training EHS-GOV-3.2.1?Review how the Business Function verifies that all training to support its confined and enclosed space entry program are developed, delivered, and managed per the requirements of the Enterprise standard EHS Training EHS-GOV-3.2.1.
           {% endif %}
+
           {% if themeTag.name == "Documentation and Recordkeeping" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Has the Business Function established processes for maintaining all necessary supporting records in accordance with the Entergy policy Records Management and Retention?Review how the Business Function maintains all supporting records to its Confined and Enclosed Space program per the requirements of the Entergy policy Records Management and Retention. 
           {% endif %}
+
           {% if themeTag.name == "Program Review and Evaluation" and topicTag.name == "Confined and Enclosed Space Entry" %}
           Does the Business Function have a process to assess the overall health of the Confined and Enclosed Space program by including it in a formal review of their compliance performance as part of the management review process as required by the Enterprise standard EHS Assessments and Audits EHS-GOV-5.2.2?Review how the Business Function assesses and reviews the health of the  Confined and Enclosed Space program, including the program in its formal review of the management system as required by the Enterprise standard EHS Assessments and Audits EHS-GOV-5.2.2.
           {% endif %}
