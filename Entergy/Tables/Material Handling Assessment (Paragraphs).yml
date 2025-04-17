@@ -29,8 +29,9 @@ actions:
           1. Extract the core requirement and list the exact keywords/phrases from the question that must be present.
           2. Extract all directly relevant snippets from the provided text.
           3. Compare snippet language to the requirement, noting matches, partial matches, ambiguities, or omissions.
-          4. Make a determination: YES, NO, or MAYBE (definitions below).
-          5. Document your reasoning in the required format.
+          4. For each question, continue searching and documenting all instances of misalignment or partial compliance found in the provided snippets. Do not stop after the first misalignment; ensure all relevant evidence is captured and cited before moving on to the next question.
+          5. Make a determination: YES, NO, or MAYBE (definitions below).
+          6. Document your reasoning in the required format.
       - If multiple relevant or conflicting snippets are found, cite all and explain how the determination was made.
       - For partial matches, specify which part is missing in both your determination and Citation.
       - Citations must be verbatim, including full sentences where possible. Use ellipses only for clearly irrelevant omitted text. If no relevant text is found, state "N/A - Requirement not found in any provided snippets."
@@ -1355,20 +1356,17 @@ functions:
           {% endfor %}
           ```
 
-          Please present your analysis for each question as a well-structured list, using the following fields:
-          - **Question:** [Full text]
-          - **Core Keywords/Phrases:** [List]
-          - **Determination:** [YES/NO/MAYBE]
-          - **Confidence:** [High/Medium/Low]
-          - **Citation:** [Verbatim relevant snippet(s), with ***bold and italics*** on key phrases. If partial match, indicate which part is covered. If none, state "N/A - Requirement not found in any provided snippets."]
-          - **Corrective Action:** [If NO or MAYBE, explain what needs to change and which role/department should make the change. If YES, state "N/A".]
-          - **Recommended Language:** [If NO or MAYBE, provide precise, actionable text to add/replace, referencing the exact section/heading/paragraph. If YES, state "N/A".]
+          Please present your analysis for each question as a markdown table with the following columns:
+          | Question                   | Core Keywords/Phrases   | Determination   | Confidence   | Citation   | Corrective Action   | Recommended Language   |
+          |---------------------------|------------------------|----------------|--------------|------------|---------------------|-----------------------|
+          | [Question text]           | [Keywords/phrases]     | [YES/NO/MAYBE] | [Confidence] | [Citation] | [Corrective Action] | [Recommended Language]|
+          | [Question text]           | [Keywords/phrases]     | [YES/NO/MAYBE] | [Confidence] | [Citation] | [Corrective Action] | [Recommended Language]|
 
-          Note:
-          - For YES determinations, mark Corrective Action and Recommended Language as "N/A"
-          - For NO/MAYBE determinations, provide specific corrective actions and recommended language
-          - Use ***bold and italics*** to emphasize key phrases in citations
-          - If no relevant snippets found, use "N/A - Requirement not found in provided snippets" as citation
+          - In the Citation column, provide verbatim relevant snippet text from the provided document(s), with the key part(s) emphasized using ***bold and italics***. If the information is missing, state "N/A - Requirement not found in any provided snippets." All verbatim text from the source must appear only in this Citation section.
+          - For YES determinations, mark Corrective Action and Recommended Language as "N/A".
+          - For NO/MAYBE determinations, provide specific corrective actions and recommended language.
+          - Use ***bold and italics*** to emphasize key phrases in citations.
+          - If no relevant snippets found, use "N/A - Requirement not found in provided snippets" as citation.
 
       create-insight:
         input:
